@@ -44,6 +44,11 @@
         "runId": "replay-2026-08-14T20-33-56-773Z",
         "timestamp": "2026-08-14T20:33:59.576Z",
         "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-14T20-49-43-683Z",
+        "timestamp": "2026-08-14T20:49:50.972Z",
+        "status": "failure"
       }
     ]
   }

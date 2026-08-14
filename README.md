@@ -27,13 +27,17 @@ and cuts).
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
   drive the same live browser session, capture what they did, hand control back).
 - `src/evidence/` — the structured JSONL run logger.
-- `src/cli/` — the three entry points (`run-agent`, `replay`, `approve`) and the
-  `open-sub-account` capability's domain config (param mappings, checkpoints, known outcomes).
-- `evidence/` — two real discovery runs (one clean success, one that genuinely triggers
-  human escalation against a nonexistent member, with a real intervention screenshot/log),
-  a real artifact, its confidence/approval registry, and real replay runs covering success,
-  a recovered session-timeout, "member not found," "permission denied," a validation error,
-  simulated slow load, and the draft→approved gating flow.
+- `src/cli/` — the entry points (`run-agent`, `replay`, `approve`, `escalation-resume-demo`)
+  and the `open-sub-account` capability's domain config (param mappings, checkpoints, known
+  outcomes).
+- `evidence/` — three real discovery runs (a clean success; an escalation resolved with
+  `abort` against a nonexistent member, with a real intervention screenshot/log; and an
+  escalation resolved with `resume` against a permission-denied member, where the run
+  continues on the same live session and actually completes the goal afterward), a real
+  artifact, its confidence/approval registry, and real replay runs covering success, a
+  recovered session-timeout, "member not found," "permission denied," a validation error,
+  simulated slow load, the draft→approved gating flow, and a genuine `failure` result (an
+  account type the app's dropdown doesn't offer, with no known outcome to explain it).
 
 ## Setup
 
@@ -102,6 +106,29 @@ Useful flags: `--goal "..."`, `--start-url http://localhost:4000/login`, `--head
 (no visible window -- but then a real escalation handoff has nothing to hand control of),
 `--artifact-out path.json`.
 
+**2b. See a real escalation resolved with `resume`, not just `abort`.** Every other
+escalation scenario in this repo ends the run; this one shows a human handing control back
+and the goal actually completing afterward on the same session:
+
+```bash
+npm run escalation-resume-demo
+```
+
+This drives a goal against a permission-denied member (`99999`) -- not something automation
+can route around on its own, and not something fixable server-side either. What a human
+operator *can* do is redirect the same live browser to a member they're actually permitted
+to serve; since this process has no mouse to hand to an actual human, that one action is
+scripted (see the header comment in `src/cli/escalation-resume-demo.ts`), but the pause, the
+resume decision, Gemini re-observing the new page, and it finishing the goal from there are
+all real:
+
+```
+Discovery finished with status: finished
+Summary: Successfully escalated when member 99999 was denied, and upon return, opened a new
+Savings sub-account for member 10001 with an initial deposit of $100. Confirmation SA-00001
+displayed.
+```
+
 **3. Replay the resulting artifact** -- deterministically, with no LLM call, against fresh
 input params (the mock app resets sub-account state via `POST /__test__/reset`, a
 test-only endpoint, if you want a clean slate between runs):
@@ -150,6 +177,30 @@ npm run replay -- \
 
 Real recorded examples of all of the above are already checked into `/evidence`.
 
+**4b. See a real (not simulated) `failure` result.** The three-way replay contract's third
+leg -- "nothing in `knownOutcomes` explains this" -- needs a genuinely unanticipated
+deviation, not a business outcome. Requesting an `accountType` the app's dropdown doesn't
+actually offer is exactly that:
+
+```bash
+npm run replay -- \
+  --artifact evidence/artifacts/open-sub-account.artifact.json \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10001","accountType":"MoneyMarket","initialDeposit":"100"}' \
+  --allow-risky true
+```
+
+```json
+{
+  "status": "failure",
+  "stepId": "step-8",
+  "expected": "select_option to succeed",
+  "observed": "locator.selectOption: Timeout 5000ms exceeded. ... did not find some options",
+  "evidenceRef": "evidence/runs/replay-2026-08-14T20-49-43-683Z/screenshots/001-failure-step-8.png"
+}
+```
+
+This also lowered the approved artifact's confidence score for real -- see step 5.
+
 **5. Confidence & approval (Section 8 stretch goal).** Every replay records its outcome
 against the artifact's exact content fingerprint in `evidence/artifacts/registry.json`, and
 computes a confidence label (`unproven` → `low`/`medium` → `high`) from clean-run history
@@ -170,8 +221,12 @@ Confidence: high (8/8 clean runs)
 Approved. --allow-risky will now be honored for this exact artifact content on replay.
 ```
 
-(The exact fingerprint and run count above are from the real `evidence/artifacts/registry.json`
-checked into this repo -- yours will differ once you record your own artifact.)
+(The exact fingerprint above is from the real `evidence/artifacts/registry.json` checked
+into this repo -- yours will differ once you record your own artifact. The checked-in
+registry currently reads `medium (8/9 clean runs)`, not `high (8/8)`, because step 4b above
+was deliberately run against it to produce a real `failure` entry -- see "Confidence &
+approval" in `REPORT.md` for why the approval state itself does *not* automatically revoke
+when that happens.)
 
 Now `--allow-risky true` runs fully unattended — no prompt, no stdin needed at all:
 
@@ -202,14 +257,17 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (81 tests across 8 files, no network/browser
+`npm test` runs a real Vitest unit suite (89 tests across 9 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route
 matching (including the origin-vs-prefix bypass cases described in `REPORT.md` "Safety"),
 artifact schema cross-field validation, the confidence/registry math, the recorder's
-artifact-building, and the replay engine's guardrail/recovery/retry behavior (using a stub
-`Surface` and, where the class's own state made a stub impractical, a real
-`GuardrailsPolicy` against a temp config). The Playwright surface and the LLM loop itself
-are deliberately not unit-tested with mocks -- see `REPORT.md` "Architecture" for why real
-runs in `/evidence` are the right verification for those instead.
+artifact-building, the replay engine's guardrail/recovery/retry behavior, and the discovery
+loop's own control flow (escalate/resume, dead-end detection, risky-action confirmation) --
+using a stub `Surface`, a scripted fake model *output* (not a claim about what real Gemini
+would decide), and, where a class's own private state made a stub impractical, a real
+`GuardrailsPolicy` against a temp config. What's deliberately not unit-tested with mocks:
+the real Playwright surface, and Gemini's actual judgment about what to click next -- see
+`REPORT.md` "Architecture" for why real runs in `/evidence` (including `escalation-resume-
+demo` and the `failure`-result replay above) are the right verification for those instead.

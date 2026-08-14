@@ -1,0 +1,9 @@
+{
+  "runId": "discovery-2026-08-14T20-54-22-489Z",
+  "capability": "open-sub-account",
+  "step": 6,
+  "reason": "Member 99999 cannot be accessed by demo_operator (Access denied)",
+  "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-14T20-54-22-489Z/screenshots/intervention-1.png",
+  "url": "http://localhost:4000/members/99999",
+  "createdAt": "2026-08-14T20:54:28.551Z"
+}

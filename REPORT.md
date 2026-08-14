@@ -44,14 +44,19 @@ first, so the model has to justify itself as part of the structured call, not be
 
 **Verification.** Near-pure logic — checkpoint evaluation, redaction, allowlist route
 matching (including origin-parsing edge cases), the confidence/registry math, the recorder's
-artifact-building, schema cross-field validation, and the replay engine's recovery/retry
-state machine — has a real unit test suite (`npm test`, Vitest, 81 tests) built against
-small fakes (a stub `Surface`, a synthetic `DiscoveryResult`, a real `GuardrailsPolicy`
-against a temp config where the class's private state made a plain fake impractical), not
-mocks of the browser or the model. Deliberately *not* unit-tested with mocks: the Playwright
-surface and the LLM loop itself. Mocking a browser or an LLM response would test the mock,
-not the system; those are verified by the real discovery/replay runs in `/evidence` instead,
-which the brief treats as the stronger signal anyway ("we can't assess a description of it").
+artifact-building, schema cross-field validation, the replay engine's recovery/retry state
+machine, and now the discovery loop's own control flow (escalate/resume, dead-end detection,
+risky-action confirmation) — has a real unit test suite (`npm test`, Vitest, 89 tests) built
+against small fakes (a stub `Surface`, a scripted fake model *output*, a real
+`GuardrailsPolicy` against a temp config where the class's private state made a plain fake
+impractical), not mocks of the browser or of what the model would actually decide. What's
+deliberately *not* unit-tested: the real Playwright surface, and Gemini's actual judgment
+about what to click next. Mocking a browser or asserting what an LLM "should" say would test
+the mock, not the system; those are verified by the real discovery/replay runs in `/evidence`
+instead, which the brief treats as the stronger signal anyway ("we can't assess a description
+of it") — including, as of this pass, real evidence for every leg of the replay contract
+(`success`/`business_outcome`/`failure`) and both escalation outcomes (abort and resume), not
+just the ones that came up easily on the first pass.
 
 **This system was adversarially reviewed after the first pass, and several real bugs were
 found and fixed** — a route-allowlist bypass via string-prefix matching, recovery actions
@@ -124,7 +129,16 @@ section:
   not a crash — the replay CLI exits 0 for it, same as success.
 - `failure` — nothing in `knownOutcomes` explains the deviation. Reported with the step id,
   what was expected, what was actually observed, and a screenshot path, specifically so a
-  human can debug it without re-running.
+  human can debug it without re-running. Real evidence in `/evidence` for this leg is a
+  replay run given an `accountType` the mock app's dropdown doesn't offer (`MoneyMarket`) —
+  a genuinely unanticipated input, not a synthetically corrupted artifact — which times out
+  resolving `select_option` at `step-8` with no known outcome to explain it, and correctly
+  reports `failure` rather than crashing or silently misclassifying it as a business outcome
+  (`replay-2026-08-14T20-49-43-683Z`). This also shows the two other pieces working
+  together: the registry's confidence score reacted (dropped from `high` to `medium` once a
+  real failure entered that artifact's history — see §8), while the `approved` state itself
+  did **not** auto-revoke, exactly the documented limitation in §8, now visible in a real
+  `registry.json` entry instead of just described.
 
 **Recoverable conditions** get one real level of self-healing: `session_timeout`'s detector
 matches a redirect-to-login banner; its `recovery: "reauthenticate_and_retry_step"` re-runs
@@ -208,12 +222,34 @@ current state. For replay, the risky-step confirmation gate is the same mechanis
 production build would extend it to resume mid-artifact after a hard failure, which today
 just returns the `failure` result for the caller to handle (see Cuts).
 
+This resume path has its own dedicated real evidence, not just the abort path: `npm run
+escalation-resume-demo` (`src/cli/escalation-resume-demo.ts`) drives a goal against a
+permission-denied member (`99999`) — a condition automation genuinely cannot route around
+and a human cannot fix server-side either. What a human operator *can* do is redirect the
+same live session to a member they're actually permitted to serve, so that's what happens:
+on intervention, the same `Page` navigates to member `10001`, and the run resolves with
+`resume`. The discovery loop re-observes, recognizes it's now on a different member's page,
+and — without being told step-by-step — selects Savings, types the deposit, submits, and
+reaches a real confirmation number (`discovery-2026-08-14T20-54-22-489Z`, status
+`finished`). Because this process has no mouse or keyboard to hand to an actual human, the
+operator's action (the navigation) is scripted rather than typed into a live terminal
+prompt — that's disclosed in the script's own header comment — but everything downstream of
+it (the pause, the resume decision routed back into `DiscoveryAgent`, Gemini re-observing,
+and the goal actually completing on the same session) is real, not simulated. The loop's
+control-flow branches that this exercises (resume-and-continue, and separately dead-end
+detection and risky-action-declined) also now have deterministic unit coverage in
+`src/agent/discovery-agent.test.ts`, using a scripted fake model *output* (not a claim about
+what real Gemini would decide) the same way the replay engine's tests already fake the
+Surface — closing what was, until this pass, the one part of the system with literally zero
+test coverage.
+
 **What's mocked deliberately:** the operator "console" is a terminal prompt, per the
-brief's explicit scope note. What's *not* mocked: the actual control-transfer model (who's
-driving, on which session, with what evidence trail) is real and exercised in `/evidence`.
-A real console would swap the CLI prompt for a web UI that attaches to the same Playwright
-`Page` (e.g. via its CDP endpoint) — the same `controller` flag and intervention-request
-shape would carry over unchanged.
+brief's explicit scope note, and (per above) the operator's manual browser action in the
+resume demo specifically. What's *not* mocked: the actual control-transfer model (who's
+driving, on which session, with what evidence trail) is real and exercised in `/evidence`,
+for both the abort and resume outcomes. A real console would swap the CLI prompt for a web
+UI that attaches to the same Playwright `Page` (e.g. via its CDP endpoint) — the same
+`controller` flag and intervention-request shape would carry over unchanged.
 
 ## 6. Safety
 
@@ -362,10 +398,17 @@ including a business outcome counted correctly as clean), one showing `--allow-r
 explicitly ignored and falling back to a confirmation prompt, an `approve` run showing the
 confidence summary at the moment of approval, and a final replay with `--allow-risky` that
 completes with zero stdin interaction (`< /dev/null`) now that the artifact is approved.
+The registry also has real evidence of the score reacting to a genuine failure: deliberately
+replaying with an `accountType` the app's dropdown doesn't offer (§3) added a `failure`
+entry to this same artifact's history, and `npm run approve` immediately reflected it —
+`high (8/8 clean runs)` became `medium (8/9 clean runs)` — while the artifact's
+`approvalState` stayed `approved`, which is exactly the no-auto-demotion limitation below,
+now demonstrated rather than only described.
 
 **Cut from this stretch goal:** no reviewer identity (see §7), no automatic *demotion* back
-to draft if confidence later drops (e.g. from accumulating failures post-approval) — an
-approved artifact stays approved until someone runs `--revoke` by hand. Also worth being
+to draft if confidence later drops (e.g. from accumulating failures post-approval, as just
+shown above) — an approved artifact stays approved until someone runs `--revoke` by hand.
+Also worth being
 direct about: the confidence score trusts the replay engine's own business_outcome/failure
 classification. If a `knownOutcomes` detector were wrong — too loose, matching pages it
 shouldn't — every run would score as a clean business outcome and confidence would climb

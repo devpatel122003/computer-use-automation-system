@@ -1,0 +1,8 @@
+{
+  "status": "failure",
+  "runId": "replay-2026-08-14T20-49-43-683Z",
+  "stepId": "step-8",
+  "expected": "select_option to succeed",
+  "observed": "locator.selectOption: Timeout 5000ms exceeded.\nCall log:\n  - waiting for getByRole('combobox', { name: 'Account Type', exact: true }).first()\n    - locator resolved to <select id=\"accountType\" name=\"accountType\">…</select>\n  - attempting select option action\n    2 × waiting for element to be visible and enabled\n      - did not find some options\n    - retrying select option action\n    - waiting 20ms\n    2 × waiting for element to be visible and enabled\n      - did not find some options\n    - retrying select option action\n      - waiting 100ms\n    10 × waiting for element to be visible and enabled\n       - did not find some options\n     - retrying select option action\n       - waiting 500ms\n",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-14T20-49-43-683Z/screenshots/001-failure-step-8.png"
+}
