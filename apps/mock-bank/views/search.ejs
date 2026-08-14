@@ -1,0 +1,33 @@
+<html>
+<head><title>CU Core &mdash; Member Search</title></head>
+<body bgcolor="#d6d3ce">
+<table width="100%" cellpadding="4" cellspacing="0" border="0">
+  <tr bgcolor="#003366">
+    <td><font color="#ffffff" face="Arial" size="4"><b>Member Services Terminal</b></font></td>
+    <td align="right"><font color="#ffffff" face="Arial" size="2">Signed on as <%= username %> &nbsp; | &nbsp; <a href="/logout"><font color="#ffffff">Sign Off</font></a></font></td>
+  </tr>
+</table>
+<br/>
+<table cellpadding="8" cellspacing="0" border="1">
+  <tr>
+    <td>
+      <% if (typeof error !== "undefined" && error) { %>
+        <table bgcolor="#f8d0d0" width="100%"><tr><td>
+          <font color="#7a0000"><b><%= error %></b></font>
+        </td></tr></table>
+        <br/>
+      <% } %>
+      <form method="GET" action="/search">
+        <table cellpadding="4" cellspacing="0" border="0">
+          <tr>
+            <td><label for="memberId">Member ID</label></td>
+            <td><input type="text" id="memberId" name="memberId" value="<%= typeof memberId !== 'undefined' ? memberId : '' %>" /></td>
+            <td><input type="submit" value="Look Up Member" /></td>
+          </tr>
+        </table>
+      </form>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

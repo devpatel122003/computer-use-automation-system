@@ -1,0 +1,12 @@
+{
+  "allowedBaseUrls": ["http://localhost:4000"],
+  "routes": [
+    { "pattern": "/login", "methods": ["GET", "POST"], "risk": "safe" },
+    { "pattern": "/logout", "methods": ["GET"], "risk": "safe" },
+    { "pattern": "/search", "methods": ["GET"], "risk": "safe" },
+    { "pattern": "/members/:id", "methods": ["GET"], "risk": "safe" },
+    { "pattern": "/members/:id/sub-accounts/new", "methods": ["GET"], "risk": "safe" },
+    { "pattern": "/members/:id/sub-accounts", "methods": ["POST"], "risk": "risky" },
+    { "pattern": "/members/:id/sub-accounts/:subId/confirm", "methods": ["GET"], "risk": "safe" }
+  ]
+}
