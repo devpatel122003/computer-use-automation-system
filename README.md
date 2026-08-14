@@ -106,7 +106,7 @@ curl -s -X POST http://localhost:4000/__test__/reset
 
 npm run replay -- \
   --artifact evidence/artifacts/open-sub-account.artifact.json \
-  --params '{"username":"demo_operator","password":"demo_password","memberId":"10002","accountType":"Savings","initialDeposit":"100"}' \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10002","initialDeposit":"100"}' \
   --allow-risky true
 ```
 
@@ -130,7 +130,7 @@ trigger IDs baked in (see `apps/mock-bank/src/data.ts`):
 ```bash
 npm run replay -- \
   --artifact evidence/artifacts/open-sub-account.artifact.json \
-  --params '{"username":"demo_operator","password":"demo_password","memberId":"40404","accountType":"Savings","initialDeposit":"100"}' \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"40404","initialDeposit":"100"}' \
   --allow-risky true
 ```
 
@@ -158,7 +158,7 @@ npm run approve -- --artifact evidence/artifacts/open-sub-account.artifact.json
 ```
 
 ```
-Artifact: Open Sub-Account v1.0.0 (471d29d9fb476818)
+Artifact: Open Sub-Account v1.0.0 (e4c424998ad0d892)
 Current approval state: draft
 Confidence: high (6/6 clean runs)
 
@@ -170,7 +170,7 @@ Now `--allow-risky true` runs fully unattended — no prompt, no stdin needed at
 ```bash
 npm run replay -- \
   --artifact evidence/artifacts/open-sub-account.artifact.json \
-  --params '{"username":"demo_operator","password":"demo_password","memberId":"10002","accountType":"Savings","initialDeposit":"100"}' \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10002","initialDeposit":"100"}' \
   --allow-risky true < /dev/null
 ```
 
@@ -187,8 +187,17 @@ it and (for discovery only) the Gemini API. `npm run replay` needs mock-bank run
 never calls Gemini. There's no way to demo the discovery step without a real model call --
 per the assignment brief, that's intentional; the discovery run has to be real.
 
-## Type-checking
+## Type-checking & tests
 
 ```bash
 npm run typecheck
+npm test
 ```
+
+`npm test` runs a real Vitest unit suite (40 tests, no network/browser needed) over the
+near-pure logic: checkpoint evaluation (URL templates, wildcards, text matching), redaction
+(including the exact credential-leak scenario described in `REPORT.md` "Safety"), allowlist
+route matching, the confidence/registry math, and the recorder's artifact-building. The
+Playwright surface and the LLM loop itself are deliberately not unit-tested with mocks --
+see `REPORT.md` "Architecture" for why real runs in `/evidence` are the right verification
+for those instead.

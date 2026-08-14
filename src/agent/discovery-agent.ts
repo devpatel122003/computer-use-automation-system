@@ -140,7 +140,6 @@ export class DiscoveryAgent {
 
       const responseParts = response.candidates?.[0]?.content?.parts ?? [];
       const functionCallPart = findFunctionCallPart(responseParts);
-      const rationale = findTextPart(responseParts)?.text;
 
       if (!functionCallPart?.functionCall?.name) {
         status = "error";
@@ -153,6 +152,16 @@ export class DiscoveryAgent {
       // Guarded above: functionCallPart.functionCall.name is truthy.
       const toolName: string = call.name!;
       const input = (call.args ?? {}) as Record<string, unknown>;
+
+      // Forcing a function call every turn (mode = ANY) means Gemini never emits an
+      // accompanying free-text part, so "reasoning" is requested as a structured argument
+      // on the call itself instead (see tool-schemas.ts); finish/escalate already carry
+      // their own "why" via summary/reason. findTextPart is a defensive fallback only.
+      const rationale =
+        (typeof input.reasoning === "string" ? input.reasoning : undefined) ??
+        (toolName === "finish" ? (input.summary as string | undefined) : undefined) ??
+        (toolName === "escalate" ? (input.reason as string | undefined) : undefined) ??
+        findTextPart(responseParts)?.text;
 
       if (toolName === "type") {
         const target = findElement(snapshot, {

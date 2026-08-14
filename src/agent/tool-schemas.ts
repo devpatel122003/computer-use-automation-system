@@ -1,5 +1,20 @@
 import { Type, type FunctionDeclaration } from "@google/genai";
 
+/**
+ * Every action tool requires "reasoning" as its FIRST declared property. Forcing a function
+ * call every turn (functionCallingConfig.mode = ANY, so the loop always gets exactly one
+ * action) means Gemini never emits an accompanying free-text part to explain itself -- so
+ * the "why" has to live inside the structured call itself, not beside it. Listing it first
+ * also nudges the model to produce its justification before committing to the action, the
+ * same reason chain-of-thought prompts ask for reasoning before an answer.
+ */
+const REASONING_FIELD = {
+  reasoning: {
+    type: Type.STRING,
+    description: "One brief sentence: why this specific action, right now, moves toward the goal.",
+  },
+};
+
 export const DISCOVERY_TOOLS: FunctionDeclaration[] = [
   {
     name: "navigate",
@@ -7,8 +22,8 @@ export const DISCOVERY_TOOLS: FunctionDeclaration[] = [
       "Navigate the browser directly to a URL. Prefer clicking links/buttons seen in the observation; use this mainly for the initial entry point.",
     parameters: {
       type: Type.OBJECT,
-      properties: { url: { type: Type.STRING } },
-      required: ["url"],
+      properties: { ...REASONING_FIELD, url: { type: Type.STRING } },
+      required: ["reasoning", "url"],
     },
   },
   {
@@ -18,11 +33,12 @@ export const DISCOVERY_TOOLS: FunctionDeclaration[] = [
     parameters: {
       type: Type.OBJECT,
       properties: {
+        ...REASONING_FIELD,
         role: { type: Type.STRING, enum: ["button", "link", "checkbox", "radio"] },
         name: { type: Type.STRING },
         nth: { type: Type.INTEGER, description: "0-based index if duplicates exist, default 0" },
       },
-      required: ["role", "name"],
+      required: ["reasoning", "role", "name"],
     },
   },
   {
@@ -31,12 +47,13 @@ export const DISCOVERY_TOOLS: FunctionDeclaration[] = [
     parameters: {
       type: Type.OBJECT,
       properties: {
+        ...REASONING_FIELD,
         role: { type: Type.STRING, enum: ["textbox"] },
         name: { type: Type.STRING },
         nth: { type: Type.INTEGER },
         text: { type: Type.STRING },
       },
-      required: ["role", "name", "text"],
+      required: ["reasoning", "role", "name", "text"],
     },
   },
   {
@@ -45,12 +62,13 @@ export const DISCOVERY_TOOLS: FunctionDeclaration[] = [
     parameters: {
       type: Type.OBJECT,
       properties: {
+        ...REASONING_FIELD,
         role: { type: Type.STRING, enum: ["combobox"] },
         name: { type: Type.STRING },
         nth: { type: Type.INTEGER },
         option: { type: Type.STRING },
       },
-      required: ["role", "name", "option"],
+      required: ["reasoning", "role", "name", "option"],
     },
   },
   {
@@ -60,12 +78,13 @@ export const DISCOVERY_TOOLS: FunctionDeclaration[] = [
     parameters: {
       type: Type.OBJECT,
       properties: {
+        ...REASONING_FIELD,
         role: { type: Type.STRING },
         name: { type: Type.STRING },
         nth: { type: Type.INTEGER },
         as: { type: Type.STRING, description: "Output name to store the value under, e.g. savingsBalance" },
       },
-      required: ["role", "name", "as"],
+      required: ["reasoning", "role", "name", "as"],
     },
   },
   {

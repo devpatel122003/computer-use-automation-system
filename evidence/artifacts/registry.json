@@ -1,43 +1,43 @@
 {
-  "open-sub-account@471d29d9fb476818": {
+  "open-sub-account@e4c424998ad0d892": {
     "artifactId": "open-sub-account",
     "version": "1.0.0",
-    "fingerprint": "471d29d9fb476818",
+    "fingerprint": "e4c424998ad0d892",
     "approvalState": "approved",
     "history": [
       {
-        "runId": "replay-2026-08-14T01-08-02-201Z",
-        "timestamp": "2026-08-14T01:08:06.751Z",
+        "runId": "replay-2026-08-14T01-34-58-240Z",
+        "timestamp": "2026-08-14T01:35:01.054Z",
         "status": "success"
       },
       {
-        "runId": "replay-2026-08-14T01-08-14-364Z",
-        "timestamp": "2026-08-14T01:08:17.077Z",
+        "runId": "replay-2026-08-14T01-35-12-108Z",
+        "timestamp": "2026-08-14T01:35:14.805Z",
         "status": "success"
       },
       {
-        "runId": "replay-2026-08-14T01-08-24-156Z",
-        "timestamp": "2026-08-14T01:08:25.695Z",
+        "runId": "replay-2026-08-14T01-35-22-453Z",
+        "timestamp": "2026-08-14T01:35:24.002Z",
         "status": "business_outcome"
       },
       {
-        "runId": "replay-2026-08-14T01-08-33-375Z",
-        "timestamp": "2026-08-14T01:08:37.239Z",
+        "runId": "replay-2026-08-14T01-35-36-346Z",
+        "timestamp": "2026-08-14T01:35:40.215Z",
         "status": "success"
       },
       {
-        "runId": "replay-2026-08-14T01-08-46-398Z",
-        "timestamp": "2026-08-14T01:08:49.107Z",
+        "runId": "replay-2026-08-14T01-36-15-372Z",
+        "timestamp": "2026-08-14T01:36:18.190Z",
         "status": "business_outcome"
       },
       {
-        "runId": "replay-2026-08-14T01-08-49-552Z",
-        "timestamp": "2026-08-14T01:08:52.271Z",
+        "runId": "replay-2026-08-14T01-36-18-643Z",
+        "timestamp": "2026-08-14T01:36:21.356Z",
         "status": "success"
       },
       {
-        "runId": "replay-2026-08-14T01-09-06-068Z",
-        "timestamp": "2026-08-14T01:09:08.799Z",
+        "runId": "replay-2026-08-14T01-36-35-309Z",
+        "timestamp": "2026-08-14T01:36:38.012Z",
         "status": "success"
       }
     ]

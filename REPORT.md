@@ -4,7 +4,8 @@
 
 Single Node/TypeScript process, no queues or services — deliberately, per the brief's
 "don't build scaling infrastructure you don't need." The system is a small set of modules
-with one clear responsibility each, wired together by two CLI entry points:
+with one clear responsibility each, wired together by three CLI entry points
+(`run-agent`, `replay`, `approve`):
 
 - **`Surface`** (`src/surface`) is the seam between "how we perceive/act on a UI" and
   everything above it. `observe()` returns a flattened, role-based view of the page
@@ -31,6 +32,24 @@ code path* for discovery and replay (both go through `Surface.perform`/`predictN
 and `GuardrailsPolicy.authorize`). This costs a little indirection but means the replay
 engine can't silently diverge from what discovery actually exercised — the artifact is a
 faithful contract, not a second implementation of "how to click things."
+
+**Getting the "why," not just the "what," into the logs.** Forcing exactly one function
+call per turn (`functionCallingConfig.mode = ANY`, needed so the loop always gets a single
+unambiguous action) means Gemini never emits an accompanying free-text explanation — a
+first pass at this left every `"phase":"decide"` log entry with the tool and its arguments
+but no rationale, quietly falling short of "a structured log of what the agent did and
+why." The fix: every action tool's own argument schema requires a `reasoning` field, listed
+first, so the model has to justify itself as part of the structured call, not beside it.
+`/evidence` reflects this — each decision now carries a real one-line rationale.
+
+**Verification.** Near-pure logic — checkpoint evaluation, redaction, allowlist route
+matching, the confidence/registry math, and the recorder's artifact-building — has a real
+unit test suite (`npm test`, Vitest, 40 tests) built against small fakes (a stub `Surface`,
+a synthetic `DiscoveryResult`), not mocks of the browser or the model. Deliberately *not*
+unit-tested with mocks: the Playwright surface and the LLM loop itself. Mocking a browser
+or an LLM response would test the mock, not the system; those are verified by the real
+discovery/replay runs in `/evidence` instead, which the brief treats as the stronger signal
+anyway ("we can't assess a description of it").
 
 ## 2. Artifact schema
 

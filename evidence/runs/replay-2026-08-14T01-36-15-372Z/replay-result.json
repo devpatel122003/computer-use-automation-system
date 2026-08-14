@@ -1,0 +1,7 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-14T01-36-15-372Z",
+  "outcome": "validation_error",
+  "description": "The initial deposit amount did not meet the minimum required ($25).",
+  "stepId": "step-9"
+}

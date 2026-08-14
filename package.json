@@ -13,6 +13,7 @@
     "replay": "tsx src/cli/replay.ts",
     "approve": "tsx src/cli/approve.ts",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "playwright:install": "playwright install chromium"
   },
   "dependencies": {
@@ -29,6 +30,7 @@
     "@types/express-session": "^1.19.0",
     "@types/node": "^22.10.5",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.10"
   }
 }

@@ -3,7 +3,7 @@
   "name": "Open Sub-Account",
   "description": "Signs on, looks up a member by ID, opens a new sub-account with a specified type and initial deposit, and confirms the result.",
   "version": "1.0.0",
-  "createdAt": "2026-08-14T00:42:04.693Z",
+  "createdAt": "2026-08-14T01:34:03.788Z",
   "target": {
     "appId": "mock-bank",
     "surfaceType": "web",
@@ -30,13 +30,6 @@
       "required": true,
       "sensitive": false,
       "description": "The member to open a sub-account for."
-    },
-    {
-      "name": "accountType",
-      "type": "string",
-      "required": true,
-      "sensitive": false,
-      "description": "Savings, Checking, or CD."
     },
     {
       "name": "initialDeposit",
@@ -289,43 +282,6 @@
     },
     {
       "id": "step-8",
-      "actionType": "select_option",
-      "description": "Select option on combobox \"Account Type\"",
-      "locator": [
-        {
-          "strategy": "role",
-          "role": "combobox",
-          "name": "Account Type",
-          "nth": 0,
-          "confidence": "high",
-          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
-        },
-        {
-          "strategy": "text",
-          "name": "Account Type",
-          "nth": 0,
-          "confidence": "medium",
-          "rationale": "Exact visible text match; stable as long as copy doesn't change."
-        },
-        {
-          "strategy": "css_structural",
-          "cssPath": "#accountType",
-          "nth": 0,
-          "confidence": "low",
-          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
-        }
-      ],
-      "input": {
-        "paramRef": "accountType"
-      },
-      "risk": "safe",
-      "waitPolicy": {
-        "timeoutMs": 5000,
-        "retries": 0
-      }
-    },
-    {
-      "id": "step-9",
       "actionType": "type",
       "description": "Type into textbox \"Initial Deposit ($)\"",
       "locator": [
@@ -362,7 +318,7 @@
       }
     },
     {
-      "id": "step-10",
+      "id": "step-9",
       "actionType": "click",
       "description": "Click button \"Submit\"",
       "locator": [
