@@ -1,0 +1,45 @@
+{
+  "open-sub-account@471d29d9fb476818": {
+    "artifactId": "open-sub-account",
+    "version": "1.0.0",
+    "fingerprint": "471d29d9fb476818",
+    "approvalState": "approved",
+    "history": [
+      {
+        "runId": "replay-2026-08-14T01-08-02-201Z",
+        "timestamp": "2026-08-14T01:08:06.751Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-14T01-08-14-364Z",
+        "timestamp": "2026-08-14T01:08:17.077Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-14T01-08-24-156Z",
+        "timestamp": "2026-08-14T01:08:25.695Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-14T01-08-33-375Z",
+        "timestamp": "2026-08-14T01:08:37.239Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-14T01-08-46-398Z",
+        "timestamp": "2026-08-14T01:08:49.107Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-14T01-08-49-552Z",
+        "timestamp": "2026-08-14T01:08:52.271Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-14T01-09-06-068Z",
+        "timestamp": "2026-08-14T01:09:08.799Z",
+        "status": "success"
+      }
+    ]
+  }
+}

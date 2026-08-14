@@ -173,9 +173,11 @@ guess. Anything outside the allowlist is blocked outright, not just flagged.
 everything else in this flow is a GET and `safe`. The conservative default: risky actions
 always require confirmation — interactively in discovery, and in replay either an
 interactive confirmation or an explicit `--allow-risky` flag standing in for "this artifact
-was reviewed and approved for unattended production execution." The cost of this default is
-real (a fully unattended pipeline needs that flag, or a real approval-gate — the stretch
-goal I didn't build, see Cuts) and I think it's the right conservative choice for a system
+was reviewed and approved for unattended production execution." That flag is no longer a
+bare trust-me switch: it's gated by the confidence/approval registry (§8) — a freshly
+recorded artifact is `draft`, where `--allow-risky` is silently ignored and risky steps
+always block on interactive confirmation, regardless of the flag. Only an explicitly
+`approve`d artifact honors it. I think this is the right conservative choice for a system
 whose write actions touch real account state at a bank.
 
 **Redaction.** The logger masks two things: fields whose *name* looks sensitive (password,
@@ -195,9 +197,11 @@ in a config file), not inferred from anything about the data being touched.
 
 ## 7. Cuts
 
-- **No stretch goals implemented.** Time went into getting the core loop, artifact schema,
-  determinism, and escalation genuinely right (including finding and fixing the two real
-  bugs above) rather than adding a capability catalog or confidence scoring.
+- **One stretch goal implemented** (Confidence & approval, §8); the rest were deliberately
+  skipped per Section 8's "pick at most one or two, depth over breadth" — time went into
+  getting the core loop, artifact schema, determinism, and escalation genuinely right
+  (including finding and fixing the real bugs described above) rather than adding a
+  capability catalog, code generation, assisted fallback, or cross-tenant canonicalization.
 - **`known_outcomes` are human-authored, not auto-mined.** A single happy-path discovery
   run never observes its own error states by definition. A production version would run
   discovery against seeded error fixtures too, or gate known-outcome additions behind
@@ -213,12 +217,53 @@ in a config file), not inferred from anything about the data being touched.
 - **No mid-artifact resume after a replay hard failure.** A failure returns to the caller
   today; a fuller build would let a human fix the live state during escalation and resume
   replay from the next step, mirroring what discovery's `resume` already does.
-- **No approval-gating (draft → approved) or confidence scoring** on artifacts, per Section
-  8's "pick at most one or two" — I picked none, in favor of depth on the required core.
 - **Desktop/legacy-web/multi-tenant are design-only**, per the brief's explicit "not
   necessarily build" — addressed in §4, not implemented.
+- **The approval registry has no per-user identity** — `approve` records *that* an artifact
+  was approved, not *by whom*. A real deployment would tie this to an authenticated
+  reviewer, not a CLI command anyone with repo access can run.
 
 **What I'd build next**, roughly in order: (1) mid-artifact resume-after-failure, since
 escalation without it is only half the story; (2) the UI-drift diff/report job, since the
-data for it already exists; (3) an actual approval-gate stretch goal, since `--allow-risky`
-is a blunt stand-in for it.
+data for it already exists (and would pair naturally with the confidence score — a step
+that keeps falling back to a lower-confidence locator strategy should pull an artifact's
+score down even if it's still technically succeeding); (3) reviewer identity on approval.
+
+## 8. Stretch goal: Confidence & approval
+
+**What it does.** `src/artifact/registry.ts` scores each *exact recorded version* of an
+artifact by its replay history and gates unattended replay behind an explicit
+`draft → approved` transition:
+
+- Every replay outcome (`success` / `business_outcome` / `failure`) is appended to
+  `evidence/artifacts/registry.json`, keyed by a content fingerprint (a hash of the
+  artifact's steps, params, outputs, and checkpoints — not just `id`+`version`, and not
+  cosmetic fields like `createdAt`). A materially different re-recording starts back at
+  `draft`/`unproven` automatically; it hasn't earned whatever trust the old content had.
+- Confidence is `(success + business_outcome) / total` — both mean *the artifact correctly
+  did its job*, including correctly reporting a legitimate business outcome; only a
+  `failure` (the replay engine couldn't explain what happened) counts against it. This
+  reuses the same three-way result split from §3 rather than inventing a second notion of
+  "worked."
+- A fresh artifact is `draft`. In `draft`, `--allow-risky` is silently ignored — risky
+  steps always block on interactive confirmation, no matter what flag was passed. Only
+  `npm run approve -- --artifact <path>` (which prints the current confidence first, so the
+  approval is an informed one) flips it to `approved`, after which `--allow-risky` is
+  honored for unattended replay of that exact content.
+
+**Why this shape.** The brief asks for confidence scoring *and* an approval gate — treating
+them as two separate features risks the gate being decorative (an artifact could be
+`approved` with zero evidence it ever worked). Tying them together so the approval command
+itself surfaces the confidence score, and gating the practical effect of approval
+(`--allow-risky`) on the state, makes the score load-bearing rather than informational.
+
+**Real evidence in `/evidence`:** a sequence of replay runs against a freshly recorded
+`draft` artifact (confidence climbing `unproven → medium → high` as clean runs accumulate,
+including a business outcome counted correctly as clean), one showing `--allow-risky`
+explicitly ignored and falling back to a confirmation prompt, an `approve` run showing the
+confidence summary at the moment of approval, and a final replay with `--allow-risky` that
+completes with zero stdin interaction (`< /dev/null`) now that the artifact is approved.
+
+**Cut from this stretch goal:** no reviewer identity (see §7), no automatic *demotion* back
+to draft if confidence later drops (e.g. from accumulating failures post-approval) — an
+approved artifact stays approved until someone runs `--revoke` by hand.

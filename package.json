@@ -11,6 +11,7 @@
     "mock-bank": "tsx apps/mock-bank/src/server.ts",
     "run-agent": "tsx src/cli/run-agent.ts",
     "replay": "tsx src/cli/replay.ts",
+    "approve": "tsx src/cli/approve.ts",
     "typecheck": "tsc --noEmit",
     "playwright:install": "playwright install chromium"
   },

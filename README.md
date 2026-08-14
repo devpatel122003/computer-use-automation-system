@@ -4,7 +4,9 @@ A small, real end-to-end slice of the system described in the take-home brief: a
 drives a live web app to accomplish a goal (**discovery**), the successful run is recorded
 as a typed, versioned **capability artifact**, and that artifact **replays deterministically**
 — no model involved — with structured success / business-outcome / failure results, an
-allowlist-based guardrail layer, and a real (not mocked) human-escalation handoff.
+allowlist-based guardrail layer, and a real (not mocked) human-escalation handoff. It also
+includes one Section 8 stretch goal: **confidence scoring + a draft→approved approval gate**
+on unattended replay.
 
 See [`REPORT.md`](REPORT.md) for the design write-up (architecture, artifact schema,
 determinism & error handling, heterogeneity/multi-tenant story, escalation model, safety,
@@ -18,17 +20,18 @@ and cuts).
   not-found / permission-denied / validation-error / session-timeout / slow-load.
 - `src/surface/` — the `Surface` abstraction (observe/act) and its Playwright implementation.
 - `src/agent/` — the discovery loop: observe → Gemini function-call decision → act.
-- `src/artifact/` — the capability artifact schema (Zod) and the recorder that builds one
-  from a finished discovery run.
+- `src/artifact/` — the capability artifact schema (Zod), the recorder that builds one from
+  a finished discovery run, and the confidence/approval registry (stretch goal).
 - `src/replay/` — the deterministic replay engine and checkpoint/known-outcome evaluator.
 - `src/guardrails/` — the allowlist policy, risk classification, and redaction utilities.
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
   drive the same live browser session, capture what they did, hand control back).
 - `src/evidence/` — the structured JSONL run logger.
-- `src/cli/` — the two entry points (`run-agent`, `replay`) and the `open-sub-account`
-  capability's domain config (param mappings, checkpoints, known outcomes).
-- `evidence/` — a real discovery run, a real artifact, and three real replay runs
-  (success, a recovered session-timeout, and a "member not found" business outcome).
+- `src/cli/` — the three entry points (`run-agent`, `replay`, `approve`) and the
+  `open-sub-account` capability's domain config (param mappings, checkpoints, known outcomes).
+- `evidence/` — a real discovery run, a real artifact, its confidence/approval registry, and
+  real replay runs covering success, a recovered session-timeout, a "member not found"
+  business outcome, and the draft→approved gating flow.
 
 ## Setup
 
@@ -109,7 +112,8 @@ npm run replay -- \
 
 `--allow-risky true` is the unattended-production-replay opt-in for this artifact's risky
 step (see `REPORT.md` "Safety"); omit it to get an interactive confirmation prompt instead,
-same as discovery.
+same as discovery. **It's only honored once the artifact is `approved`** (see step 5) — on a
+freshly recorded artifact it's ignored and you'll still be prompted.
 
 **4. See a real error/exceptional-state replay.** The mock app has several deterministic
 trigger IDs baked in (see `apps/mock-bank/src/data.ts`):
@@ -140,6 +144,41 @@ npm run replay -- \
 ```
 
 Real recorded examples of all of the above are already checked into `/evidence`.
+
+**5. Confidence & approval (Section 8 stretch goal).** Every replay records its outcome
+against the artifact's exact content fingerprint in `evidence/artifacts/registry.json`, and
+computes a confidence label (`unproven` → `low`/`medium` → `high`) from clean-run history
+(`success` and `business_outcome` both count as "the artifact behaved correctly"; only a
+`failure` counts against it). A freshly recorded artifact starts in `draft`, where
+`--allow-risky` is silently ignored and risky steps always require interactive confirmation
+— exactly what step 3 demonstrated. Run a few replays to build up history, then approve it:
+
+```bash
+npm run approve -- --artifact evidence/artifacts/open-sub-account.artifact.json
+```
+
+```
+Artifact: Open Sub-Account v1.0.0 (471d29d9fb476818)
+Current approval state: draft
+Confidence: high (6/6 clean runs)
+
+Approved. --allow-risky will now be honored for this exact artifact content on replay.
+```
+
+Now `--allow-risky true` runs fully unattended — no prompt, no stdin needed at all:
+
+```bash
+npm run replay -- \
+  --artifact evidence/artifacts/open-sub-account.artifact.json \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10002","accountType":"Savings","initialDeposit":"100"}' \
+  --allow-risky true < /dev/null
+```
+
+The registry is keyed by a content fingerprint (a hash of the artifact's steps/params/
+outputs/checkpoints, excluding cosmetic fields like `createdAt`), not just `id`+`version` —
+so a re-recorded artifact with materially different steps starts back at `draft`/`unproven`
+automatically, rather than silently inheriting an approval it never earned. Use
+`npm run approve -- --artifact <path> --revoke true` to send an artifact back to draft.
 
 ## Running without live services
 

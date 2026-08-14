@@ -1,0 +1,7 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-14T01-08-24-156Z",
+  "outcome": "member_not_found",
+  "description": "No member exists with the given memberId. A legitimate result, not a crash.",
+  "stepId": "step-6"
+}

@@ -8,6 +8,7 @@ import { EvidenceLogger, newRunId } from "../evidence/logger.js";
 import { DiscoveryAgent } from "../agent/discovery-agent.js";
 import { EscalationController } from "../escalation/controller.js";
 import { buildArtifact } from "../artifact/recorder.js";
+import { getOrCreateEntry, loadRegistry, saveRegistry } from "../artifact/registry.js";
 import { parseArgs } from "./args.js";
 import {
   OPEN_SUB_ACCOUNT_KNOWN_OUTCOMES,
@@ -92,6 +93,15 @@ async function main(): Promise<void> {
     fs.mkdirSync(path.dirname(artifactOut), { recursive: true });
     fs.writeFileSync(artifactOut, JSON.stringify(artifact, null, 2));
     console.log(`\nArtifact written to: ${artifactOut}`);
+
+    // Confidence & approval (Section 8 stretch goal): a freshly recorded artifact always
+    // starts in "draft" -- unattended replay isn't trusted until a human runs `approve`.
+    const registryPath = "evidence/artifacts/registry.json";
+    const registry = loadRegistry(registryPath);
+    const entry = getOrCreateEntry(registry, artifact);
+    saveRegistry(registryPath, registry);
+    console.log(`Registered as "${entry.approvalState}" in ${registryPath} (fingerprint ${entry.fingerprint}).`);
+    console.log(`Run \`npm run approve -- --artifact ${artifactOut}\` once you've reviewed it and are ready to allow unattended replay.`);
   } else {
     console.log("\nNo artifact recorded (discovery did not finish successfully).");
   }
