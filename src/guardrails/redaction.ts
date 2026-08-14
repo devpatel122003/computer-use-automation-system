@@ -24,30 +24,45 @@ export interface RedactOptions {
   keyHint?: string;
 }
 
+// Below this length, scrubbing every substring match does more harm than good -- e.g. a
+// short/weak secret could coincidentally match part of an unrelated member ID or amount
+// elsewhere in the same log line, over-redacting legitimate business data. Key-based
+// redaction (above) still fully masks a short secret when it's stored under a flagged key;
+// this threshold only limits the blind whole-log substring scan.
+const MIN_SCRUBBABLE_VALUE_LENGTH = 6;
+
 function scrubKnownValues(value: string, sensitiveValues: Set<string>): string {
   let out = value;
   for (const secret of sensitiveValues) {
-    if (secret) out = out.split(secret).join("[REDACTED]");
+    if (secret && secret.length >= MIN_SCRUBBABLE_VALUE_LENGTH) {
+      out = out.split(secret).join("[REDACTED]");
+    }
   }
   return out;
 }
 
-/** Deep-redacts a value: masks fields whose key is known-sensitive, scrubs any occurrence of a
- *  known sensitive value regardless of which field it appears under, and scrubs SSN/card-shaped
- *  strings anywhere else as defense in depth. */
+/** Deep-redacts a value: masks fields whose key is known-sensitive (whatever type or shape
+ *  that field's value has -- a number, a nested object, an array), scrubs any occurrence of
+ *  a known sensitive value regardless of which field it appears under, and scrubs SSN/card-
+ *  shaped strings anywhere else as defense in depth. */
 export function redact(value: unknown, options: RedactOptions = {}): unknown {
   const sensitiveKeys = options.sensitiveKeys ?? new Set<string>();
   const sensitiveValues = options.sensitiveValues ?? new Set<string>();
 
+  // Checked BEFORE the type-based branches below: a key flagged sensitive must mask its
+  // whole value no matter what shape that value is. A numeric PIN/SSN, or an object like
+  // `{ password: { value: "hunter2" } }`, previously fell through untouched because this
+  // check used to live only inside the `typeof value === "string"` branch.
+  if (options.keyHint && (sensitiveKeys.has(options.keyHint) || SENSITIVE_KEY_PATTERN.test(options.keyHint))) {
+    return "[REDACTED]";
+  }
+
   if (typeof value === "string") {
-    if (options.keyHint && (sensitiveKeys.has(options.keyHint) || SENSITIVE_KEY_PATTERN.test(options.keyHint))) {
-      return "[REDACTED]";
-    }
     return scrubString(scrubKnownValues(value, sensitiveValues));
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => redact(item, options));
+    return value.map((item) => redact(item, { sensitiveKeys, sensitiveValues }));
   }
 
   if (value && typeof value === "object") {

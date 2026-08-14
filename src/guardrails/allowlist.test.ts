@@ -46,4 +46,29 @@ describe("isBaseUrlAllowed", () => {
   it("rejects a URL outside every allowed base", () => {
     expect(isBaseUrlAllowed(config, "http://evil.example.com/members/10001")).toBe(false);
   });
+
+  // These three all previously passed under a plain `String.startsWith` prefix check --
+  // each one literally starts with "http://localhost:4000" as a string, while resolving to
+  // a completely different origin as a URL. This is the exact allowlist bypass found in review.
+  it("rejects a different port that happens to share the allowed port as a numeric prefix", () => {
+    expect(isBaseUrlAllowed(config, "http://localhost:40000/login")).toBe(false);
+  });
+
+  it("rejects a subdomain-confusion host that string-prefixes the allowed origin", () => {
+    expect(isBaseUrlAllowed(config, "http://localhost:4000.evil.example.com/login")).toBe(false);
+  });
+
+  it("rejects a userinfo-based bypass (browsers resolve this to evil.com)", () => {
+    expect(isBaseUrlAllowed(config, "http://localhost:4000@evil.com/login")).toBe(false);
+  });
+
+  it("rejects a malformed URL rather than throwing", () => {
+    expect(isBaseUrlAllowed(config, "not a url")).toBe(false);
+  });
+
+  it("requires a full path-segment match when the allowed base itself has a path prefix", () => {
+    const scoped: AllowlistConfig = { allowedBaseUrls: ["http://localhost:4000/app"], routes: [] };
+    expect(isBaseUrlAllowed(scoped, "http://localhost:4000/app/members")).toBe(true);
+    expect(isBaseUrlAllowed(scoped, "http://localhost:4000/app-danger")).toBe(false);
+  });
 });

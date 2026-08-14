@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { Page, Frame } from "playwright";
 import type { EvidenceLogger } from "../evidence/logger.js";
 import { promptLine } from "./prompt.js";
@@ -30,10 +31,25 @@ export class EscalationController {
   }
 
   async requestIntervention(params: { step: number | string; reason: string }): Promise<InterventionDecision> {
+    if (this.controller === "human") {
+      // Defensive: in this single-process design the caller always awaits the previous
+      // requestIntervention() to resolve before issuing another, so this shouldn't be
+      // reachable -- but if some future caller ever raced two escalations, silently
+      // overwriting the in-progress one would lose evidence, not just log noise.
+      this.logger.log({
+        step: 0,
+        phase: "error",
+        summary: "requestIntervention called while a human already has control; ignoring the re-entrant call.",
+      });
+      return "abort";
+    }
+
     this.counter += 1;
     const id = `${this.runId}-intervention-${this.counter}`;
-    const screenshotPath = `${this.logger.screenshotsDir}/intervention-${this.counter}.png`;
-    await this.page.screenshot({ path: screenshotPath });
+    const screenshotPath = path.join(this.logger.screenshotsDir, `intervention-${this.counter}.png`);
+    await this.page.screenshot({ path: screenshotPath }).catch((err) => {
+      this.logger.log({ step: 0, phase: "error", summary: `Could not capture intervention screenshot: ${err}` });
+    });
 
     const request: InterventionRequest = {
       id,

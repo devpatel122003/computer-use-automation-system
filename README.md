@@ -29,9 +29,11 @@ and cuts).
 - `src/evidence/` — the structured JSONL run logger.
 - `src/cli/` — the three entry points (`run-agent`, `replay`, `approve`) and the
   `open-sub-account` capability's domain config (param mappings, checkpoints, known outcomes).
-- `evidence/` — a real discovery run, a real artifact, its confidence/approval registry, and
-  real replay runs covering success, a recovered session-timeout, a "member not found"
-  business outcome, and the draft→approved gating flow.
+- `evidence/` — two real discovery runs (one clean success, one that genuinely triggers
+  human escalation against a nonexistent member, with a real intervention screenshot/log),
+  a real artifact, its confidence/approval registry, and real replay runs covering success,
+  a recovered session-timeout, "member not found," "permission denied," a validation error,
+  simulated slow load, and the draft→approved gating flow.
 
 ## Setup
 
@@ -46,10 +48,13 @@ Create a `.env` file in the repo root (never committed) with your own Gemini API
 
 ```
 GEMINI_API_KEY=your-key-here
-# optional -- defaults to gemini-3.7-flash, which is agentic-workflow-tuned and has a
-# workable free-tier quota. gemini-3.1-pro / gemini-2.5-pro's free tier is often capped
-# at 0-20 requests/day, which a ~10-step discovery run can exceed; gemini-2.5-flash is a
-# good fallback if you hit a quota wall on the default.
+# optional -- defaults to gemini-3.7-flash. Free-tier daily quotas on Gemini's flash models
+# are small (single digits to low tens of requests/day) and a ~10-step discovery run can
+# exhaust one in a single attempt; the code retries 429s with backoff, but once a model's
+# whole daily quota is gone, no amount of retrying helps. If you see RESOURCE_EXHAUSTED,
+# switch GEMINI_MODEL to a different Gemini flash-tier model and try again -- the evidence
+# in this repo was itself produced on gemini-3.5-flash-lite after several other models hit
+# their daily cap during testing.
 GEMINI_MODEL=gemini-3.7-flash
 ```
 
@@ -158,12 +163,15 @@ npm run approve -- --artifact evidence/artifacts/open-sub-account.artifact.json
 ```
 
 ```
-Artifact: Open Sub-Account v1.0.0 (e4c424998ad0d892)
+Artifact: Open Sub-Account v1.0.0 (006fd53ee041c1ca)
 Current approval state: draft
-Confidence: high (6/6 clean runs)
+Confidence: high (8/8 clean runs)
 
 Approved. --allow-risky will now be honored for this exact artifact content on replay.
 ```
+
+(The exact fingerprint and run count above are from the real `evidence/artifacts/registry.json`
+checked into this repo -- yours will differ once you record your own artifact.)
 
 Now `--allow-risky true` runs fully unattended — no prompt, no stdin needed at all:
 
@@ -194,10 +202,14 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (40 tests, no network/browser needed) over the
-near-pure logic: checkpoint evaluation (URL templates, wildcards, text matching), redaction
-(including the exact credential-leak scenario described in `REPORT.md` "Safety"), allowlist
-route matching, the confidence/registry math, and the recorder's artifact-building. The
-Playwright surface and the LLM loop itself are deliberately not unit-tested with mocks --
-see `REPORT.md` "Architecture" for why real runs in `/evidence` are the right verification
-for those instead.
+`npm test` runs a real Vitest unit suite (81 tests across 8 files, no network/browser
+needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
+matching, malformed-input guards), redaction (including the exact credential-leak scenario
+described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route
+matching (including the origin-vs-prefix bypass cases described in `REPORT.md` "Safety"),
+artifact schema cross-field validation, the confidence/registry math, the recorder's
+artifact-building, and the replay engine's guardrail/recovery/retry behavior (using a stub
+`Surface` and, where the class's own state made a stub impractical, a real
+`GuardrailsPolicy` against a temp config). The Playwright surface and the LLM loop itself
+are deliberately not unit-tested with mocks -- see `REPORT.md` "Architecture" for why real
+runs in `/evidence` are the right verification for those instead.

@@ -27,21 +27,32 @@ function escapeAttrValue(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-function buildLocatorCandidates(
-  role: string,
-  name: string,
-  testId: string | undefined,
-  cssPath: string | undefined,
-  nth: number,
-  isUniqueRoleName: boolean
-): LocatorCandidate[] {
+interface LocatorCandidateInputs {
+  role: string;
+  name: string;
+  testId?: string;
+  cssPath?: string;
+  /** nth within elements sharing this exact (role, name) -- for the "role" strategy. */
+  roleNameNth: number;
+  isUniqueRoleName: boolean;
+  /** nth within ALL elements sharing this exact name regardless of role -- for the "text"
+   *  strategy, since `page.getByText()` matches across roles. Reusing the role-scoped nth
+   *  here would pick the wrong element whenever the same name appears under >1 role. */
+  nameOnlyNth: number;
+  /** nth within elements sharing this exact testId -- test ids are normally unique, but
+   *  don't assume it. */
+  testIdNth: number;
+}
+
+function buildLocatorCandidates(inputs: LocatorCandidateInputs): LocatorCandidate[] {
+  const { role, name, testId, cssPath, roleNameNth, isUniqueRoleName, nameOnlyNth, testIdNth } = inputs;
   const candidates: LocatorCandidate[] = [];
 
   if (testId) {
     candidates.push({
       strategy: "test_id",
       testId,
-      nth: 0,
+      nth: testIdNth,
       confidence: "high",
       rationale: "Explicit data-testid present on the element -- the most stable identifier available.",
     });
@@ -52,7 +63,7 @@ function buildLocatorCandidates(
       strategy: "role",
       role: role as ElementRole,
       name,
-      nth,
+      nth: roleNameNth,
       confidence: isUniqueRoleName ? "high" : "medium",
       rationale: isUniqueRoleName
         ? "Accessible role + name uniquely identifies this control, independent of markup/CSS."
@@ -63,7 +74,7 @@ function buildLocatorCandidates(
   candidates.push({
     strategy: "text",
     name,
-    nth,
+    nth: nameOnlyNth,
     confidence: "medium",
     rationale: "Exact visible text match; stable as long as copy doesn't change.",
   });
@@ -117,24 +128,42 @@ export class PlaywrightSurface implements Surface {
     const shimmedSource = `(() => { const __name = (fn) => fn; return (${scanPage.toString()})(); })()`;
     const raw = (await page.evaluate(shimmedSource)) as ReturnType<typeof scanPage>;
 
-    const seenKeyCounts = new Map<string, number>();
-    const keyTotals = new Map<string, number>();
+    const roleNameSeen = new Map<string, number>();
+    const roleNameTotals = new Map<string, number>();
+    const nameOnlySeen = new Map<string, number>();
+    const testIdSeen = new Map<string, number>();
     for (const el of raw) {
       const key = `${el.role}::${el.name}`;
-      keyTotals.set(key, (keyTotals.get(key) ?? 0) + 1);
+      roleNameTotals.set(key, (roleNameTotals.get(key) ?? 0) + 1);
     }
 
     const elements: ObservedElement[] = raw.map((el) => {
-      const key = `${el.role}::${el.name}`;
-      const nth = seenKeyCounts.get(key) ?? 0;
-      seenKeyCounts.set(key, nth + 1);
-      const isUnique = (keyTotals.get(key) ?? 1) === 1;
+      const roleNameKey = `${el.role}::${el.name}`;
+      const roleNameNth = roleNameSeen.get(roleNameKey) ?? 0;
+      roleNameSeen.set(roleNameKey, roleNameNth + 1);
+
+      const nameOnlyNth = nameOnlySeen.get(el.name) ?? 0;
+      nameOnlySeen.set(el.name, nameOnlyNth + 1);
+
+      const testIdNth = el.testId ? (testIdSeen.get(el.testId) ?? 0) : 0;
+      if (el.testId) testIdSeen.set(el.testId, testIdNth + 1);
+
+      const isUnique = (roleNameTotals.get(roleNameKey) ?? 1) === 1;
       return {
         role: el.role as ElementRole,
         name: el.name,
         value: el.value,
-        nth,
-        locatorCandidates: buildLocatorCandidates(el.role, el.name, el.testId, el.cssPath, nth, isUnique),
+        nth: roleNameNth,
+        locatorCandidates: buildLocatorCandidates({
+          role: el.role,
+          name: el.name,
+          testId: el.testId,
+          cssPath: el.cssPath,
+          roleNameNth,
+          isUniqueRoleName: isUnique,
+          nameOnlyNth,
+          testIdNth,
+        }),
         sensitive: el.sensitive,
       };
     });
@@ -163,7 +192,14 @@ export class PlaywrightSurface implements Surface {
     if (!locator) return null;
     const count = await locator.count().catch(() => 0);
     if (count <= candidate.nth) return null;
-    return locator.nth(candidate.nth);
+    const nthLocator = locator.nth(candidate.nth);
+    // Reject invisible matches rather than treating "found in the DOM" as "found": a
+    // display:none element with a coincidentally-matching name/testId shouldn't satisfy an
+    // `element_visible` checkpoint (which resolves via this same path), and preferring a
+    // visible fallback candidate over an invisible higher-priority one is strictly safer.
+    const visible = await nthLocator.isVisible().catch(() => false);
+    if (!visible) return null;
+    return nthLocator;
   }
 
   /** Tries each locator candidate in order (most -> least robust); reports which one matched. */
@@ -178,29 +214,37 @@ export class PlaywrightSurface implements Surface {
   }
 
   /** Resolves where a click/navigate would go, without performing it -- used by guardrails. */
-  async predictNavigation(action: Action): Promise<PredictedNavigation | null> {
+  async predictNavigation(action: Action): Promise<PredictedNavigation | null | undefined> {
     const page = this.getPage();
 
     if (action.type === "navigate") {
       return { url: new URL(action.url, page.url()).toString(), method: "GET" };
     }
     if (action.type !== "click") {
-      return null;
+      return undefined;
     }
 
     const resolved = await this.resolve(action.target);
-    if (!resolved) return null;
+    // Element doesn't exist on the page at all (e.g. this step's target is only rendered
+    // on the happy path, and we're on a permission-denied/error variant of the page) --
+    // that's not an authorization question, it's `perform()` about to fail on its own,
+    // which the caller's normal known-outcome detection handles.
+    if (!resolved) return undefined;
 
     const info = await resolved.locator.evaluate((el) => {
+      // Check anchor FIRST: a real <a href> click navigates via its href regardless of
+      // whether it happens to sit inside a <form> -- forms don't intercept anchor clicks.
+      // Checking form first (the previous order) would predict the wrong destination for
+      // any off-allowlist link that happens to be nested inside a form.
+      const anchor = el.closest("a[href]");
+      if (anchor) {
+        return { method: "GET", action: anchor.getAttribute("href") ?? "" };
+      }
       const form = el.closest("form");
       if (form) {
         const method = (form.getAttribute("method") ?? "GET").toUpperCase();
         const action = form.getAttribute("action") ?? "";
         return { method, action };
-      }
-      const anchor = el.closest("a[href]");
-      if (anchor) {
-        return { method: "GET", action: anchor.getAttribute("href") ?? "" };
       }
       return null;
     });
@@ -220,11 +264,6 @@ export class PlaywrightSurface implements Surface {
         return { ok: true, url: page.url() };
       }
 
-      if (action.type === "wait") {
-        await page.waitForTimeout(action.ms);
-        return { ok: true, url: page.url() };
-      }
-
       const resolved = await this.resolve(action.target);
       if (!resolved) {
         return { ok: false, error: "No locator candidate resolved to an element.", url: page.url() };
@@ -232,18 +271,18 @@ export class PlaywrightSurface implements Surface {
       const { locator, strategyUsed } = resolved;
 
       if (action.type === "click") {
-        await locator.click({ timeout: 5000 });
+        await locator.click({ timeout: action.timeoutMs ?? 5000 });
         await page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => undefined);
         return { ok: true, matchedStrategy: strategyUsed, url: page.url() };
       }
 
       if (action.type === "type") {
-        await locator.fill(action.text, { timeout: 5000 });
+        await locator.fill(action.text, { timeout: action.timeoutMs ?? 5000 });
         return { ok: true, matchedStrategy: strategyUsed, url: page.url() };
       }
 
       if (action.type === "select_option") {
-        await locator.selectOption(action.option, { timeout: 5000 });
+        await locator.selectOption(action.option, { timeout: action.timeoutMs ?? 5000 });
         return { ok: true, matchedStrategy: strategyUsed, url: page.url() };
       }
 

@@ -23,8 +23,13 @@ const seedMembers: Member[] = [
   { id: "90909", name: "Tempo Member", checkingBalance: 1500.0, savingsBalance: 2200.0 },
 ];
 
-export let members: Map<string, Member> = new Map(seedMembers.map((m) => [m.id, m]));
-export let subAccounts: Map<string, SubAccount> = new Map();
+// Populated by resetData() below, called once at module load -- a single source of truth
+// for "fresh state" instead of duplicating slightly-different init logic here and there.
+// The initial assignment previously stored direct references into `seedMembers` (only
+// resetData()'s clone was deep), so any in-place mutation of a served Member object before
+// the first reset would have permanently corrupted the seed data for the process lifetime.
+export let members: Map<string, Member>;
+export let subAccounts: Map<string, SubAccount>;
 let nextSubAccountSeq = 1;
 
 // Simulates a session expiring exactly once mid-flow (a real, transient condition), rather
@@ -43,6 +48,8 @@ export function resetData(): void {
   nextSubAccountSeq = 1;
   sessionTimeoutArmed = true;
 }
+
+resetData();
 
 export function findMember(id: string): Member | undefined {
   return members.get(id.trim());

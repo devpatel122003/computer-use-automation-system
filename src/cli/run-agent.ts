@@ -23,7 +23,9 @@ const DEFAULT_PASSWORD = "demo_password";
 function buildDefaultGoal(username: string, password: string): string {
   return (
     `Sign on as operator "${username}" with password "${password}", look up member 10001, ` +
-    "open a new Savings sub-account with an initial deposit of $100, and reach the confirmation screen."
+    "explicitly select Savings as the account type, open a new sub-account with an initial " +
+    "deposit of $100, and once you reach the confirmation screen, extract and report the " +
+    "confirmation number."
   );
 }
 
@@ -48,68 +50,71 @@ async function main(): Promise<void> {
   // just when the discovery loop later observes the password field.
   logger.addSensitiveValue(password);
   const surface = new PlaywrightSurface({ evidenceDir: logger.screenshotsDir, headed });
-  await surface.launch(startUrl);
 
-  const policy = new GuardrailsPolicy();
-  const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const escalation = new EscalationController(surface.getPage(), logger, runId, "discovery", "open-sub-account");
+  try {
+    await surface.launch(startUrl);
 
-  const agent = new DiscoveryAgent({
-    surface,
-    policy,
-    logger,
-    genai,
-    onRiskyAction: async ({ reason }) => escalation.confirmRiskyAction(reason),
-    onEscalate: async ({ step, reason }) => escalation.requestIntervention({ step, reason }),
-  });
+    const policy = new GuardrailsPolicy();
+    const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const escalation = new EscalationController(surface.getPage(), logger, runId, "discovery", "open-sub-account");
 
-  console.log(`Discovery run: ${runId}`);
-  console.log(`Goal: ${goal}\n`);
-
-  const result = await agent.run(goal, startUrl);
-  logger.writeJson("discovery-result.json", result);
-
-  console.log(`\nDiscovery finished with status: ${result.status}`);
-  if (result.finalSummary) console.log(`Summary: ${result.finalSummary}`);
-  if (result.escalationReason) console.log(`Escalation reason: ${result.escalationReason}`);
-  if (Object.keys(result.outputs).length > 0) console.log(`Outputs: ${JSON.stringify(result.outputs, null, 2)}`);
-  console.log(`Evidence written to: ${logger.runDir}`);
-
-  if (result.status === "finished") {
-    const artifact = buildArtifact(result, {
-      id: "open-sub-account",
-      name: "Open Sub-Account",
-      description:
-        "Signs on, looks up a member by ID, opens a new sub-account with a specified type and initial deposit, and confirms the result.",
-      version: "1.0.0",
-      appId: "mock-bank",
-      baseUrlPattern: "http://localhost:4000",
-      paramMappings: OPEN_SUB_ACCOUNT_PARAM_MAPPINGS,
-      successCheckpoint: OPEN_SUB_ACCOUNT_SUCCESS_CHECKPOINT,
-      knownOutcomes: OPEN_SUB_ACCOUNT_KNOWN_OUTCOMES,
+    const agent = new DiscoveryAgent({
+      surface,
+      policy,
+      logger,
+      genai,
+      onRiskyAction: async ({ reason }) => escalation.confirmRiskyAction(reason),
+      onEscalate: async ({ step, reason }) => escalation.requestIntervention({ step, reason }),
     });
-    annotateOpenSubAccountCheckpoints(artifact);
 
-    fs.mkdirSync(path.dirname(artifactOut), { recursive: true });
-    fs.writeFileSync(artifactOut, JSON.stringify(artifact, null, 2));
-    console.log(`\nArtifact written to: ${artifactOut}`);
+    console.log(`Discovery run: ${runId}`);
+    console.log(`Goal: ${goal}\n`);
 
-    // Confidence & approval (Section 8 stretch goal): a freshly recorded artifact always
-    // starts in "draft" -- unattended replay isn't trusted until a human runs `approve`.
-    const registryPath = "evidence/artifacts/registry.json";
-    const registry = loadRegistry(registryPath);
-    const entry = getOrCreateEntry(registry, artifact);
-    saveRegistry(registryPath, registry);
-    console.log(`Registered as "${entry.approvalState}" in ${registryPath} (fingerprint ${entry.fingerprint}).`);
-    console.log(`Run \`npm run approve -- --artifact ${artifactOut}\` once you've reviewed it and are ready to allow unattended replay.`);
-  } else {
-    console.log("\nNo artifact recorded (discovery did not finish successfully).");
+    const result = await agent.run(goal, startUrl);
+    logger.writeJson("discovery-result.json", result);
+
+    console.log(`\nDiscovery finished with status: ${result.status}`);
+    if (result.finalSummary) console.log(`Summary: ${result.finalSummary}`);
+    if (result.escalationReason) console.log(`Escalation reason: ${result.escalationReason}`);
+    if (Object.keys(result.outputs).length > 0) console.log(`Outputs: ${JSON.stringify(result.outputs, null, 2)}`);
+    console.log(`Evidence written to: ${logger.runDir}`);
+
+    if (result.status === "finished") {
+      const artifact = buildArtifact(result, {
+        id: "open-sub-account",
+        name: "Open Sub-Account",
+        description:
+          "Signs on, looks up a member by ID, opens a new sub-account with a specified type and initial deposit, and confirms the result.",
+        version: "1.0.0",
+        appId: "mock-bank",
+        baseUrlPattern: "http://localhost:4000",
+        paramMappings: OPEN_SUB_ACCOUNT_PARAM_MAPPINGS,
+        successCheckpoint: OPEN_SUB_ACCOUNT_SUCCESS_CHECKPOINT,
+        knownOutcomes: OPEN_SUB_ACCOUNT_KNOWN_OUTCOMES,
+      });
+      annotateOpenSubAccountCheckpoints(artifact);
+
+      fs.mkdirSync(path.dirname(artifactOut), { recursive: true });
+      fs.writeFileSync(artifactOut, JSON.stringify(artifact, null, 2));
+      console.log(`\nArtifact written to: ${artifactOut}`);
+
+      // Confidence & approval (Section 8 stretch goal): a freshly recorded artifact always
+      // starts in "draft" -- unattended replay isn't trusted until a human runs `approve`.
+      const registryPath = "evidence/artifacts/registry.json";
+      const registry = loadRegistry(registryPath);
+      const entry = getOrCreateEntry(registry, artifact);
+      saveRegistry(registryPath, registry);
+      console.log(`Registered as "${entry.approvalState}" in ${registryPath} (fingerprint ${entry.fingerprint}).`);
+      console.log(`Run \`npm run approve -- --artifact ${artifactOut}\` once you've reviewed it and are ready to allow unattended replay.`);
+    } else {
+      console.log("\nNo artifact recorded (discovery did not finish successfully).");
+    }
+  } finally {
+    await surface.close();
   }
-
-  await surface.close();
 }
 
 main().catch((err) => {
   console.error(err);
-  process.exit(1);
+  process.exitCode = 1;
 });

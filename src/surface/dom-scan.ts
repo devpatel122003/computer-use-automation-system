@@ -63,8 +63,22 @@ export function scanPage(): Array<{
     return style.visibility !== "hidden" && style.display !== "none";
   }
 
+  // Tags that only ever carry inline formatting (bold/italic/font color/etc.) -- absorbed
+  // into whichever block/cell ancestor wraps them, never queried as leaves in their own
+  // right. Without this, `<font><b>Access denied.</b> the rest of the message</font>`
+  // (real markup in this app's error banners) yields only "Access denied." -- the `<b>`
+  // text -- because the container has an element child and gets skipped outright.
+  const INLINE_ABSORB_TAGS = new Set(["b", "font", "strong", "em", "i", "tt", "u", "sub", "sup"]);
+
+  function isInlineOnlyContent(el: Element): boolean {
+    for (const child of Array.from(el.children)) {
+      if (!INLINE_ABSORB_TAGS.has(child.tagName.toLowerCase())) return false;
+      if (!isInlineOnlyContent(child)) return false;
+    }
+    return true;
+  }
+
   const results: Array<{ role: string; name: string; value?: string; testId?: string; cssPath?: string; sensitive?: boolean }> = [];
-  const seenTextElements = new Set<Element>();
 
   // Interactive controls first.
   document.querySelectorAll("a[href], button, input, select, textarea").forEach((el) => {
@@ -113,15 +127,13 @@ export function scanPage(): Array<{
     results.push({ role, name, value, testId, cssPath: cssPathFor(el), sensitive });
   });
 
-  // Leaf text nodes: elements with direct text and no interactive/text-bearing descendants.
-  document.querySelectorAll("td, span, div, p, li, h1, h2, h3, b, font").forEach((el) => {
+  // Leaf text nodes: elements whose content is plain text or inline-only formatting (no
+  // block/structural children -- that would make this a container, not a leaf).
+  document.querySelectorAll("td, th, span, div, p, li, h1, h2, h3, h4, h5, label, small, option").forEach((el) => {
     if (!isVisible(el)) return;
-    const hasElementChildren = Array.from(el.children).length > 0;
-    if (hasElementChildren) return;
+    if (!isInlineOnlyContent(el)) return;
     const text = (el.textContent ?? "").trim();
     if (!text || text.length > 200) return;
-    if (seenTextElements.has(el)) return;
-    seenTextElements.add(el);
     const testId = el.getAttribute("data-testid") ?? undefined;
     results.push({ role: "text", name: text, testId, cssPath: cssPathFor(el) });
   });

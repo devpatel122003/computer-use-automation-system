@@ -1,0 +1,11 @@
+{
+  "id": "discovery-2026-08-14T20-34-37-635Z-intervention-1",
+  "runId": "discovery-2026-08-14T20-34-37-635Z",
+  "runType": "discovery",
+  "capability": "open-sub-account",
+  "step": 6,
+  "reason": "No member found with ID 40404.",
+  "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-14T20-34-37-635Z/screenshots/intervention-1.png",
+  "url": "http://localhost:4000/search?memberId=40404",
+  "createdAt": "2026-08-14T20:34:43.251Z"
+}

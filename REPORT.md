@@ -43,13 +43,23 @@ first, so the model has to justify itself as part of the structured call, not be
 `/evidence` reflects this — each decision now carries a real one-line rationale.
 
 **Verification.** Near-pure logic — checkpoint evaluation, redaction, allowlist route
-matching, the confidence/registry math, and the recorder's artifact-building — has a real
-unit test suite (`npm test`, Vitest, 40 tests) built against small fakes (a stub `Surface`,
-a synthetic `DiscoveryResult`), not mocks of the browser or the model. Deliberately *not*
-unit-tested with mocks: the Playwright surface and the LLM loop itself. Mocking a browser
-or an LLM response would test the mock, not the system; those are verified by the real
-discovery/replay runs in `/evidence` instead, which the brief treats as the stronger signal
-anyway ("we can't assess a description of it").
+matching (including origin-parsing edge cases), the confidence/registry math, the recorder's
+artifact-building, schema cross-field validation, and the replay engine's recovery/retry
+state machine — has a real unit test suite (`npm test`, Vitest, 81 tests) built against
+small fakes (a stub `Surface`, a synthetic `DiscoveryResult`, a real `GuardrailsPolicy`
+against a temp config where the class's private state made a plain fake impractical), not
+mocks of the browser or the model. Deliberately *not* unit-tested with mocks: the Playwright
+surface and the LLM loop itself. Mocking a browser or an LLM response would test the mock,
+not the system; those are verified by the real discovery/replay runs in `/evidence` instead,
+which the brief treats as the stronger signal anyway ("we can't assess a description of it").
+
+**This system was adversarially reviewed after the first pass, and several real bugs were
+found and fixed** — a route-allowlist bypass via string-prefix matching, recovery actions
+bypassing the guardrail layer entirely, a replay retry that skipped re-verifying its own
+checkpoint, an artifact confidence-fingerprint that wasn't actually stable, and the human-
+escalation path having zero real evidence despite being cited as `/evidence`-verified. All
+are described where they're structurally relevant below, and summarized together in Cuts,
+because I think how they were found matters as much as the fixes themselves.
 
 ## 2. Artifact schema
 
@@ -80,8 +90,20 @@ The schema (`src/artifact/schema.ts`) is built around one idea: a capability is 
   step rather than "somewhere in this 9-step flow."
 - **Steps reference params by `{paramRef}`, never bake in literal values** (except where
   a literal genuinely wasn't parameterized — see Cuts). `target.baseUrlPattern` is a field
-  on the artifact, not embedded in each step's URL, so the same artifact can point at a
-  different tenant's instance.
+  on the artifact, and `navigate` steps store paths *relative* to it (`/login`, not
+  `http://localhost:4000/login`) — this was a real gap the first recorder implementation
+  had (it captured the absolute URL straight off the page), which would have made
+  `baseUrlPattern` a documented field with no actual effect. Fixed so the field is
+  load-bearing: swap it and every navigate step re-targets.
+- **Cross-field integrity is enforced by the schema itself, not left to convention.**
+  `CapabilityArtifactSchema` (`src/artifact/schema.ts`) adds a `superRefine` pass on top of
+  the base shape checking that every step's `paramRef` names a declared input param, every
+  `outputSchema[].sourceStepId` names a real step, and every `recoveryStepIds` entry
+  (used only when a known outcome's `category` is `recoverable`) names a real step. A
+  hand-written or LLM-mutated artifact with a dangling reference fails to parse instead of
+  failing at replay time three steps in — the recorder calls this same schema on its own
+  output before returning it, so a broken artifact can't be produced by this system's own
+  tooling either.
 
 ## 3. Determinism & error handling
 
@@ -110,10 +132,25 @@ a declared list of prior steps (re-login, *and* re-entering the search field the
 wiped out — recovery has to reconstruct whatever in-page state was lost, not just retry the
 one failing action) and then retries the step that originally failed. This is exercised for
 real in `/evidence` (member `90909`): checkpoint fails → outcome detected → recovery steps
-replayed → step retried → run completes successfully. Everywhere business_outcome/
-recoverable detection applies (both mid-action-failure and checkpoint-failure), not just one
-of the two — an earlier version of this only handled it on the action-failure path, silently
-never recovering from a checkpoint-shaped failure.
+replayed → step retried → run completes successfully. This runs through one unified
+`executeStep` path regardless of *why* the step needed recovery (mechanical action failure,
+or a checkpoint that didn't hold after an apparently-successful action) — an earlier version
+had two separate code paths for those two triggers and only one of them re-ran the
+guardrail check and re-verified the checkpoint/extract afterward; the other did a bare
+retry that could silently skip verification. Recovery is capped at one attempt per step, so
+a misbehaving detector can't loop forever.
+
+**Every guardrail check happens through one function, `authorizeAndConfirm`**, called
+before the *original* attempt at a step, before *every* recovery step, and before a
+post-recovery retry of the step that failed. This closes a real gap: the first
+implementation had recovery and retries call the surface directly, bypassing
+`GuardrailsPolicy.authorize()` entirely — meaning a risky POST could effectively re-fire
+unattended during "recovery" with no re-confirmation, even in a run that required
+interactive confirmation for its first attempt. There's also a second, independent check
+after a `navigate`/`click` actually executes: the *landed* URL is re-checked against the
+allowlist (`authorizeLandedUrl`), because a redirect chain — or, on this app, a validation
+error re-rendering the same page in place as the direct response to a POST rather than
+redirecting — can land the browser somewhere the pre-flight prediction never saw.
 
 **Secondarily, UI drift**: every action result records which locator strategy actually
 matched. A production version would diff that against what was recorded and flag "step-6
@@ -186,7 +223,18 @@ they're `safe` or `risky`. Every action — discovery or replay — is checked v
 `GuardrailsPolicy.authorize()` before it executes; for a `click`/`navigate`,
 `Surface.predictNavigation()` resolves the *actual* pending destination (a form's real
 `method`/`action`, or a link's `href`) so the check reflects what will really happen, not a
-guess. Anything outside the allowlist is blocked outright, not just flagged.
+guess. Base-URL comparison is origin-based (`new URL(...).origin`), not a string-prefix
+check — the earlier `startsWith` version would have let `http://localhost:4000.evil.example.com`
+or `http://localhost:4000@evil.com` (userinfo-in-URL) both pass as "allowed," since both
+literally start with the configured base string. Anything outside the allowlist is blocked
+outright, not just flagged, with one deliberate exception: `predictNavigation` returns three
+distinct things — a real destination (checked normally), `null` for "this element exists but
+its destination can't be determined" (fails *closed*, since that's exactly the JS-driven-write
+case the allowlist exists to catch), and `undefined` for "this element doesn't even resolve on
+the current page" (treated as safe to let `perform()` fail on its own). Collapsing that last
+case into "block" was an early bug: on the permission-denied page the "Open Sub-Account" link
+legitimately isn't rendered at all, and the guardrail layer was misreporting a business
+outcome as a security block.
 
 **Risky vs. safe.** Writes (here: the one POST route, opening a sub-account) are `risky`;
 everything else in this flow is a GET and `safe`. The conservative default: risky actions
@@ -208,7 +256,13 @@ the demo goal string embeds credentials in plain English for the model to type
 otherwise have logged it in the clear, before the discovery loop had ever "seen" the
 password field to know it was sensitive. The fix registers known-sensitive values (the CLI's
 `--password`) before any logging happens, not just when the agent happens to type into a
-field flagged sensitive. Nothing in `/evidence` contains the raw credential.
+field flagged sensitive. The name-based check also used to only apply inside the
+string-value branch of the redactor, so a sensitive key holding a number, boolean, or nested
+object passed through unmasked — moved to run first, before any type branching, so it's
+uniform. Value-based scrubbing has a minimum-length floor (6 characters) so it doesn't start
+masking short, coincidentally-matching substrings inside unrelated fields. Nothing in
+`/evidence` contains the raw credential (verified by grepping the committed evidence tree
+for the plaintext password).
 
 **Limits.** The allowlist is static per run, not per-tenant/per-role; there's no
 audit trail beyond the JSONL log; and the risky/safe classification is manual (route rules
@@ -242,11 +296,37 @@ in a config file), not inferred from anything about the data being touched.
   was approved, not *by whom*. A real deployment would tie this to an authenticated
   reviewer, not a CLI command anyone with repo access can run.
 
+**What survived an adversarial pass, and what's honestly still left after it.** I ran a
+deliberately hostile review of this system after the first pass (looking for exactly the
+kind of gap a grader would look for — guardrail bypasses, false claims in this document
+versus what `/evidence` actually contains, silent correctness bugs) and fixed everything it
+found that was fixable in scope: the allowlist bypass, recovery skipping guardrails, the
+unstable fingerprint, the missing escalation evidence, and about a dozen more (folded into
+the relevant sections above rather than listed separately here). What's still genuinely
+open, not because it wasn't found but because fixing it properly is bigger than this
+exercise:
+  - The confidence score's honesty is bounded by the correctness of `knownOutcomes`
+    detectors (see §8) — a systematically wrong detector still accumulates "trustworthy"
+    history. The `medium ⇒ totalRuns ≥ 2` rule is a floor, not a fix.
+  - `registry.json` is read-modify-written with no file locking; two replays finishing at
+    the same instant could race and one's history entry could be lost. Fine for a CLI tool
+    run by one operator at a time, not fine as a shared service.
+  - The discovery loop's conversation history grows unbounded for the lifetime of a run —
+    no windowing or summarization. Not a problem at the step counts this system exercises;
+    would matter for a much longer-running goal.
+  - `page.evaluate`'s DOM-scan function has to work around a `__name` helper that esbuild/tsx
+    injects into transpiled named functions, by wrapping the evaluated function in a small
+    IIFE shim. It works, but it's a coupling to a build-tool implementation detail rather
+    than anything Playwright or the DOM guarantees — the kind of thing that quietly breaks
+    on a toolchain upgrade.
+
 **What I'd build next**, roughly in order: (1) mid-artifact resume-after-failure, since
 escalation without it is only half the story; (2) the UI-drift diff/report job, since the
 data for it already exists (and would pair naturally with the confidence score — a step
 that keeps falling back to a lower-confidence locator strategy should pull an artifact's
-score down even if it's still technically succeeding); (3) reviewer identity on approval.
+score down even if it's still technically succeeding); (3) reviewer identity on approval;
+(4) some outside-the-system check on `knownOutcomes` detector correctness, since that's the
+one gap above that quietly undermines a feature (confidence scoring) that already shipped.
 
 ## 8. Stretch goal: Confidence & approval
 
@@ -285,4 +365,14 @@ completes with zero stdin interaction (`< /dev/null`) now that the artifact is a
 
 **Cut from this stretch goal:** no reviewer identity (see §7), no automatic *demotion* back
 to draft if confidence later drops (e.g. from accumulating failures post-approval) — an
-approved artifact stays approved until someone runs `--revoke` by hand.
+approved artifact stays approved until someone runs `--revoke` by hand. Also worth being
+direct about: the confidence score trusts the replay engine's own business_outcome/failure
+classification. If a `knownOutcomes` detector were wrong — too loose, matching pages it
+shouldn't — every run would score as a clean business outcome and confidence would climb
+regardless of whether the artifact actually still works. The one mitigation in place is
+structural, not semantic: `medium` requires at least two recorded runs, not just a score
+threshold, so a single lucky/misclassified run can't alone produce a "trustworthy-looking"
+label. That doesn't touch the underlying risk — a *systematically* wrong detector, replayed
+many times, still gets rewarded. Catching that needs either detector review as part of
+`approve`, or comparing detector outcomes against something outside the system's own
+say-so (e.g. periodic human spot-checks of `business_outcome` runs) — neither is built.

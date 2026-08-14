@@ -49,4 +49,39 @@ describe("redact", () => {
     ) as any;
     expect(out.action.text).toBe("[REDACTED]");
   });
+
+  it("masks a non-string value under a sensitive key (e.g. a numeric PIN or SSN)", () => {
+    // Real gap: Gemini/JSON tool args can be numbers, and the sensitivity check used to
+    // live only inside the string branch, so a numeric secret went to disk in the clear.
+    const out = redact({ password: 12345, ssn: 123456789, verified: true }) as Record<string, unknown>;
+    expect(out.password).toBe("[REDACTED]");
+    expect(out.ssn).toBe("[REDACTED]");
+    expect(out.verified).toBe(true);
+  });
+
+  it("masks an object nested directly under a sensitive key, not just its string leaves", () => {
+    const out = redact({ password: { value: "hunter2", hint: "pet name" } }) as Record<string, unknown>;
+    expect(out.password).toBe("[REDACTED]");
+  });
+
+  it("masks an array nested directly under a sensitive key", () => {
+    const out = redact({ tokens: ["a", "b"] }) as Record<string, unknown>;
+    expect(out.tokens).toBe("[REDACTED]");
+  });
+
+  it("does not blindly scrub a short sensitive value as a substring match elsewhere", () => {
+    // A weak/short secret shouldn't nuke unrelated legitimate data that happens to contain
+    // the same characters (e.g. a member ID). Key-based redaction still fully masks a short
+    // secret stored under a flagged field name; this only limits the blind substring scan.
+    const out = redact({ note: "member 10001 has 1 account" }, { sensitiveValues: new Set(["1"]) }) as Record<string, unknown>;
+    expect(out.note).toBe("member 10001 has 1 account");
+  });
+
+  it("still scrubs a sufficiently long sensitive value found under an unrelated key", () => {
+    const out = redact({ note: "the code was ABC123XYZ today" }, { sensitiveValues: new Set(["ABC123XYZ"]) }) as Record<
+      string,
+      unknown
+    >;
+    expect(out.note).toBe("the code was [REDACTED] today");
+  });
 });

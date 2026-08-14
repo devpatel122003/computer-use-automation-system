@@ -53,6 +53,38 @@ describe("evaluateCheckpoint: url", () => {
     const ok = await evaluateCheckpoint(surface, { kind: "url", expr: "/members/{memberId}", description: "" }, { memberId: "10001" });
     expect(ok).toBe(false);
   });
+
+  it("returns false instead of throwing when currentUrl() is empty", async () => {
+    const surface = fakeSurface({ currentUrl: () => "" });
+    const ok = await evaluateCheckpoint(surface, { kind: "url", expr: "/search", description: "" }, {});
+    expect(ok).toBe(false);
+  });
+
+  it("percent-decodes path segments before comparing against raw param values", async () => {
+    const surface = fakeSurface({ currentUrl: () => "http://localhost:4000/members/Acme%20Corp" });
+    const ok = await evaluateCheckpoint(surface, { kind: "url", expr: "/members/{memberId}", description: "" }, { memberId: "Acme Corp" });
+    expect(ok).toBe(true);
+  });
+
+  it("matches the query string too when the template includes one", async () => {
+    const surface = fakeSurface({ currentUrl: () => "http://localhost:4000/search?memberId=40404" });
+    const matching = await evaluateCheckpoint(surface, { kind: "url", expr: "/search?memberId=40404", description: "" }, {});
+    const mismatching = await evaluateCheckpoint(surface, { kind: "url", expr: "/search?memberId=99999", description: "" }, {});
+    expect(matching).toBe(true);
+    expect(mismatching).toBe(false);
+  });
+
+  it("ignores the query string when the template has none (backward compatible)", async () => {
+    const surface = fakeSurface({ currentUrl: () => "http://localhost:4000/search?memberId=40404" });
+    const ok = await evaluateCheckpoint(surface, { kind: "url", expr: "/search", description: "" }, {});
+    expect(ok).toBe(true);
+  });
+
+  it("matches multiple distinct {param} segments independently", async () => {
+    const surface = fakeSurface({ currentUrl: () => "http://localhost:4000/a/b" });
+    const ok = await evaluateCheckpoint(surface, { kind: "url", expr: "/{first}/{second}", description: "" }, { first: "a", second: "b" });
+    expect(ok).toBe(true);
+  });
 });
 
 describe("evaluateCheckpoint: text_match", () => {
@@ -70,17 +102,30 @@ describe("evaluateCheckpoint: text_match", () => {
 });
 
 describe("evaluateCheckpoint: element_visible", () => {
-  it("resolves true when the underlying locator resolves (perform succeeds)", async () => {
-    const surface = fakeSurface({ perform: async () => ({ ok: true, url: "" }) });
+  it("parses the JSON-encoded candidates and forwards them to perform() as an extract action", async () => {
+    let receivedAction: Action | undefined;
+    const surface = fakeSurface({
+      perform: async (action) => {
+        receivedAction = action;
+        return { ok: true, url: "" };
+      },
+    });
     const candidates = [{ strategy: "text" as const, name: "Confirmation Number", nth: 0, confidence: "medium" as const, rationale: "" }];
     const ok = await evaluateCheckpoint(surface, { kind: "element_visible", expr: JSON.stringify(candidates), description: "" }, {});
     expect(ok).toBe(true);
+    expect(receivedAction).toEqual({ type: "extract", target: candidates });
   });
 
   it("resolves false when the locator fails to resolve", async () => {
     const surface = fakeSurface({ perform: async () => ({ ok: false, error: "not found", url: "" }) });
     const candidates = [{ strategy: "text" as const, name: "Nonexistent", nth: 0, confidence: "medium" as const, rationale: "" }];
     const ok = await evaluateCheckpoint(surface, { kind: "element_visible", expr: JSON.stringify(candidates), description: "" }, {});
+    expect(ok).toBe(false);
+  });
+
+  it("returns false instead of throwing on a malformed (non-JSON) expr", async () => {
+    const surface = fakeSurface({});
+    const ok = await evaluateCheckpoint(surface, { kind: "element_visible", expr: "{not valid json", description: "" }, {});
     expect(ok).toBe(false);
   });
 });

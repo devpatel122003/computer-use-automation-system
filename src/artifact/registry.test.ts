@@ -33,6 +33,34 @@ describe("fingerprintArtifact", () => {
     });
     expect(fingerprintArtifact(a)).not.toBe(fingerprintArtifact(b));
   });
+
+  it("is stable across different object key insertion order for identical data", () => {
+    // Regression test: a hand-built artifact (recorder output) and the same data rebuilt
+    // by zod's `.parse()` (which reorders keys to schema declaration order) previously
+    // produced two different fingerprints for byte-for-byte identical content, because
+    // fingerprintArtifact hashed `JSON.stringify` with no key canonicalization.
+    const step1 = { id: "step-1", actionType: "navigate" as const, description: "Navigate", url: "http://localhost:4000/login", risk: "safe" as const, waitPolicy: { timeoutMs: 5000, retries: 0 } };
+    // Same fields, deliberately reinserted in a different order.
+    const step1Reordered = {
+      waitPolicy: step1.waitPolicy,
+      risk: step1.risk,
+      url: step1.url,
+      description: step1.description,
+      actionType: step1.actionType,
+      id: step1.id,
+    };
+    const a = makeArtifact({ steps: [step1] });
+    const b = makeArtifact({ steps: [step1Reordered as typeof step1] });
+    expect(fingerprintArtifact(a)).toBe(fingerprintArtifact(b));
+  });
+
+  it("does not change when only target.baseUrlPattern changes (tenant/environment swap)", () => {
+    // A capability re-pointed at a different tenant's base URL is still the same reviewed
+    // flow -- it shouldn't lose its accumulated confidence/approval history.
+    const a = makeArtifact({ target: { appId: "mock-bank", surfaceType: "web", baseUrlPattern: "http://tenant-a.example.com" } });
+    const b = makeArtifact({ target: { appId: "mock-bank", surfaceType: "web", baseUrlPattern: "http://tenant-b.example.com" } });
+    expect(fingerprintArtifact(a)).toBe(fingerprintArtifact(b));
+  });
 });
 
 describe("getOrCreateEntry", () => {

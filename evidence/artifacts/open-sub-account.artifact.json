@@ -3,7 +3,7 @@
   "name": "Open Sub-Account",
   "description": "Signs on, looks up a member by ID, opens a new sub-account with a specified type and initial deposit, and confirms the result.",
   "version": "1.0.0",
-  "createdAt": "2026-08-14T01:34:03.788Z",
+  "createdAt": "2026-08-14T20:25:39.344Z",
   "target": {
     "appId": "mock-bank",
     "surfaceType": "web",
@@ -32,6 +32,13 @@
       "description": "The member to open a sub-account for."
     },
     {
+      "name": "accountType",
+      "type": "string",
+      "required": true,
+      "sensitive": false,
+      "description": "Savings, Checking, or CD."
+    },
+    {
       "name": "initialDeposit",
       "type": "string",
       "required": true,
@@ -39,13 +46,20 @@
       "description": "Opening deposit amount in dollars."
     }
   ],
-  "outputSchema": [],
+  "outputSchema": [
+    {
+      "name": "confirmationNumber",
+      "type": "string",
+      "sourceStepId": "step-11",
+      "description": "Extracted from text \"SA-00001\""
+    }
+  ],
   "steps": [
     {
       "id": "step-1",
       "actionType": "navigate",
-      "description": "Navigate to http://localhost:4000/login",
-      "url": "http://localhost:4000/login",
+      "description": "Navigate to /login",
+      "url": "/login",
       "risk": "safe",
       "waitPolicy": {
         "timeoutMs": 5000,
@@ -282,6 +296,43 @@
     },
     {
       "id": "step-8",
+      "actionType": "select_option",
+      "description": "Select option on combobox \"Account Type\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "combobox",
+          "name": "Account Type",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Account Type",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "#accountType",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "input": {
+        "paramRef": "accountType"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-9",
       "actionType": "type",
       "description": "Type into textbox \"Initial Deposit ($)\"",
       "locator": [
@@ -318,7 +369,7 @@
       }
     },
     {
-      "id": "step-9",
+      "id": "step-10",
       "actionType": "click",
       "description": "Click button \"Submit\"",
       "locator": [
@@ -354,6 +405,33 @@
         "kind": "url",
         "expr": "/members/{memberId}/sub-accounts/*/confirm",
         "description": "Reached the sub-account confirmation page."
+      }
+    },
+    {
+      "id": "step-11",
+      "actionType": "extract",
+      "description": "Extract value from text \"SA-00001\"",
+      "locator": [
+        {
+          "strategy": "text",
+          "name": "SA-00001",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "#confirmationNumberValue",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "outputName": "confirmationNumber",
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
       }
     }
   ],

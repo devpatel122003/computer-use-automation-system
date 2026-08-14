@@ -29,6 +29,7 @@ You perceive the page only through a flattened list of elements (role + accessib
 
 Rules:
 - Only reference elements present in the CURRENT observation, using their exact role and name (add nth if a duplicate is indicated).
+- If the goal specifies a value for a dropdown/combobox (e.g. an account type), call "select_option" for it explicitly even if the field already shows that value by default -- an unexercised default doesn't become a reusable input for future callers of this capability.
 - Use "extract" to capture any data value the goal asks you to read or report.
 - Call "finish" as soon as the goal's target state (e.g. a confirmation screen, or the requested data) is visible. Do not take extra actions after the goal is met.
 - If you see an unexpected error banner, a permission-denied message, a validation error you cannot resolve from the goal's own instructions, or you are repeating the same failed action, call "escalate" with a clear reason instead of guessing.
@@ -43,22 +44,31 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** Free-tier Gemini quotas are tight (e.g. 5 req/min); back off on 429s using the
- *  server-suggested retryDelay rather than failing the whole discovery run. */
+ *  server-suggested retryDelay. Also retries transient 5xx ("Internal error encountered")
+ *  responses, which are a real, observed failure mode distinct from quota exhaustion --
+ *  worth a short fixed backoff rather than failing the whole discovery run outright. */
 async function withRetry<T>(fn: () => Promise<T>, logger: EvidenceLogger, maxAttempts = 6): Promise<T> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await fn();
     } catch (err) {
+      const status = (err as { status?: number })?.status;
       const message = err instanceof Error ? err.message : String(err);
-      const isRateLimit = (err as { status?: number })?.status === 429 || message.includes("RESOURCE_EXHAUSTED");
-      if (!isRateLimit || attempt === maxAttempts) throw err;
+      const isRateLimit = status === 429 || message.includes("RESOURCE_EXHAUSTED");
+      const isServerError = status !== undefined && status >= 500;
+      if ((!isRateLimit && !isServerError) || attempt === maxAttempts) throw err;
 
-      const match = message.match(/"retryDelay":"(\d+)s"/);
-      const delayMs = (match ? Number(match[1]) : 15) * 1000 + 1000;
+      let delayMs: number;
+      if (isRateLimit) {
+        const match = message.match(/"retryDelay":"(\d+(?:\.\d+)?)s"/);
+        delayMs = (match ? Number(match[1]) : 15) * 1000 + 1000;
+      } else {
+        delayMs = 5000 * attempt; // simple linear backoff for transient server errors
+      }
       logger.log({
         step: 0,
         phase: "error",
-        summary: `Gemini rate-limited (attempt ${attempt}/${maxAttempts}); waiting ${delayMs}ms before retry.`,
+        summary: `Gemini ${isRateLimit ? "rate-limited" : "returned a server error"} (attempt ${attempt}/${maxAttempts}); waiting ${delayMs}ms before retry.`,
       });
       await sleep(delayMs);
     }
@@ -68,6 +78,26 @@ async function withRetry<T>(fn: () => Promise<T>, logger: EvidenceLogger, maxAtt
 
 function findTextPart(parts: Part[]): Part | undefined {
   return parts.find((part) => typeof part.text === "string" && !part.thought);
+}
+
+/** Deterministic JSON stringify (sorted keys) -- Gemini's function-call `args` don't come
+ *  back in a stable key order between calls, so a plain `JSON.stringify` of the same
+ *  logical action can produce two different strings and defeat repeated-action detection. */
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  if (value && typeof value === "object") {
+    const keys = Object.keys(value as Record<string, unknown>).sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** Signature used for dead-end detection. Excludes "reasoning": the model rephrases its
+ *  justification slightly on every call, even for a logically identical retried action, so
+ *  including it would make two attempts at the same action almost never compare equal. */
+function actionSignature(toolName: string, input: Record<string, unknown>): string {
+  const { reasoning: _reasoning, ...rest } = input;
+  return `${toolName}:${stableStringify(rest)}`;
 }
 
 export class DiscoveryAgent {
@@ -225,6 +255,20 @@ export class DiscoveryAgent {
         pendingFunctionResponsePart = {
           functionResponse: { name: toolName, id: call.id, response: { error: errorMsg } },
         };
+
+        // A hallucinated element reference is the single most common failure mode and must
+        // count toward the dead-end limit like any other failure -- previously this branch
+        // `continue`d without ever touching repeatedFailureCount, so this case alone could
+        // burn every step up to max_steps without the loop ever recognizing it was stuck.
+        const notFoundSignature = actionSignature(toolName, input);
+        repeatedFailureCount = notFoundSignature === recentFailureSignature ? repeatedFailureCount + 1 : 1;
+        recentFailureSignature = notFoundSignature;
+        if (repeatedFailureCount >= REPEATED_FAILURE_LIMIT) {
+          status = "dead_end";
+          escalationReason = `Repeated the same failing action ${REPEATED_FAILURE_LIMIT} times: ${notFoundSignature}`;
+          logger.log({ step: stepIndex, phase: "error", summary: escalationReason });
+          break;
+        }
         continue;
       }
 
@@ -279,7 +323,7 @@ export class DiscoveryAgent {
         risk: authorization.risk,
       });
 
-      const signature = `${toolName}:${JSON.stringify(input)}`;
+      const signature = actionSignature(toolName, input);
       repeatedFailureCount = !result.ok && signature === recentFailureSignature ? repeatedFailureCount + 1 : result.ok ? 0 : 1;
       recentFailureSignature = result.ok ? null : signature;
 

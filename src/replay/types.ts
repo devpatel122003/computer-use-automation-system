@@ -10,6 +10,7 @@ export interface ReplayBusinessOutcomeResult {
   outcome: string;
   description: string;
   stepId?: string;
+  evidenceRef?: string;
 }
 
 export interface ReplayFailureResult {

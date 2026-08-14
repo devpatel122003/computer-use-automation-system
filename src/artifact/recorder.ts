@@ -1,12 +1,13 @@
 import type { DiscoveryResult } from "../agent/types.js";
-import type {
-  ArtifactStep,
-  CapabilityArtifact,
-  Checkpoint,
-  InputParam,
-  KnownOutcome,
-  OutputField,
-  StepInput,
+import {
+  CapabilityArtifactSchema,
+  type ArtifactStep,
+  type CapabilityArtifact,
+  type Checkpoint,
+  type InputParam,
+  type KnownOutcome,
+  type OutputField,
+  type StepInput,
 } from "./schema.js";
 
 /**
@@ -39,6 +40,13 @@ export interface RecorderOptions {
    * reviewer would annotate a capability before approving it for unattended replay.
    */
   knownOutcomes: KnownOutcome[];
+}
+
+/** Strips the base URL so navigate steps store a path, not an absolute URL -- otherwise
+ *  `target.baseUrlPattern` is decorative and pointing the same artifact at a different
+ *  tenant/environment would require editing every step instead of one field. */
+function toRelativePath(url: string, baseUrlPattern: string): string {
+  return url.startsWith(baseUrlPattern) ? url.slice(baseUrlPattern.length) || "/" : url;
 }
 
 /** Post-processing helper: attach a checkpoint to the first step matching a predicate.
@@ -74,7 +82,8 @@ export function buildArtifact(discovery: DiscoveryResult, options: RecorderOptio
     const waitPolicy = { timeoutMs: 5000, retries: action.type === "click" ? 1 : 0 };
 
     if (action.type === "navigate") {
-      steps.push({ id: stepId, actionType: "navigate", description: `Navigate to ${action.url}`, url: action.url, risk, waitPolicy });
+      const url = toRelativePath(action.url, options.baseUrlPattern);
+      steps.push({ id: stepId, actionType: "navigate", description: `Navigate to ${url}`, url, risk, waitPolicy });
       continue;
     }
 
@@ -144,17 +153,23 @@ export function buildArtifact(discovery: DiscoveryResult, options: RecorderOptio
     }
   }
 
-  return {
+  const artifact = {
     id: options.id,
     name: options.name,
     description: options.description,
     version: options.version,
     createdAt: new Date().toISOString(),
-    target: { appId: options.appId, surfaceType: "web", baseUrlPattern: options.baseUrlPattern },
+    target: { appId: options.appId, surfaceType: "web" as const, baseUrlPattern: options.baseUrlPattern },
     inputParams,
     outputSchema,
     steps,
     successCheckpoint: options.successCheckpoint,
     knownOutcomes: options.knownOutcomes,
   };
+
+  // Validate what we just built, not just what gets loaded back from disk later -- catches
+  // a bad known-outcome/checkpoint config (e.g. a typo'd recoveryStepId) at record time,
+  // and applies the schema's defaults (e.g. WaitPolicySchema's) rather than relying on the
+  // recorder to have set every field by hand.
+  return CapabilityArtifactSchema.parse(artifact);
 }

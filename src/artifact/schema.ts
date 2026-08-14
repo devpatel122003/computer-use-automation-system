@@ -93,7 +93,7 @@ export const KnownOutcomeSchema = z.object({
 });
 export type KnownOutcome = z.infer<typeof KnownOutcomeSchema>;
 
-export const CapabilityArtifactSchema = z.object({
+const CapabilityArtifactShape = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
@@ -102,7 +102,8 @@ export const CapabilityArtifactSchema = z.object({
   target: z.object({
     appId: z.string(),
     surfaceType: z.literal("web"),
-    /** Not a concrete URL -- overridden per tenant/environment, never baked into steps. */
+    /** Not a concrete URL -- overridden per tenant/environment, never baked into steps.
+     *  Steps store paths relative to this; replay prefixes it back on. */
     baseUrlPattern: z.string(),
   }),
   inputParams: z.array(InputParamSchema),
@@ -111,4 +112,60 @@ export const CapabilityArtifactSchema = z.object({
   successCheckpoint: CheckpointSchema,
   knownOutcomes: z.array(KnownOutcomeSchema),
 });
-export type CapabilityArtifact = z.infer<typeof CapabilityArtifactSchema>;
+
+/**
+ * Cross-field checks a plain object-shape schema can't express: these catch a hand-edited
+ * (or buggy) artifact referencing a param/step that doesn't actually exist, rather than
+ * failing silently at replay time (a typo'd paramRef used to just resolve to "").
+ */
+export const CapabilityArtifactSchema = CapabilityArtifactShape.superRefine((artifact, ctx) => {
+  const declaredParamNames = new Set(artifact.inputParams.map((p) => p.name));
+  const stepIds = new Set(artifact.steps.map((s) => s.id));
+
+  artifact.steps.forEach((step, index) => {
+    if (step.input && "paramRef" in step.input && !declaredParamNames.has(step.input.paramRef)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["steps", index, "input", "paramRef"],
+        message: `Step "${step.id}" references undeclared input param "${step.input.paramRef}".`,
+      });
+    }
+    if (step.outputName !== undefined && step.actionType !== "extract") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["steps", index, "outputName"],
+        message: `Step "${step.id}" sets outputName but is a "${step.actionType}" step, not "extract".`,
+      });
+    }
+  });
+
+  artifact.outputSchema.forEach((field, index) => {
+    if (!stepIds.has(field.sourceStepId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["outputSchema", index, "sourceStepId"],
+        message: `Output "${field.name}" references non-existent step "${field.sourceStepId}".`,
+      });
+    }
+  });
+
+  artifact.knownOutcomes.forEach((outcome, index) => {
+    if (outcome.category !== "recoverable" && (outcome.recovery || outcome.recoveryStepIds)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["knownOutcomes", index, "recovery"],
+        message: `Known outcome "${outcome.name}" sets recovery fields but category is "${outcome.category}", not "recoverable".`,
+      });
+    }
+    outcome.recoveryStepIds?.forEach((stepId, stepIdIndex) => {
+      if (!stepIds.has(stepId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["knownOutcomes", index, "recoveryStepIds", stepIdIndex],
+          message: `Known outcome "${outcome.name}" recoveryStepIds references non-existent step "${stepId}".`,
+        });
+      }
+    });
+  });
+});
+export type CapabilityArtifact = z.infer<typeof CapabilityArtifactShape>;

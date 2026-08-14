@@ -43,11 +43,10 @@ export interface StateSnapshot {
 
 export type Action =
   | { type: "navigate"; url: string }
-  | { type: "click"; target: LocatorCandidate[] }
-  | { type: "type"; target: LocatorCandidate[]; text: string }
-  | { type: "select_option"; target: LocatorCandidate[]; option: string }
-  | { type: "extract"; target: LocatorCandidate[] }
-  | { type: "wait"; ms: number };
+  | { type: "click"; target: LocatorCandidate[]; timeoutMs?: number }
+  | { type: "type"; target: LocatorCandidate[]; text: string; timeoutMs?: number }
+  | { type: "select_option"; target: LocatorCandidate[]; option: string; timeoutMs?: number }
+  | { type: "extract"; target: LocatorCandidate[] };
 
 export interface ActionResult {
   ok: boolean;
@@ -65,8 +64,17 @@ export interface PredictedNavigation {
 export interface Surface {
   observe(): Promise<StateSnapshot>;
   perform(action: Action): Promise<ActionResult>;
-  /** Read-only: where would this action navigate to, without performing it? Used by guardrails. */
-  predictNavigation(action: Action): Promise<PredictedNavigation | null>;
+  /**
+   * Read-only: where would this action navigate to, without performing it? Used by
+   * guardrails. Three distinct outcomes:
+   * - a PredictedNavigation: the destination is known.
+   * - `null`: the target element resolved, but its destination is genuinely ambiguous (no
+   *   enclosing form/anchor -- e.g. a JS-driven write). Guardrails should fail CLOSED here.
+   * - `undefined`: the target element didn't resolve at all, so there's nothing to
+   *   authorize or block -- `perform()` will fail on its own next, and that failure is
+   *   handled through the normal known-outcome/error path, not the guardrail layer.
+   */
+  predictNavigation(action: Action): Promise<PredictedNavigation | null | undefined>;
   /** All visible text on the current page -- used by known-outcome / checkpoint text_match detectors. */
   getVisibleText(): Promise<string>;
   screenshot(label: string): Promise<string>;

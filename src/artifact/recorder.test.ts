@@ -129,6 +129,20 @@ describe("buildArtifact", () => {
     const clickStep = artifact.steps.find((s) => s.actionType === "click");
     expect(clickStep?.locator?.[0]).toMatchObject({ strategy: "role", role: "button", name: "Sign On" });
   });
+
+  it("stores the navigate step's URL relative to baseUrlPattern, not absolute", () => {
+    // Otherwise target.baseUrlPattern is decorative: pointing this artifact at a different
+    // tenant's base URL would require editing every step instead of one field.
+    const artifact = record(makeDiscoveryResult());
+    const navigateStep = artifact.steps.find((s) => s.actionType === "navigate");
+    expect(navigateStep?.url).toBe("/login");
+  });
+
+  it("produces an artifact that passes its own schema validation", () => {
+    // buildArtifact now runs its own output through CapabilityArtifactSchema.parse() --
+    // this just confirms that doesn't throw for a normal recording.
+    expect(() => record(makeDiscoveryResult())).not.toThrow();
+  });
 });
 
 describe("attachStepCheckpoint", () => {
