@@ -106,7 +106,7 @@ describe("renderDashboard", () => {
       knownOutcomes: [],
     });
     const baseDrift = [
-      { stepId: "step-4", description: 'Click "Sign On"', expectedStrategy: "role" as const, observedCounts: { role: 5 }, totalObservations: 5, driftCount: 0 },
+      { stepId: "step-4", description: 'Click "Sign On"', actionType: "click" as const, expectedStrategy: "role" as const, observedCounts: { role: 5 }, totalObservations: 5, driftCount: 0 },
     ];
     const viewNoVariants: CapabilityView = {
       artifact,
@@ -132,7 +132,7 @@ describe("renderDashboard", () => {
           approvalState: "approved",
           confidence: { totalRuns: 1, successCount: 1, hardFailureCount: 0, score: 1, label: "low" },
           drift: [
-            { stepId: "step-4", description: 'Click "Log In"', expectedStrategy: "role" as const, observedCounts: { css_structural: 1 }, totalObservations: 1, driftCount: 1 },
+            { stepId: "step-4", description: 'Click "Log In"', actionType: "click" as const, expectedStrategy: "role" as const, observedCounts: { css_structural: 1 }, totalObservations: 1, driftCount: 1 },
           ],
         },
       ],

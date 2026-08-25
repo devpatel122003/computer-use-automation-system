@@ -57,7 +57,7 @@ async function main(): Promise<void> {
   const registry = loadRegistry(registryPath);
   const entry = getOrCreateEntry(registry, artifact);
   const confidence = computeConfidence(entry);
-  const drift = loadMatchingDriftReports(artifact, entry.fingerprint);
+  const drift = loadMatchingDriftReports(artifact, entry.fingerprint, undefined, appliedTenantId);
   const adjustedConfidenceLabel = driftAdjustedLabel(confidence.label, drift);
 
   // Confidence & approval gate (Section 8 stretch goal): unattended replay of a risky step

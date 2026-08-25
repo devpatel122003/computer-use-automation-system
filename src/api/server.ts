@@ -88,7 +88,7 @@ app.post("/capabilities/:id/invoke", async (req, res) => {
   // independent of the base artifact's, exactly like the CLI/replay path.
   const registry = loadRegistry(REGISTRY_PATH);
   const entry = getOrCreateEntry(registry, artifact);
-  const drift = loadMatchingDriftReports(artifact, entry.fingerprint);
+  const drift = loadMatchingDriftReports(artifact, entry.fingerprint, undefined, tenantId);
   const adjustedConfidenceLabel = driftAdjustedLabel(computeConfidence(entry).label, drift);
   // Same gate as the CLI (src/cli/replay.ts): --allow-risky/allowRisky only takes effect
   // once this exact artifact content -- base or tenant-overridden -- has been approved AND

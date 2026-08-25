@@ -489,11 +489,27 @@ real circuit breaker, wired into both `replay` and the capability API: an `appro
 artifact whose drift-adjusted confidence has degraded to `low`/`unproven` falls back to
 attended confirmation for its risky steps regardless of `--allow-risky`, the same way a
 `draft` artifact already did. Confidence stops being a report card and becomes a second,
-independent gate the system actually obeys — real evidence: replaying the base artifact
-(medium confidence, drift-capped to `low` from step-11's known false-positive) with
-`--allow-risky true` correctly falls back to an interactive prompt instead of running
-unattended, with a console message that distinguishes "still building a track record" from
-"drift specifically caused this," rather than blaming drift for every low-confidence case.
+independent gate the system actually obeys — real evidence: replaying the freshly-recorded
+northgate-cu tenant variant (§8 "Cross-tenant reuse" — `approved`, but only one real run so
+far) with `--allow-risky true` correctly falls back to an interactive prompt instead of
+running unattended, with a console message that distinguishes "still building a track
+record" from "drift specifically caused this," rather than blaming drift for every
+low-confidence case.
+
+**Turning this into an actual gate immediately surfaced a real bug in the drift signal
+itself, not a hypothetical.** The very first version of this circuit breaker also tripped
+for the *base* artifact — not because anything was genuinely wrong, but because step-11's
+extract step has a permanent, harmless false positive (§3: its `text` locator is the literal
+confirmation number captured at *recording* time, which by construction never matches
+again). While drift was purely informational (a dashboard badge), that false positive was
+cosmetic. The moment it started *enforcing*, it silently broke the base artifact's own
+unattended-replay demo. Fixed by having `driftAdjustedLabel()` (`src/replay/drift.ts`)
+exclude `extract`-step drift from the capping decision entirely -- a `click`/`type` step's
+drift means the recorded UI copy genuinely changed; an `extract` step's drift, for a value
+that's dynamic by definition, doesn't mean the UI changed at all. Found by re-running the
+manual verification checklist against a fresh clone specifically because it's exactly the
+kind of interaction between two individually-correct features that only shows up when you
+actually run the thing, not when you reason about each feature in isolation.
 
 ### Cross-tenant reuse
 
@@ -558,8 +574,29 @@ showed up in the base artifact's own confidence history until I removed that one
 hand. The registry has no notion of "environment" separate from "content," so a tenant
 override that happens to change nothing fingerprint-relevant (rare in practice -- a real
 rebrand almost always touches locator names too) pools its history with the base artifact's.
-Scoping the registry key to `(fingerprint, tenantId)` instead of just `fingerprint` would fix
-this properly; not done here.
+
+**This collision resurfaced for real, with real consequences, and got a real fix this
+time.** A later clean-clone re-verification (re-running the full manual checklist against a
+fresh `git clone` from GitHub, not the working copy) caught the same collision doing
+concrete damage: the assisted-fallback negative-control runs (§8 "Assisted fallback")
+against the rebranded northgate-cu tenant *without* its locator override shared the base
+artifact's fingerprint, so their genuine drift (step-5's "Member ID" field resolving via
+`css_structural` on a page that actually says "Member Number") silently counted toward the
+*base* artifact's own drift signal. Once the confidence circuit breaker (`execution-policy.ts`)
+started actually enforcing on that signal, this stopped being a cosmetic footnote and started
+blocking the base artifact's own unattended replay demo -- `npm run replay -- --allow-risky
+true` began falling back to an interactive prompt for a capability that had done nothing
+wrong. `src/replay/drift-loader.ts`'s `loadMatchingRunLogs` now takes an `expectedTenantId`:
+a run's own *declared* `tenantOverride` (logged on its `start` event) is the source of truth
+for which surface it actually ran against, not the coincidental content hash -- the base
+artifact's own view only counts runs declaring no override at all, and each tenant's view
+only counts that exact tenant's own declared runs. This is the `(fingerprint, tenantId)`
+disambiguation this section previously said "not done here" — done now, for the
+drift/confidence-adjustment layer specifically. What's still a manual cleanup, not a code
+fix: the underlying `evidence/artifacts/registry.json` confidence-history entries themselves
+are still keyed by raw content fingerprint alone, so a collision can still misfile a
+replay *outcome* (not just its drift) into the wrong artifact's trust history; the one
+instance of that found here was corrected by hand, again, not by a rule.
 
 **Per-tenant drift, built for real rather than left as a described gap.** REPORT.md
 originally listed "no per-tenant drift detection" as a cut. The dashboard now computes each

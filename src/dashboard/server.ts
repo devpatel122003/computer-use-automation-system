@@ -51,7 +51,10 @@ function buildCapabilityViews(): CapabilityView[] {
   );
 
   return catalog.map(({ artifact, fingerprint, approvalState, confidence }) => {
-    const matchedRunLogs = loadMatchingRunLogs(fingerprint, RUNS_DIR);
+    // undefined tenantId -- only runs of the *unmodified* artifact count toward its own
+    // drift/metrics, even if a tenant override happens to collide on content fingerprint
+    // (see drift-loader.ts's own note on why this matters).
+    const matchedRunLogs = loadMatchingRunLogs(fingerprint, RUNS_DIR, undefined);
 
     const drift = summarizeDrift(artifact, matchedRunLogs.flatMap((events) => extractStepMatches(events)));
     const replayMetrics = aggregateRunMetrics(
@@ -64,7 +67,7 @@ function buildCapabilityViews(): CapabilityView[] {
     // "Heterogeneity & multi-tenant"): a per-step comparison across every surface this
     // capability actually runs on, built from whichever tenants actually exist today.
     const tenantVariants: TenantVariantView[] = loadTenantVariants(artifact).map((variant) => {
-      const variantRunLogs = loadMatchingRunLogs(variant.fingerprint, RUNS_DIR);
+      const variantRunLogs = loadMatchingRunLogs(variant.fingerprint, RUNS_DIR, variant.tenantId);
       return { ...variant, drift: summarizeDrift(variant.artifact, variantRunLogs.flatMap((events) => extractStepMatches(events))) };
     });
 

@@ -106,8 +106,8 @@ describe("summarizeDrift", () => {
   });
 });
 
-function driftReport(driftCount: number): StepDriftReport {
-  return { stepId: "step-2", description: "d", expectedStrategy: "role", observedCounts: {}, totalObservations: 1, driftCount };
+function driftReport(driftCount: number, actionType: StepDriftReport["actionType"] = "click"): StepDriftReport {
+  return { stepId: "step-2", description: "d", actionType, expectedStrategy: "role", observedCounts: {}, totalObservations: 1, driftCount };
 }
 
 describe("driftAdjustedLabel", () => {
@@ -130,5 +130,13 @@ describe("driftAdjustedLabel", () => {
   it("leaves low and unproven as themselves -- there's nowhere lower to cap them", () => {
     expect(driftAdjustedLabel("low", [driftReport(1)])).toBe("low");
     expect(driftAdjustedLabel("unproven", [driftReport(1)])).toBe("unproven");
+  });
+
+  it("does NOT cap the label when the only drifting step is an 'extract' -- found live: a literal recorded value (e.g. a confirmation number) never matches again once a new one is issued, a permanent harmless false positive, not a real UI-drift risk the way a click/type step's drift is", () => {
+    expect(driftAdjustedLabel("high", [driftReport(1, "extract")])).toBe("high");
+  });
+
+  it("still caps the label when a non-extract step drifts, even alongside a drifting extract step", () => {
+    expect(driftAdjustedLabel("high", [driftReport(1, "extract"), driftReport(1, "click")])).toBe("medium");
   });
 });

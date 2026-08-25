@@ -23,9 +23,23 @@ function readRunLog(runDir: string): LogEvent[] {
     .map((line) => JSON.parse(line) as LogEvent);
 }
 
-/** Every replay run's log events, filtered to this exact content fingerprint -- the raw
- *  material both the drift signal and the dashboard's cost/time metrics are built from. */
-export function loadMatchingRunLogs(fingerprint: string, runsDir = "evidence/runs"): LogEvent[][] {
+/**
+ * Every replay run's log events, filtered to this exact content fingerprint -- the raw
+ * material both the drift signal and the dashboard's cost/time metrics are built from.
+ *
+ * `expectedTenantId` disambiguates a real collision found while producing evidence: a
+ * tenant override that changes only `baseUrlPattern` (e.g. a negative-control fixture
+ * proving the *lack* of a locator override breaks things) produces the exact same content
+ * fingerprint as the base artifact, since the fingerprint deliberately excludes
+ * `baseUrlPattern` (see registry.ts). Without this, a run explicitly testing the base
+ * artifact against an incompatible tenant page would silently count toward the *base*
+ * artifact's own drift/confidence signal just because the hashes happened to collide. A
+ * run's own declared `tenantOverride` (logged on its `start` event) is the source of truth
+ * for "which surface was this run actually against," not the coincidental fingerprint --
+ * pass `undefined` for the base artifact's own view (only unmodified-artifact runs count),
+ * or a specific tenantId for that tenant's view (only that exact tenant's runs count).
+ */
+export function loadMatchingRunLogs(fingerprint: string, runsDir = "evidence/runs", expectedTenantId?: string): LogEvent[][] {
   if (!fs.existsSync(runsDir)) return [];
   return fs
     .readdirSync(runsDir)
@@ -33,15 +47,19 @@ export function loadMatchingRunLogs(fingerprint: string, runsDir = "evidence/run
     .map((dir) => readRunLog(path.join(runsDir, dir)))
     .filter((events) => {
       const start = events.find((e) => e.phase === "start");
-      return (start?.detail as { fingerprint?: string } | undefined)?.fingerprint === fingerprint;
+      const detail = (start?.detail ?? {}) as { fingerprint?: string; tenantOverride?: { tenantId?: string } };
+      if (detail.fingerprint !== fingerprint) return false;
+      const declaredTenantId = detail.tenantOverride?.tenantId;
+      return expectedTenantId === undefined ? declaredTenantId === undefined : declaredTenantId === expectedTenantId;
     });
 }
 
 export function loadMatchingDriftReports(
   artifact: CapabilityArtifact,
   fingerprint: string,
-  runsDir = "evidence/runs"
+  runsDir = "evidence/runs",
+  expectedTenantId?: string
 ): StepDriftReport[] {
-  const matches = loadMatchingRunLogs(fingerprint, runsDir).flatMap((events) => extractStepMatches(events));
+  const matches = loadMatchingRunLogs(fingerprint, runsDir, expectedTenantId).flatMap((events) => extractStepMatches(events));
   return summarizeDrift(artifact, matches);
 }

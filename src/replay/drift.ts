@@ -1,4 +1,4 @@
-import type { CapabilityArtifact } from "../artifact/schema.js";
+import type { ArtifactStep, CapabilityArtifact } from "../artifact/schema.js";
 import type { LocatorStrategy } from "../surface/types.js";
 import type { LogEvent } from "../evidence/logger.js";
 
@@ -17,6 +17,7 @@ import type { LogEvent } from "../evidence/logger.js";
 export interface StepDriftReport {
   stepId: string;
   description: string;
+  actionType: ArtifactStep["actionType"];
   /** The step's own top-priority locator candidate at record time -- not necessarily what
    *  resolved on any given run. */
   expectedStrategy: LocatorStrategy;
@@ -62,6 +63,7 @@ export function summarizeDrift(
     reports.set(index + 1, {
       stepId: step.id,
       description: step.description,
+      actionType: step.actionType,
       expectedStrategy: topCandidate.strategy,
       observedCounts: {},
       totalObservations: 0,
@@ -96,10 +98,20 @@ const LABEL_DOWNGRADE: Record<ConfidenceLabel, ConfidenceLabel> = {
  * score itself (registry.ts) -- "did the replay engine correctly explain what happened"
  * and "is a step quietly relying on a fallback" are two honestly separate signals, and
  * blending them into one number would hide which one moved. This caps the *displayed*
- * label one tier down when any step shows drift; the underlying success/business_outcome
- * ratio is untouched and still available for anyone who wants the raw number.
+ * label one tier down when any NON-extract step shows drift; the underlying success/
+ * business_outcome ratio is untouched and still available for anyone who wants the raw
+ * number.
+ *
+ * `extract` steps are excluded from this decision -- found live, not theoretical: this
+ * artifact's own `extract` step targets a `text` locator whose recorded value is the
+ * literal confirmation number captured *at recording time*, which by construction never
+ * matches again once a new one is issued. That's a permanent, harmless false positive
+ * (falling back to `css_structural`, which still works), not a real UI-drift risk the
+ * way a `click`/`type` step's drift is -- those target *static* copy, so their drift means
+ * the recorded label genuinely changed. Still shown in the raw drift report (§3/§4) for
+ * anyone who wants to see it; just excluded from capping trust.
  */
 export function driftAdjustedLabel(rawLabel: ConfidenceLabel, drift: StepDriftReport[]): ConfidenceLabel {
-  const hasDrift = drift.some((r) => r.driftCount > 0);
+  const hasDrift = drift.some((r) => r.actionType !== "extract" && r.driftCount > 0);
   return hasDrift ? LABEL_DOWNGRADE[rawLabel] : rawLabel;
 }
