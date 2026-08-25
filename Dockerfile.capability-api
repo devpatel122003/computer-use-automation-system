@@ -1,0 +1,56 @@
+# capability-api -- lists recorded capabilities and, on POST /capabilities/:id/invoke,
+# drives a REAL headless Playwright/Chromium browser against mock-bank. That means the
+# runtime stage needs actual browser binaries, not just node_modules.
+#
+# Runtime base image: mcr.microsoft.com/playwright:v1.49.1-jammy. Verified (not guessed)
+# that this exact tag exists and is multi-arch (amd64 + arm64) via the MCR registry API:
+#   curl -s https://mcr.microsoft.com/v2/playwright/tags/list   -> includes "v1.49.1-jammy"
+# and cross-checked that the v1.49.1 Playwright release's own Dockerfile.jammy installs
+# Node.js 22.x (>= this repo's engines: ">=20"), so the pruned node_modules built with
+# node:20-slim in the builder stage below run fine on top of it. This tag exactly matches
+# "playwright": "^1.49.1" in package.json, so the browser binaries baked into the base
+# image match the driver version this code calls -- no `playwright install` needed at
+# build or run time, which is the whole reason to use this image over plain node:20-slim.
+#
+# Build stage still uses node:20-slim (smaller, faster npm ci/tsc) -- only the runtime
+# stage needs the heavyweight browser image.
+
+FROM node:20-slim AS builder
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY src ./src
+COPY apps ./apps
+RUN npx tsc
+
+RUN npm prune --omit=dev
+
+FROM mcr.microsoft.com/playwright:v1.49.1-jammy AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+
+# capability-api throws at module load if CAPABILITY_API_KEY is unset (intentional
+# fail-closed startup check) -- it MUST be supplied via `docker run -e` / compose
+# env_file when this container starts, or it will crash-loop. That's expected, not
+# a bug to paper over here.
+
+# Deliberately still root (unlike Dockerfile.mock-bank/Dockerfile.dashboard): this is
+# Playwright's own documented default for their Docker images (Chromium's sandbox has
+# real, non-trivial permission requirements under a non-root user), and this container
+# also needs write access to the bind-mounted evidence/ volume. Revisiting this is a
+# real "before this goes further than a demo" item, not an oversight -- see SECURITY.md.
+
+EXPOSE 4700
+
+# GET /health is the one unauthenticated route, by design, for exactly this purpose.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["node", "-e", "fetch(`http://localhost:${process.env.CAPABILITY_API_PORT||4700}/health`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+CMD ["node", "dist/src/api/server.js"]

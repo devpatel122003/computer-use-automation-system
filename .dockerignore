@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.env
+.env.local
+evidence/runs
+*.log
+.tools
+.claude
+Assignment A — Computer-Use Automation System.pdf

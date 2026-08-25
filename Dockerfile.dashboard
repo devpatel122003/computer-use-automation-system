@@ -1,0 +1,41 @@
+# dashboard -- read-only ops UI that reads evidence/artifacts and evidence/runs from
+# disk on every request. No Playwright/browser involved, so a plain node:20-slim
+# runtime is enough (unlike Dockerfile.capability-api).
+
+FROM node:20-slim AS builder
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY src ./src
+COPY apps ./apps
+RUN npx tsc
+
+RUN npm prune --omit=dev
+
+FROM node:20-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder --chown=node:node /app/package.json ./package.json
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/dist ./dist
+
+# dashboard throws at module load if DASHBOARD_PASSWORD is unset (intentional
+# fail-closed startup check, matching capability-api) -- must be supplied via
+# `docker run -e` / compose env_file, or the container will crash-loop.
+
+# Read-only against evidence/artifacts and evidence/runs -- no reason this needs root.
+# node:20-slim's built-in "node" user (uid 1000) covers it; not verified by an actual
+# `docker build`/run here (Docker isn't available in this environment).
+USER node
+
+EXPOSE 4600
+
+# GET /health is the one unauthenticated route, by design, for exactly this purpose.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD ["node", "-e", "fetch(`http://localhost:${process.env.DASHBOARD_PORT||4600}/health`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+CMD ["node", "dist/src/dashboard/server.js"]

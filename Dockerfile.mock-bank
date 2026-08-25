@@ -1,0 +1,57 @@
+# mock-bank -- the fake target banking app the automation system drives.
+#
+# Runs as TWO separate containers from this same image (see docker-compose.yml):
+# the base tenant on PORT=4000, and a second "northgate-cu" rebrand on PORT=4100
+# (TENANT=northgate-cu). Same code, different env vars.
+#
+# Build: node's own tsc compiles TypeScript, but it does NOT copy non-.ts assets
+# (the EJS view templates), so those are copied by hand into the same relative
+# location tsc's output uses -- apps/mock-bank/src/server.ts sets
+# `views: path.join(__dirname, "..", "views")`, and tsc (outDir "dist", rootDir ".")
+# compiles that file to dist/apps/mock-bank/src/server.js, so __dirname at runtime
+# is /app/dist/apps/mock-bank/src and "../views" must resolve to
+# /app/dist/apps/mock-bank/views. Verified by actually running `npx tsc` once
+# against this repo's real tsconfig.json rather than guessing the output layout.
+
+FROM node:20-slim AS builder
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY src ./src
+COPY apps ./apps
+RUN npx tsc
+
+# Drop devDependencies (typescript, tsx, vitest, @types/*) from node_modules now
+# that the build is done, so the runtime stage only copies what it needs to run.
+RUN npm prune --omit=dev
+
+FROM node:20-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder --chown=node:node /app/package.json ./package.json
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/dist ./dist
+# EJS templates aren't TypeScript, so tsc never touches them -- copy them by hand
+# to the exact path the compiled server.js expects at runtime (see comment above).
+COPY --chown=node:node apps/mock-bank/views ./dist/apps/mock-bank/views
+
+# node:20-slim ships a non-root "node" user (uid 1000) for exactly this purpose --
+# no reason a plain Express app needs root inside the container. Not verified by an
+# actual `docker build`/run here (Docker isn't available in this environment); the
+# --chown above matches every COPY that needs to be readable by this user.
+USER node
+
+# Both the base tenant (4000) and the northgate-cu tenant (4100) run from this same
+# image, one port each depending on the PORT env var the container is started with.
+EXPOSE 4000 4100
+
+# node:20-slim has Node's built-in global fetch (no curl/wget in the base image),
+# so use that directly instead of adding a package just for the healthcheck.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD ["node", "-e", "fetch(`http://localhost:${process.env.PORT||4000}/health`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+CMD ["node", "dist/apps/mock-bank/src/server.js"]

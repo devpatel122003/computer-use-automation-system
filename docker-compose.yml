@@ -1,0 +1,92 @@
+# Wires up the three long-running Express services (mock-bank x2, capability-api,
+# dashboard). Deliberately excludes `npm run run-agent` and the other interactive/
+# headed-Chromium CLI demo scripts -- those are meant to be watched live on a host
+# display, not containerized.
+#
+# --- Why network_mode: "service:mock-bank" everywhere ---
+# The real, checked-in recorded evidence this repo replays against
+# (evidence/artifacts/open-sub-account.artifact.json, config/tenant-overrides/*.json)
+# has literal `"baseUrlPattern": "http://localhost:4000"` (base tenant) and
+# "http://localhost:4100" (northgate-cu) baked in, because that's genuinely what was
+# recorded during discovery. We're not allowed to rewrite that evidence to point at
+# Compose service-discovery hostnames just for infra convenience -- so the container
+# that launches the real Playwright browser (capability-api) needs `localhost:4000`
+# and `localhost:4100` to actually mean the two mock-bank containers.
+#
+# `network_mode: "service:mock-bank"` makes a container join mock-bank's network
+# namespace outright, so `localhost` inside it really is mock-bank's `localhost` --
+# unlike a normal Compose network, where each container gets its own loopback and
+# services only reach each other by service name. mock-bank is the "anchor": it's
+# the only service with its own network namespace, and the only one allowed to
+# declare `ports:` (Compose does not support combining `ports:` with
+# `network_mode: "service:*"` on the same service -- the port owner has to be the
+# anchor). So mock-bank's `ports:` list below carries every host-facing port for
+# all four containers: 4000 and 4100 for the two mock-bank tenants, 4700 for
+# capability-api, 4600 for dashboard. dashboard doesn't strictly need localhost
+# access to mock-bank (it only reads files from evidence/), but it still needs to
+# share the netns for its own 4600 mapping on the anchor to actually go anywhere.
+services:
+  mock-bank:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock-bank
+    environment:
+      - PORT=4000
+    ports:
+      - "4000:4000" # mock-bank (base tenant)
+      - "4100:4100" # mock-bank-northgate (shares this netns, see below)
+      - "4700:4700" # capability-api (shares this netns, see below)
+      - "4600:4600" # dashboard (shares this netns, see below)
+
+  mock-bank-northgate:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock-bank
+    environment:
+      - TENANT=northgate-cu
+      - PORT=4100
+    # Joins mock-bank's network namespace: its own healthcheck hits
+    # http://localhost:4100/health, which resolves inside the shared namespace to
+    # this container's own listener, exposed to the host via mock-bank's ports:.
+    network_mode: "service:mock-bank"
+    depends_on:
+      mock-bank:
+        condition: service_started
+
+  capability-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.capability-api
+    env_file: .env # supplies CAPABILITY_API_KEY -- the server throws at startup without it
+    environment:
+      - CAPABILITY_API_PORT=4700
+    # Shares mock-bank's netns so the real Playwright browser launched in here can
+    # navigate to the literal http://localhost:4000 / http://localhost:4100 baked
+    # into the checked-in recorded evidence and tenant overrides.
+    network_mode: "service:mock-bank"
+    volumes:
+      - ./evidence:/app/evidence
+      - ./config:/app/config
+    depends_on:
+      mock-bank:
+        condition: service_healthy
+      mock-bank-northgate:
+        condition: service_healthy
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    env_file: .env # supplies DASHBOARD_PASSWORD -- the server throws at startup without it
+    environment:
+      - DASHBOARD_PORT=4600
+    # Doesn't launch a browser or call mock-bank over HTTP (it only reads
+    # evidence/artifacts and evidence/runs from disk), but still needs to share
+    # mock-bank's netns for its own 4600 mapping on the anchor to be reachable.
+    network_mode: "service:mock-bank"
+    volumes:
+      - ./evidence:/app/evidence
+      - ./config:/app/config
+    depends_on:
+      mock-bank:
+        condition: service_healthy

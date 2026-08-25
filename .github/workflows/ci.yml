@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # Vitest runs against a stub Surface -- no real Playwright browser or network
+      # calls are needed, so this job does not run `playwright install`.
+      - run: npm test
+
+      # Real gate, not decorative: repo currently has 0 known high/critical
+      # vulnerabilities in production dependencies, so this is expected to pass.
+      - run: npm audit --omit=dev --audit-level=high
