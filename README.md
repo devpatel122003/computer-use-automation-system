@@ -1,5 +1,7 @@
 # Computer-Use Automation System
 
+[![CI](https://github.com/devpatel122003/computer-use-automation-system/actions/workflows/ci.yml/badge.svg)](https://github.com/devpatel122003/computer-use-automation-system/actions/workflows/ci.yml)
+
 A small, real end-to-end slice of the system described in the take-home brief: an LLM
 drives a live web app to accomplish a goal (**discovery**), the successful run is recorded
 as a typed, versioned **capability artifact**, and that artifact **replays deterministically**
@@ -23,7 +25,8 @@ already writes into a compliance/audit report for a bank's audit function specif
 
 See [`REPORT.md`](REPORT.md) for the design write-up (architecture, artifact schema,
 determinism & error handling, heterogeneity/multi-tenant story, escalation model, safety,
-and cuts).
+and cuts), and [`SECURITY.md`](SECURITY.md) for the consolidated threat model, auth, and
+guardrail design in one place.
 
 ## What's in here
 
@@ -65,6 +68,11 @@ and cuts).
 - `src/guardrails/` — the allowlist policy, risk classification, and redaction utilities.
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
   drive the same live browser session, capture what they did, hand control back).
+- `src/http/` — production-hardening middleware shared by the capability API and dashboard:
+  `api-key-auth.ts` (bearer/API-key auth for the capability API, HTTP Basic auth for the
+  dashboard, both timing-safe and fail-closed at startup if unconfigured — see `SECURITY.md`)
+  and `request-log.ts` (one structured JSON access-log line per request, shape-only, never
+  headers or bodies).
 - `src/evidence/` — the structured JSONL run logger, plus `audit-report.ts` (not a Section 8
   stretch goal — a non-numbered addition that reformats the same redacted evidence every run
   already writes into a compliance/audit report for a bank's audit function).
@@ -84,6 +92,14 @@ and cuts).
   account type the app's dropdown doesn't offer, with no known outcome to explain it), and
   the cross-tenant reuse pair described in step 6 below (the same artifact succeeding
   against a rebranded second tenant via an override, and failing against it without one).
+- `Dockerfile.mock-bank` / `Dockerfile.capability-api` / `Dockerfile.dashboard` +
+  `docker-compose.yml` — containerizes the three long-running services (see "Running via
+  Docker Compose" below); the interactive, headed-browser demo scripts stay host-only.
+- `.github/workflows/ci.yml` — typecheck + test + dependency-audit on every push/PR to
+  `main` (see "Continuous integration" below).
+- `SECURITY.md` — the consolidated threat model, auth design, and guardrail/escalation
+  summary; `.env.example` — every environment variable this repo uses, documented with a
+  placeholder, safe to commit (real values go in `.env`, which is git-ignored).
 
 ## Setup
 
@@ -94,7 +110,11 @@ npm install
 npx playwright install chromium   # one-time browser download
 ```
 
-Create a `.env` file in the repo root (never committed) with your own Gemini API key:
+Copy `.env.example` to `.env` (git-ignored, never committed) and fill in real values:
+
+```bash
+cp .env.example .env
+```
 
 ```
 GEMINI_API_KEY=your-key-here
@@ -106,9 +126,18 @@ GEMINI_API_KEY=your-key-here
 # in this repo was itself produced on gemini-3.5-flash-lite after several other models hit
 # their daily cap during testing.
 GEMINI_MODEL=gemini-3.7-flash
+
+# Required to start the capability API and dashboard -- both now refuse to start without
+# these set (see SECURITY.md "Authentication"). Generate your own; don't reuse the
+# placeholder in .env.example.
+CAPABILITY_API_KEY=generate-a-random-value
+DASHBOARD_PASSWORD=generate-a-random-value
 ```
 
-Get a key at https://ai.google.dev. Nothing else needs a key -- replay never calls the model.
+Get a Gemini key at https://ai.google.dev. `CAPABILITY_API_KEY`/`DASHBOARD_PASSWORD` are
+yours to generate, e.g. `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"`.
+Plain `npm run replay` and `npm run mock-bank` need neither -- replay never calls the model,
+and mock-bank is the target app, not one of the two secured surfaces.
 
 ## Demo path
 
@@ -352,7 +381,9 @@ npm run dashboard
 # -> Capability dashboard listening on http://localhost:4600
 ```
 
-Open `http://localhost:4600` in a browser. It reads straight from `evidence/artifacts/` and
+Open `http://localhost:4600` in a browser -- it'll prompt for a username (anything) and
+password (your `DASHBOARD_PASSWORD` from `.env`); that's real HTTP Basic auth, not a demo
+placeholder (see `SECURITY.md` "Authentication"). It reads straight from `evidence/artifacts/` and
 `evidence/runs/` on every request (no writes, no state of its own), so it stays accurate
 while you run more discovery/replay/approve commands in other terminals and just refresh.
 Two things worth pointing at: a second confidence badge appears ("drift-capped to ...")
@@ -387,8 +418,11 @@ npm run agent-invoke-demo -- --params '{"username":"demo_operator","password":"d
 
 Real evidence for all four legs of the contract over HTTP -- declined-risky (422),
 success (200), business_outcome (200), and a parameter-validation error (400) -- is in
-`evidence/runs/replay-2026-08-25T18-3*`. No auth on this endpoint; fine for a local demo,
-not for a real deployment (see `REPORT.md` "Stretch goals").
+`evidence/runs/replay-2026-08-25T18-3*`. Both `agent-invoke-demo` and `agent-chat` (step 11)
+read `CAPABILITY_API_KEY` from `.env` and send it automatically; calling the API directly
+(e.g. with `curl`) needs `-H "Authorization: Bearer $CAPABILITY_API_KEY"` -- see
+`SECURITY.md` "Authentication" for why this is now a real gate, not a local-demo-only
+placeholder.
 
 **Tenant-aware invocation.** The invoke body also takes an optional `tenantId`, applying
 that tenant's override (from step 6) before replaying -- so an agent can ask for a specific
@@ -524,6 +558,54 @@ brief, that's intentional for discovery, and the same principle extends to anyth
 puts a model back in the loop on purpose. Steps 14-15 (canary check, compliance report)
 never call Gemini -- they're read-only over the deterministic replay engine and existing
 evidence, same "replay never calls a model" promise as step 3.
+
+## Running via Docker Compose
+
+Containerizes the three long-running services -- mock-bank (both tenants), the capability
+API, and the dashboard -- as an alternative to running each with its own `npm run` command.
+Deliberately does **not** containerize `run-agent`, `escalation-resume-demo`, or
+`vision-fallback-demo`: those launch a real *headed* Chromium window meant to be watched
+live, which can't run headless in a container; step 1-7 and 12-13 above still need the host
+setup for that reason. `docker-compose.yml` builds `Dockerfile.mock-bank`,
+`Dockerfile.capability-api` (runtime base `mcr.microsoft.com/playwright:v1.49.1-jammy`, so
+the browser binaries baked into the image match this repo's `playwright` version -- no
+`playwright install` step needed), and `Dockerfile.dashboard`.
+
+```bash
+cp .env.example .env   # fill in real values first, see Setup above
+docker compose up --build
+```
+
+This starts mock-bank on 4000, mock-bank-northgate on 4100, the capability API on 4700, and
+the dashboard on 4600 -- the same ports as running everything natively, so
+`agent-invoke-demo`/`agent-chat`/`curl` against `http://localhost:4700` work unchanged
+whether the capability API is containerized or run with `npm run capability-api`.
+`evidence/` and `config/` are bind-mounted into the capability-api and dashboard containers,
+so state written by one is visible to the other and to your host filesystem, same as running
+natively. See `SECURITY.md` "Containers" for why `capability-api`/`mock-bank-northgate`/
+`dashboard` all set `network_mode: "service:mock-bank"` (short version: the real, checked-in
+evidence this repo replays against has literal `http://localhost:4000`/`:4100` baked in from
+actual recording sessions, and this is how a container-launched Playwright browser gets
+`localhost` to mean what that evidence expects, without rewriting real recorded data to fit
+a deployment convenience).
+
+**Not build-tested.** Docker wasn't available in the environment these files were produced
+in (verified by directly attempting `docker --version`, not assumed) -- the `dist/` output
+paths were confirmed by actually running `npx tsc` against this repo's real `tsconfig.json`,
+and the base image tag was confirmed to exist via the registry API, but no image here has
+gone through an actual `docker build`. Treat this path as reviewed-for-correctness, not
+verified end-to-end the way every other command in this README has real evidence behind it.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push/PR to `main`: `npm run typecheck`, `npm test`
+(the unit suite only -- it runs against a stub `Surface`, so no real Playwright browser is
+needed in CI), and `npm audit --omit=dev --audit-level=high` as a real dependency-vulnerability
+gate (currently 0 known vulnerabilities, so this is expected to pass, not decorative). One job,
+no deploy stage, no matrix -- this repo has no deployment target and no OS/version variability
+that matters, so CI's job is exactly "does it typecheck and pass tests on every push," nothing
+more, per the same "don't build infrastructure this doesn't need" reasoning as everywhere else
+in this pass.
 
 ## Type-checking & tests
 

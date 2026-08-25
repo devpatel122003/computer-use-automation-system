@@ -37,6 +37,70 @@ with one clear responsibility each, wired together by three CLI entry points
   turning that into a page a non-engineer can read in one glance is presentation on existing
   depth, not new surface area.
 
+**Module map.** Every arrow below is a real dependency in the code, not an aspirational one
+— `replay` and `agent` both call into `guardrails`/`escalation`/`evidence` directly, never
+through the HTTP layer, which is why an agent calling the capability API can't get looser
+guardrails than a human running the CLI: there's no separate code path for it to take.
+
+```mermaid
+flowchart TD
+    subgraph Interactive["Interactive (headed, watched live)"]
+        RunAgent["CLI: run-agent<br/>(discovery)"]
+        EscResume["CLI: escalation-resume-demo"]
+        VisionDemo["CLI: vision-fallback-demo"]
+    end
+
+    subgraph Unattended["Unattended (headless services)"]
+        ReplayCLI["CLI: replay / approve / drift-report"]
+        CapAPI["Capability API :4700<br/>(API key + rate limit)"]
+        Dashboard["Dashboard :4600<br/>(HTTP Basic auth)"]
+        Canary["CLI: canary-check"]
+        Compliance["CLI: compliance-report"]
+    end
+
+    Agent["agent (discovery loop)<br/>Gemini function-call, one action/turn"]
+    Replay["replay (deterministic engine)<br/>zero model calls"]
+    Surface["Surface<br/>observe / act / predictNavigation"]
+    Guardrails["guardrails<br/>allowlist + risk policy + redaction"]
+    Escalation["escalation<br/>pause / human takeover / resume"]
+    Artifact["artifact<br/>schema + recorder + confidence registry"]
+    Evidence["evidence<br/>JSONL logger + screenshots"]
+    Frontend["frontend/planner<br/>NL -> capability + typed args"]
+
+    RunAgent --> Agent
+    EscResume --> Agent
+    VisionDemo --> Replay
+    Agent --> Surface
+    Agent -.->|records finished run| Artifact
+    Agent --> Guardrails
+    Agent --> Escalation
+    Agent --> Evidence
+
+    ReplayCLI --> Replay
+    CapAPI --> Replay
+    Canary --> Replay
+    Replay --> Surface
+    Replay --> Guardrails
+    Replay --> Escalation
+    Replay --> Evidence
+    Replay -.->|reads/scores| Artifact
+
+    CapAPI -.->|"NL request (agent-chat)"| Frontend
+    Frontend -.->|typed invoke| CapAPI
+    Dashboard -.->|reads only, no writes| Artifact
+    Dashboard -.->|reads only, no writes| Evidence
+    Compliance -.->|reads only, no writes| Evidence
+
+    Surface -->|drives| MockBank["mock-bank :4000/:4100<br/>(fake target app)"]
+```
+
+Solid arrows are real runtime calls into shared logic; dashed arrows are read-only or
+one-shot data flow (a finished discovery transcript becoming an artifact; the dashboard and
+compliance report reading, never writing, evidence on disk). The interactive/unattended split
+at the top mirrors a real constraint, not a style choice: `run-agent` opens a *headed*
+browser window meant to be watched, which is fundamentally incompatible with a container —
+see `SECURITY.md` and the Docker/CI notes below for what actually gets containerized and why.
+
 Key trade-off: I chose to make locator resolution and the risk/allowlist check the *same
 code path* for discovery and replay (both go through `Surface.perform`/`predictNavigation`
 and `GuardrailsPolicy.authorize`). This costs a little indirection but means the replay
@@ -351,7 +415,10 @@ in a config file), not inferred from anything about the data being touched.
   added in a later pass, once the core loop, artifact schema, determinism, and escalation
   were already genuinely right. Each addition still gets the same bar: real evidence, real
   tests, no shortcuts. Code generation is the one stretch goal still deliberately skipped —
-  the least load-bearing of the six for what this system is actually for.
+  the least load-bearing of the six for what this system is actually for. A further,
+  separate pass (§8's "A non-stretch-goal addition: production hardening") added real auth,
+  transport hardening, containerization, and CI on top — closing gaps this report had
+  already named as cuts rather than adding new stretch-goal-shaped capability.
 - **`known_outcomes` are human-authored, not auto-mined.** A single happy-path discovery
   run never observes its own error states by definition. A production version would run
   discovery against seeded error fixtures too, or gate known-outcome additions behind
@@ -669,6 +736,21 @@ config/tenant-overrides/northgate-cu.json` (`replay-2026-08-25T19-04-57-509Z` an
 `replay-2026-08-25T19-05-46-142Z`) — the same independent-trust behavior already documented
 above, now reachable and provable end to end over HTTP, not just via the CLI.
 
+**A real path-traversal bug found and fixed in the production-hardening pass.**
+`tenantId` reaches `resolveEffectiveArtifact` straight from an HTTP request body (or, via
+the conversational front end, from a model's own output) — an untrusted caller, not an
+operator typing a CLI flag. The original code built the override path with a bare
+`path.join(overridesDir, `${tenantId}.json`)`, with nothing stopping a `tenantId` like
+`"../../../../etc/passwd"` from resolving outside `config/tenant-overrides/` entirely and
+reading an arbitrary `.json`-suffixed file the process could access. Fixed by validating
+`tenantId` against the same charset real tenant filenames use (`^[a-zA-Z0-9_-]+$`) before any
+path is built or any filesystem call is made — see `src/api/tenant-resolution.test.ts`'s
+traversal test, which asserts the *validation* error specifically, not a coincidental
+file-not-found, to prove the check runs first. Found by re-reading every place an HTTP
+request body value reaches `fs`/`path` during this pass, not by a fuzzer or a report — worth
+naming plainly rather than folding silently into the diff, the same reasoning §1 gives for
+listing the adversarial-review bugs explicitly instead of just fixing them quietly.
+
 **The other half of Section 1's sentence, made real.** Everything above is "this system
 reliably and safely does it." `src/frontend/planner.ts` + `src/cli/agent-chat.ts` are a thin,
 honest slice of "the agent-facing product decides what to do": a natural-language
@@ -699,14 +781,23 @@ password never appears in cleartext in this CLI's own stdout, only in npm's own 
 argv echo, which is a shell-level exposure common to every `--password`/`--params` flag in
 this repo, not something this fix could reach).
 
-**Cut from this stretch goal:** no auth (fine for a local demo; a real deployment would need
-the same kind of identity this registry already lacks for `approve` — see §7). No
-capability versioning in the URL (`/capabilities/:id/invoke` takes whichever on-disk artifact
-matches that id; two versions of the same id on disk would be ambiguous — not a scenario this
-repo's tooling produces today, but a real gap for a fleet). No rate limiting, no queueing —
-per the brief's own "don't build scaling infrastructure you don't need," and because a
-synchronous Playwright-backed HTTP handler is the right amount of infrastructure for what
-this demonstrates, not a production concurrency model.
+**No longer cut, added in the production-hardening pass:** this endpoint now requires a real
+API key on every route except `/health` (`src/http/api-key-auth.ts`, timing-safe, fails
+closed and loud at startup if unconfigured), plus a rate limit specifically on `/invoke`
+(20/min, independent of read traffic to `/capabilities`, since invocation can trigger a real
+action). See `SECURITY.md` "Authentication" for the full design and why it's a single shared
+secret per surface rather than per-operator identity.
+
+**Still cut:** the identity gap above closes "any caller with a key," not "which caller" —
+this registry still lacks the same per-approver identity `approve` lacks (see §7 and
+`SECURITY.md` "Authentication" for what a real multi-operator deployment would need on top).
+No capability versioning in the URL (`/capabilities/:id/invoke` takes whichever on-disk
+artifact matches that id; two versions of the same id on disk would be ambiguous — not a
+scenario this repo's tooling produces today, but a real gap for a fleet). No queueing — a
+synchronous Playwright-backed HTTP handler, now with a request-scoped rate limit rather than
+an unbounded one, is still the right amount of infrastructure for what this demonstrates, not
+a production concurrency model, per the brief's own "don't build scaling infrastructure you
+don't need."
 
 ### Assisted fallback
 
@@ -829,3 +920,61 @@ record *which human* approved a risky action or an artifact, only *that* one did
 (§7) — a real deployment auditing against this report would still need an
 authenticated-reviewer identity layer on top, which this report is honest about needing
 rather than implying it already has.
+
+### A non-stretch-goal addition: production hardening
+
+Also not one of the brief's six stretch goals, and also said plainly: this closes gaps this
+report already named as cuts (§6's "Limits," the capability API's own "no auth" line, above)
+rather than adding new capability-shaped behavior. Full detail lives in
+[`SECURITY.md`](SECURITY.md), written specifically so this material has one home instead of
+being re-explained per section; this is the summary of what changed and why now, not a
+duplicate of it.
+
+**Auth.** The capability API and dashboard were the two HTTP surfaces in this repo with no
+authentication at all — real operational data (confidence, approval state, drift) on one,
+a real action trigger on the other. Both now require a real credential on every route except
+`/health`, chosen per how each is actually called rather than one scheme for both: bearer/
+API-key for the capability API (called by code — an agent, a CLI), HTTP Basic for the
+dashboard (opened directly in a browser by a human, where Basic's native browser prompt
+means no login form has to exist). Both comparisons are timing-safe (SHA-256 the candidate
+and the secret before `crypto.timingSafeEqual`, so response timing can't leak the secret's
+length or a byte-position match), and both fail closed and loud: an unset key throws at
+process startup rather than silently serving unauthenticated traffic. `agent-invoke-demo.ts`
+and `agent-chat.ts` were updated to send the credential automatically from `.env`; a bare
+`curl` against the capability API now needs it explicitly, which is the point.
+
+**Transport hardening.** `helmet()` on all three Express services (mock-bank's CSP is the
+one deliberate exception — see `SECURITY.md` for why, and why mock-bank being the *fake
+target* rather than the system under hardening means this isn't a double standard). A
+request-scoped rate limit specifically on the capability API's `/invoke` route, independent
+of read traffic, since invocation can trigger a real guardrail-checked action. A structured
+JSON access log (method/path/status/duration only, deliberately never headers or bodies —
+see `src/http/request-log.ts`'s own comment for why that scope is the whole point) on all
+three services, and an unauthenticated `/health` route on all three for container
+orchestration and uptime checks, which discloses nothing beyond "the process is up."
+
+**What this deliberately doesn't add.** Per-user identity or a "who approved this" audit
+trail — both are named limits in §6 and `SECURITY.md`, not silently fixed here, because a
+single shared secret per surface is proportionate to "one caller class per surface" as this
+system exists today, and pretending otherwise would overstate what got built. No service
+mesh, no message queue, no database, no Kubernetes — the same "don't build scaling
+infrastructure you don't need" reasoning as §8's "Multi-run stability," applied to
+infrastructure this time instead of a stretch goal.
+
+**Containerization and CI.** `docker-compose.yml` + three `Dockerfile.*`s containerize the
+three long-running services (mock-bank ×2 tenants, capability API, dashboard) — deliberately
+not the interactive, headed-browser demo scripts (`run-agent`, `escalation-resume-demo`,
+`vision-fallback-demo`), which are meant to be watched live and fundamentally can't run
+headless in a container. The one real architectural wrinkle: the checked-in recorded
+evidence this repo replays against has literal `http://localhost:4000`/`:4100` baked into it
+from actual recording sessions, so a container-launched Playwright browser needs `localhost`
+to keep meaning that, not a Compose service-discovery hostname — rewriting real recorded
+evidence to fit a deployment convenience would have been the wrong call, so the compose file
+uses `network_mode: "service:mock-bank"` to have every container share one network namespace
+instead. `.github/workflows/ci.yml` runs typecheck, the unit suite, and a dependency-audit
+gate on every push — one job, no deploy stage, matching this repo's actual deployment target
+(none) rather than performing a pipeline it doesn't need. Full detail, including the honest
+limits (no `docker build` was possible in the environment that produced these files, so
+they're reviewed-for-correctness, not build-verified; `capability-api` still runs as root
+for Playwright-sandbox reasons while the other two don't), is in `SECURITY.md`
+"Containers" rather than duplicated here.
