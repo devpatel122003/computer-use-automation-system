@@ -25,7 +25,9 @@ and cuts).
 - `src/artifact/` — the capability artifact schema (Zod), the recorder that builds one from
   a finished discovery run, the confidence/approval registry (stretch goal), and the
   tenant-override module for cross-tenant reuse (stretch goal).
-- `src/replay/` — the deterministic replay engine and checkpoint/known-outcome evaluator.
+- `src/replay/` — the deterministic replay engine, the checkpoint/known-outcome evaluator,
+  and the UI-drift signal (`npm run drift-report` -- diffs each replay's matched locator
+  strategy against what was recorded, per step).
 - `src/guardrails/` — the allowlist policy, risk classification, and redaction utilities.
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
   drive the same live browser session, capture what they did, hand control back).
@@ -287,6 +289,24 @@ steps that don't have that safety net (the Sign On/Look Up Member/Open New Accou
 controls). See REPORT.md "Heterogeneity & multi-tenant" and "Stretch goals" for the full
 design and why the override is deliberately restricted to copy, not flow structure.
 
+**7. UI-drift signal.** Every replay already logs which locator strategy actually resolved
+per step; this diffs that against what was recorded, across whatever replay runs exist for
+this exact artifact content:
+
+```bash
+npm run drift-report
+```
+
+Run against this repo's own checked-in evidence, it surfaces something real: `step-2`/
+`step-3` (the Operator ID/Password fields) show a fallback to `css_structural` on the run
+that hit the rebranded northgate-cu tenant *without* the locator override -- because those
+two fields happen to carry `id` attributes, so the structural fallback quietly covered for
+the mismatched `role`/`text` candidates (see step 6's honesty note). `step-11` is flagged on
+every run for an unrelated, harmless reason: its `text` candidate is the literal
+confirmation number observed at *recording* time, which by construction never matches again.
+See `REPORT.md` "Determinism & error handling" for both, and why the second one is a known
+false-positive category rather than a real drift signal.
+
 ## Running without live services
 
 The mock-bank app *is* the "live service" here -- there's no external dependency beyond
@@ -301,14 +321,15 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (94 tests across 10 files, no network/browser
+`npm test` runs a real Vitest unit suite (98 tests across 11 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route
 matching (including the origin-vs-prefix bypass cases described in `REPORT.md` "Safety"),
 artifact schema cross-field validation, the confidence/registry math, the recorder's
 artifact-building, the tenant-override module (patch application, and that it throws on a
-stepId/strategy/known-outcome that doesn't exist rather than silently no-oping), the replay
+stepId/strategy/known-outcome that doesn't exist rather than silently no-oping), the
+UI-drift signal's extraction/aggregation logic, the replay
 engine's guardrail/recovery/retry behavior, and the discovery loop's own control flow
 (escalate/resume, dead-end detection, risky-action confirmation) -- using a stub `Surface`, a
 scripted fake model *output* (not a claim about what real Gemini would decide), and, where a

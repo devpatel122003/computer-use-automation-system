@@ -167,9 +167,22 @@ error re-rendering the same page in place as the direct response to a POST rathe
 redirecting — can land the browser somewhere the pre-flight prediction never saw.
 
 **Secondarily, UI drift**: every action result records which locator strategy actually
-matched. A production version would diff that against what was recorded and flag "step-6
-resolved via `css_structural` instead of `role`" as a drift signal for review — the schema
-already carries what's needed; only the diffing/reporting layer is unbuilt (see Cuts).
+matched. `npm run drift-report` (`src/replay/drift.ts` + `src/cli/drift-report.ts`) is the
+diffing/reporting layer this used to just describe as unbuilt: it reads every replay run's log
+for a given artifact's exact content fingerprint, and for each step compares what actually
+matched against that step's own top-priority recorded candidate, flagging steps where a run
+fell back below it (e.g. "step-6 resolved via `css_structural` instead of `role`"). Running it
+for real against this repo's own accumulated evidence surfaced something genuine, not staged:
+`step-2`/`step-3` (the Operator ID/Password fields) show up flagged on one run — the run that
+hit the rebranded northgate-cu tenant without a locator override (§8's negative control) —
+because those two fields happen to carry `id` attributes, so `css_structural` quietly caught
+what `role`/`text` missed, exactly the "free but narrow resilience" limit described in §8.
+`step-11` (extracting the confirmation number) is flagged on every run, for an unrelated,
+harmless reason: its `text` candidate is the literal value observed at *recording* time
+(`"SA-00004"`), which by construction never matches again once a new confirmation number is
+issued — a known false-positive category for any step whose "text" is actually dynamic data,
+not static copy, worth excluding in a fuller version rather than a limitation of this pass
+alone. See Cuts for what a fleet-scale version of this would still need.
 
 ## 4. Heterogeneity & multi-tenant
 
@@ -326,8 +339,13 @@ in a config file), not inferred from anything about the data being touched.
   `(role, name)` pairs to named params via a small explicit table, not an LLM
   generalization step. Simpler and fully deterministic, at the cost of needing that table
   hand-maintained per capability.
-- **No UI-drift diffing job**, despite the data (matched-locator-strategy per step) already
-  being logged — described in §3/§4 but not built.
+- **UI-drift diffing is single-artifact, single-machine, and pull-based** (`npm run
+  drift-report`, §3). It's real, not just described, but a fleet-scale version needs: per-
+  tenant/version grouping (today it's "this fingerprint across whatever runs happened to be
+  under `evidence/runs`"), a persistence layer instead of re-reading JSONL on every
+  invocation, and a way to exclude steps whose "text" candidate is inherently dynamic data
+  (like `step-11`'s confirmation number) rather than static copy, so they stop being a
+  permanent false positive.
 - **No mid-artifact resume after a replay hard failure.** A failure returns to the caller
   today; a fuller build would let a human fix the live state during escalation and resume
   replay from the next step, mirroring what discovery's `resume` already does.
@@ -362,12 +380,12 @@ exercise:
     on a toolchain upgrade.
 
 **What I'd build next**, roughly in order: (1) mid-artifact resume-after-failure, since
-escalation without it is only half the story; (2) the UI-drift diff/report job, since the
-data for it already exists (and would pair naturally with the confidence score — a step
-that keeps falling back to a lower-confidence locator strategy should pull an artifact's
-score down even if it's still technically succeeding); (3) reviewer identity on approval;
-(4) some outside-the-system check on `knownOutcomes` detector correctness, since that's the
-one gap above that quietly undermines a feature (confidence scoring) that already shipped.
+escalation without it is only half the story; (2) feeding the UI-drift signal (now built,
+§3) into the confidence score itself — a step that keeps falling back to a lower-confidence
+locator strategy should pull an artifact's score down even if it's still technically
+succeeding, which isn't wired up yet; (3) reviewer identity on approval; (4) some
+outside-the-system check on `knownOutcomes` detector correctness, since that's the one gap
+above that quietly undermines a feature (confidence scoring) that already shipped.
 
 ## 8. Stretch goals: Confidence & approval, and Cross-tenant reuse
 

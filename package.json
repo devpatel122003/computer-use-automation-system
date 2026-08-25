@@ -14,6 +14,7 @@
     "escalation-resume-demo": "tsx src/cli/escalation-resume-demo.ts",
     "replay": "tsx src/cli/replay.ts",
     "approve": "tsx src/cli/approve.ts",
+    "drift-report": "tsx src/cli/drift-report.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "playwright:install": "playwright install chromium"
