@@ -46,7 +46,13 @@ export type Action =
   | { type: "click"; target: LocatorCandidate[]; timeoutMs?: number }
   | { type: "type"; target: LocatorCandidate[]; text: string; timeoutMs?: number }
   | { type: "select_option"; target: LocatorCandidate[]; option: string; timeoutMs?: number }
-  | { type: "extract"; target: LocatorCandidate[] };
+  | { type: "extract"; target: LocatorCandidate[] }
+  /** A live-replay-only fallback for surfaces with no walkable DOM/accessibility info at
+   *  all (the brief's "native desktop application... the only reliable surface is what a
+   *  human operator sees and does" case -- canvas-rendered widgets, screen-shared terminal
+   *  emulators). Never produced by discovery or stored on a recorded artifact step -- there
+   *  is no `LocatorCandidate` for it, by design; see src/replay/vision-fallback.ts. */
+  | { type: "click_coordinates"; x: number; y: number };
 
 export interface ActionResult {
   ok: boolean;

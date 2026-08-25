@@ -7,6 +7,8 @@
     { "pattern": "/members/:id", "methods": ["GET"], "risk": "safe" },
     { "pattern": "/members/:id/sub-accounts/new", "methods": ["GET"], "risk": "safe" },
     { "pattern": "/members/:id/sub-accounts", "methods": ["POST"], "risk": "risky" },
-    { "pattern": "/members/:id/sub-accounts/:subId/confirm", "methods": ["GET"], "risk": "safe" }
+    { "pattern": "/members/:id/sub-accounts/:subId/confirm", "methods": ["GET"], "risk": "safe" },
+    { "pattern": "/legacy-widget-demo", "methods": ["GET"], "risk": "safe" },
+    { "pattern": "/legacy-widget-demo/confirmed", "methods": ["GET"], "risk": "safe" }
   ]
 }

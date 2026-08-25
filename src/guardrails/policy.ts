@@ -39,6 +39,20 @@ export class GuardrailsPolicy {
       return { allowed: true, risk: "safe" };
     }
 
+    if (action.type === "click_coordinates") {
+      // Always classified risky, never blocked outright: a coordinate click's destination
+      // can never be verified in advance (there's no DOM element to inspect, by definition
+      // -- that's exactly why this action type exists). Treating it as "safe" would let a
+      // vision-driven guess bypass the confirmation gate entirely; treating it as "blocked"
+      // the way an indeterminate DOM click is would make it permanently inert, since it's a
+      // deliberately-chosen fallback mechanism, not a bypass attempt to catch.
+      return {
+        allowed: true,
+        risk: "risky",
+        reason: "Vision-based coordinate click: destination cannot be verified in advance, always requires confirmation.",
+      };
+    }
+
     const predicted = await surface.predictNavigation(action);
 
     if (predicted === undefined) {

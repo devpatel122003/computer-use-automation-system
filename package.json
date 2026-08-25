@@ -18,6 +18,8 @@
     "dashboard": "tsx src/dashboard/server.ts",
     "capability-api": "tsx src/api/server.ts",
     "agent-invoke-demo": "tsx src/cli/agent-invoke-demo.ts",
+    "agent-chat": "tsx src/cli/agent-chat.ts",
+    "vision-fallback-demo": "tsx src/cli/vision-fallback-demo.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "playwright:install": "playwright install chromium"

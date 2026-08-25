@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { replay } from "./replay-engine.js";
 import type { CapabilityArtifact, ArtifactStep, LocatorCandidate } from "../artifact/schema.js";
 import type { Action, ActionResult, PredictedNavigation, StateSnapshot, Surface } from "../surface/types.js";
@@ -96,6 +99,154 @@ describe("replay: happy path", () => {
 
     const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true });
     expect(result.status).toBe("success");
+  });
+});
+
+describe("replay: assisted recovery (§8 stretch goal, opt-in only)", () => {
+  function scriptedGenai(name: string | undefined, args: Record<string, unknown> = {}) {
+    return {
+      models: {
+        generateContent: async () =>
+          name ? { candidates: [{ content: { parts: [{ functionCall: { name, args, id: "call-1" } }] } }] } : { candidates: [{ content: { parts: [] } }] },
+      },
+    } as unknown as import("@google/genai").GoogleGenAI;
+  }
+
+  /** attemptAssistedRecovery reads the screenshot path's bytes for real (an inline image
+   *  part for the model call), so this needs to return a real file, not a made-up string. */
+  function writeFakeScreenshot(): string {
+    const file = path.join(os.tmpdir(), `replay-engine-test-${Date.now()}-${Math.random().toString(36).slice(2)}.png`);
+    fs.writeFileSync(file, "not a real png, just needs to exist");
+    return file;
+  }
+
+  /** Unlike the shared fakeSurface above, this one supports observe() -- assisted recovery
+   *  needs a real snapshot to resolve the model's proposed element against. */
+  function fakeObservableSurface(
+    state: { url: string; text: string },
+    elements: StateSnapshot["elements"],
+    performImpl: (action: Action) => Promise<ActionResult>
+  ): Surface {
+    return {
+      observe: async (): Promise<StateSnapshot> => ({ url: state.url, title: "", elements, screenshotPath: "s.png" }),
+      perform: performImpl,
+      predictNavigation: async (): Promise<PredictedNavigation | null> => null,
+      getVisibleText: async () => state.text,
+      screenshot: async () => writeFakeScreenshot(),
+      currentUrl: () => state.url,
+      close: async () => undefined,
+    };
+  }
+
+  it("recovers a mechanical action failure via one bounded LLM call, then completes the run normally", async () => {
+    const state = { url: "http://x/start", text: "" };
+    const artifact = makeArtifact({
+      steps: [
+        step({ id: "step-1", actionType: "navigate", url: "/start" }),
+        step({
+          id: "step-2",
+          actionType: "click",
+          locator: locator("Continue"), // the recorded locator -- deliberately made to fail below, simulating drift
+          checkpoint: { kind: "url", expr: "/done", description: "reached done" },
+        }),
+      ],
+      successCheckpoint: { kind: "text_match", expr: "all set", description: "final banner" },
+    });
+
+    const goButton = {
+      role: "button" as const,
+      name: "Go",
+      nth: 0,
+      locatorCandidates: [{ strategy: "role" as const, role: "button" as const, name: "Go", nth: 0, confidence: "high" as const, rationale: "r" }],
+    };
+
+    const { policy } = fakePolicy();
+    const surface = fakeObservableSurface(state, [goButton], async (action) => {
+      if (action.type === "navigate") {
+        state.url = action.url;
+        return { ok: true, url: state.url };
+      }
+      const targetName = action.type === "click" ? action.target[0]?.name : undefined;
+      if (targetName === "Continue") return { ok: false, error: "element not found (simulated drift)", url: state.url };
+      // The assisted action (targeting "Go", resolved from the observed snapshot) succeeds.
+      state.url = "http://x/done";
+      state.text = "all set";
+      return { ok: true, url: state.url };
+    });
+
+    const genai = scriptedGenai("click", { reasoning: "The button is now labeled Go instead of Continue.", role: "button", name: "Go" });
+
+    const result = await replay({
+      artifact,
+      params: {},
+      surface,
+      policy,
+      logger: fakeLogger(),
+      runId: "r1",
+      allowRisky: true,
+      assistedRecovery: { genai },
+    });
+
+    expect(result.status).toBe("success");
+  });
+
+  it("does not attempt assisted recovery unless a caller explicitly opts in -- the default (no assistedRecovery config) is unchanged", async () => {
+    const state = { url: "http://x/start", text: "" };
+    const artifact = makeArtifact({
+      steps: [
+        step({ id: "step-1", actionType: "navigate", url: "/start" }),
+        step({ id: "step-2", actionType: "click", locator: locator("Continue") }),
+      ],
+    });
+    const { policy } = fakePolicy();
+    const surface = fakeSurface(state, async (action) => {
+      if (action.type === "navigate") {
+        state.url = action.url;
+        return { ok: true, url: state.url };
+      }
+      return { ok: false, error: "element not found", url: state.url };
+    });
+
+    // No assistedRecovery in options -- if this reached out to a model, fakeSurface's
+    // observe() throws, and the test would fail with that error instead of a clean result.
+    const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true });
+    expect(result.status).toBe("failure");
+  });
+
+  it("falls through to the original failure when the assisted attempt itself doesn't recover", async () => {
+    const state = { url: "http://x/start", text: "" };
+    const artifact = makeArtifact({
+      steps: [step({ id: "step-1", actionType: "click", locator: locator("Continue") })],
+    });
+    const { policy } = fakePolicy();
+    const surface = fakeObservableSurface(state, [], async () => ({ ok: false, error: "element not found", url: state.url }));
+    const genai = scriptedGenai("click", { reasoning: "r", role: "button", name: "Nonexistent" });
+
+    const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true, assistedRecovery: { genai } });
+    expect(result.status).toBe("failure");
+    if (result.status === "failure") expect(result.observed).toBe("element not found");
+  });
+
+  it("never attempts assisted recovery for an 'extract' step -- there's no sensible single click/type/select_option that recovers a failed extraction", async () => {
+    const state = { url: "http://x/start", text: "" };
+    const artifact = makeArtifact({
+      steps: [step({ id: "step-1", actionType: "extract", locator: locator("Confirmation") })],
+    });
+    const { policy } = fakePolicy();
+    let generateContentCalls = 0;
+    const genai = {
+      models: {
+        generateContent: async () => {
+          generateContentCalls += 1;
+          return { candidates: [{ content: { parts: [] } }] };
+        },
+      },
+    } as unknown as import("@google/genai").GoogleGenAI;
+    const surface = fakeObservableSurface(state, [], async () => ({ ok: false, error: "element not found", url: state.url }));
+
+    const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true, assistedRecovery: { genai } });
+    expect(result.status).toBe("failure");
+    expect(generateContentCalls).toBe(0);
   });
 });
 
@@ -463,5 +614,19 @@ describe("replay: input param validation", () => {
     const surface = fakeSurface(state, async () => ({ ok: true, url: state.url }));
 
     await expect(replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1" })).rejects.toThrow(/Missing required/);
+  });
+
+  it("treats an empty string as missing, not as a provided value", async () => {
+    const artifact = makeArtifact({
+      inputParams: [{ name: "memberId", type: "string", required: true, sensitive: false }],
+      steps: [],
+    });
+    const state = { url: "http://x", text: "" };
+    const { policy } = fakePolicy();
+    const surface = fakeSurface(state, async () => ({ ok: true, url: state.url }));
+
+    await expect(
+      replay({ artifact, params: { memberId: "" }, surface, policy, logger: fakeLogger(), runId: "r1" })
+    ).rejects.toThrow(/Missing required input params: memberId/);
   });
 });

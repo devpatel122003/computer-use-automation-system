@@ -6,9 +6,12 @@ import { GuardrailsPolicy } from "../guardrails/policy.js";
 import { EvidenceLogger, newRunId } from "../evidence/logger.js";
 import { redact } from "../guardrails/redaction.js";
 import { replay } from "../replay/replay-engine.js";
-import { getOrCreateEntry, loadRegistry, recordReplayOutcome, saveRegistry } from "../artifact/registry.js";
+import { computeConfidence, getOrCreateEntry, loadRegistry, recordReplayOutcome, saveRegistry } from "../artifact/registry.js";
 import { statusCodeFor } from "./status.js";
 import { resolveEffectiveArtifact } from "./tenant-resolution.js";
+import { driftAdjustedLabel } from "../replay/drift.js";
+import { loadMatchingDriftReports } from "../replay/drift-loader.js";
+import { effectiveAllowRisky } from "../replay/execution-policy.js";
 
 /**
  * The brief's §8 "agent-facing capability interface" stretch goal: a small HTTP surface an
@@ -85,9 +88,14 @@ app.post("/capabilities/:id/invoke", async (req, res) => {
   // independent of the base artifact's, exactly like the CLI/replay path.
   const registry = loadRegistry(REGISTRY_PATH);
   const entry = getOrCreateEntry(registry, artifact);
+  const drift = loadMatchingDriftReports(artifact, entry.fingerprint);
+  const adjustedConfidenceLabel = driftAdjustedLabel(computeConfidence(entry).label, drift);
   // Same gate as the CLI (src/cli/replay.ts): --allow-risky/allowRisky only takes effect
-  // once this exact artifact content -- base or tenant-overridden -- has been approved.
-  const allowRisky = requestedAllowRisky && entry.approvalState === "approved";
+  // once this exact artifact content -- base or tenant-overridden -- has been approved AND
+  // its drift-adjusted confidence hasn't degraded to "low"/"unproven" (the circuit
+  // breaker, src/replay/execution-policy.ts) -- an agent calling this over HTTP can't get
+  // looser guardrails than a human running the CLI would.
+  const allowRisky = effectiveAllowRisky({ requestedAllowRisky, approvalState: entry.approvalState, driftAdjustedLabel: adjustedConfidenceLabel });
 
   logger.log({
     step: 0,
@@ -97,6 +105,7 @@ app.post("/capabilities/:id/invoke", async (req, res) => {
       fingerprint: entry.fingerprint,
       tenantId,
       approvalState: entry.approvalState,
+      driftAdjustedConfidenceLabel: adjustedConfidenceLabel,
       allowRiskyRequested: requestedAllowRisky,
       allowRiskyEffective: allowRisky,
       params: redact(params, { sensitiveKeys: new Set(sensitiveParamNames) }),

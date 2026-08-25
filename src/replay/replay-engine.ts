@@ -3,6 +3,7 @@ import type { Action, ActionResult, Surface } from "../surface/types.js";
 import type { GuardrailsPolicy } from "../guardrails/policy.js";
 import type { EvidenceLogger } from "../evidence/logger.js";
 import { evaluateCheckpoint } from "./checkpoint.js";
+import { attemptAssistedRecovery, type AssistedRecoveryConfig } from "./assisted-recovery.js";
 import type { ReplayResult } from "./types.js";
 
 export interface ReplayOptions {
@@ -15,6 +16,12 @@ export interface ReplayOptions {
   /** Unattended production replay of risky steps requires an explicit opt-in. */
   allowRisky?: boolean;
   onRiskyStep?: (ctx: { step: ArtifactStep }) => Promise<boolean>;
+  /** Brief §8 "Assisted fallback", opt-in only: when set, a step whose mechanical action
+   *  fails with no known outcome to explain it gets exactly one bounded, policy-checked LLM
+   *  recovery attempt before this reports a hard failure. Omitted by default everywhere --
+   *  replay's core promise ("never calls a model") holds unless a caller explicitly opts in
+   *  here (see src/cli/replay.ts's `--assisted-recovery` flag). */
+  assistedRecovery?: AssistedRecoveryConfig;
 }
 
 /** A step is retried after recovery at most once -- if the same condition recurs
@@ -61,7 +68,12 @@ function buildAction(step: ArtifactStep, params: Record<string, string>, baseUrl
 }
 
 function validateParams(artifact: CapabilityArtifact, params: Record<string, string>): void {
-  const missing = artifact.inputParams.filter((p) => p.required && params[p.name] === undefined);
+  // Empty string counts as missing, not "provided" -- a blank operator ID or member ID is
+  // never a legitimate value in this domain. Found for real while wiring the conversational
+  // front end (src/frontend/planner.ts): a model that omits a value it isn't sure of can
+  // still supply "" for a plain (non-sensitive) required field, which used to sail through
+  // this check and only fail once the browser hit a login page it couldn't actually use.
+  const missing = artifact.inputParams.filter((p) => p.required && (params[p.name] === undefined || params[p.name] === ""));
   if (missing.length > 0) {
     throw new Error(`Missing required input params: ${missing.map((p) => p.name).join(", ")}`);
   }
@@ -91,6 +103,7 @@ interface ReplayContext {
   runId: string;
   allowRisky: boolean;
   onRiskyStep?: (ctx: { step: ArtifactStep }) => Promise<boolean>;
+  assistedRecovery?: AssistedRecoveryConfig;
 }
 
 type StepOutcome = { outcome: "success"; extracted?: { name: string; value: string } } | { outcome: "failure"; result: ReplayResult };
@@ -261,6 +274,7 @@ async function executeStep(ctx: ReplayContext, step: ArtifactStep, stepNum: numb
   });
 
   const canRecover = recoveryAttempt < MAX_RECOVERY_ATTEMPTS_PER_STEP;
+  let assistedRecoverySucceeded = false;
 
   if (!result.ok) {
     if (canRecover) {
@@ -271,17 +285,48 @@ async function executeStep(ctx: ReplayContext, step: ArtifactStep, stepNum: numb
         if (handled.result) return { outcome: "failure", result: handled.result };
       }
     }
-    const evidenceRef = await ctx.surface.screenshot(`failure-${step.id}`);
-    ctx.logger.log({ step: stepNum, phase: "error", summary: `Hard failure at ${step.id}: ${result.error}` });
-    return {
-      outcome: "failure",
-      result: { status: "failure", runId: ctx.runId, stepId: step.id, expected: `${step.actionType} to succeed`, observed: result.error ?? "unknown error", evidenceRef },
-    };
+
+    // Brief §8 "Assisted fallback" (opt-in only -- see ReplayOptions.assistedRecovery):
+    // one bounded LLM call proposing a single corrective action, only for a mechanical
+    // action failure with no known outcome to explain it, and never for an "extract" step
+    // (the recovery tool vocabulary is click/type/select_option -- there's no sensible
+    // single one of those that recovers a failed data extraction). Deliberately not wired
+    // into the checkpoint-failure branch below: "the action nominally succeeded but the
+    // resulting page doesn't match" is a fuzzier signal to hand a model than "this element
+    // didn't resolve at all," and this is a first, narrow pass at the stretch goal, not the
+    // whole surface it could eventually cover.
+    if (canRecover && ctx.assistedRecovery && step.actionType !== "extract") {
+      const assisted = await attemptAssistedRecovery({
+        config: ctx.assistedRecovery,
+        surface: ctx.surface,
+        policy: ctx.policy,
+        logger: ctx.logger,
+        step,
+        stepNum,
+        failureContext: result.error ?? "action did not resolve or execute",
+        onRiskyStep: ctx.onRiskyStep,
+      });
+      if (assisted.recovered) {
+        assistedRecoverySucceeded = true;
+        result = { ok: true, url: ctx.surface.currentUrl() };
+      }
+    }
+
+    if (!assistedRecoverySucceeded) {
+      const evidenceRef = await ctx.surface.screenshot(`failure-${step.id}`);
+      ctx.logger.log({ step: stepNum, phase: "error", summary: `Hard failure at ${step.id}: ${result.error}` });
+      return {
+        outcome: "failure",
+        result: { status: "failure", runId: ctx.runId, stepId: step.id, expected: `${step.actionType} to succeed`, observed: result.error ?? "unknown error", evidenceRef },
+      };
+    }
   }
 
   // Verify we actually landed somewhere in-allowlist, not just that the pre-flight
-  // prediction was fine -- a server redirect can land outside what was predicted.
-  if (action.type === "navigate" || action.type === "click") {
+  // prediction was fine -- a server redirect can land outside what was predicted (also
+  // checked after a successful assisted-recovery action, since that's a real navigation
+  // too, just not one `action.type` reflects).
+  if (action.type === "navigate" || action.type === "click" || assistedRecoverySucceeded) {
     const landed = ctx.policy.authorizeLandedUrl(ctx.surface.currentUrl());
     if (!landed.allowed) {
       const evidenceRef = await ctx.surface.screenshot(`landed-outside-allowlist-${step.id}`);
@@ -345,7 +390,17 @@ export async function replay(options: ReplayOptions): Promise<ReplayResult> {
     if (value) logger.addSensitiveValue(value);
   }
 
-  const ctx: ReplayContext = { artifact, params, surface, policy, logger, runId, allowRisky: options.allowRisky ?? false, onRiskyStep: options.onRiskyStep };
+  const ctx: ReplayContext = {
+    artifact,
+    params,
+    surface,
+    policy,
+    logger,
+    runId,
+    allowRisky: options.allowRisky ?? false,
+    onRiskyStep: options.onRiskyStep,
+    assistedRecovery: options.assistedRecovery,
+  };
 
   logger.log({
     step: 0,

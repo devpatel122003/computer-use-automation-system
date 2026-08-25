@@ -52,6 +52,16 @@ describe("GuardrailsPolicy.authorize -- predictNavigation's three-way return", (
     expect(result.allowed).toBe(false);
   });
 
+  it("classifies click_coordinates as risky but ALLOWED, never blocked outright -- a coordinate click's destination can never be verified in advance (there's no DOM to inspect), so blocking it would make the vision fallback permanently inert, same as treating it 'safe' would let it bypass confirmation entirely", async () => {
+    const policy = new GuardrailsPolicy(writeTempAllowlist());
+    const surface = fakeSurface(async () => {
+      throw new Error("predictNavigation should never be consulted for click_coordinates");
+    });
+    const result = await policy.authorize(surface, { type: "click_coordinates", x: 10, y: 20 });
+    expect(result.allowed).toBe(true);
+    expect(result.risk).toBe("risky");
+  });
+
   it("checks a known destination against the allowlist as usual", async () => {
     const policy = new GuardrailsPolicy(writeTempAllowlist());
     const allowed: PredictedNavigation = { url: "http://localhost:4000/members/1/sub-accounts", method: "POST" };

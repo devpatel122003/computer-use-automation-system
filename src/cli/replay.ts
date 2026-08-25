@@ -1,6 +1,7 @@
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
+import { GoogleGenAI } from "@google/genai";
 import { CapabilityArtifactSchema } from "../artifact/schema.js";
 import { PlaywrightSurface } from "../surface/playwright-surface.js";
 import { GuardrailsPolicy } from "../guardrails/policy.js";
@@ -11,6 +12,9 @@ import { EscalationController } from "../escalation/controller.js";
 import { parseArgs } from "./args.js";
 import { computeConfidence, getOrCreateEntry, loadRegistry, recordReplayOutcome, saveRegistry } from "../artifact/registry.js";
 import { applyTenantOverride, TenantOverrideSchema } from "../artifact/tenant-override.js";
+import { driftAdjustedLabel } from "../replay/drift.js";
+import { loadMatchingDriftReports } from "../replay/drift-loader.js";
+import { effectiveAllowRisky } from "../replay/execution-policy.js";
 
 const DEFAULT_REGISTRY_PATH = "evidence/artifacts/registry.json";
 
@@ -21,6 +25,15 @@ async function main(): Promise<void> {
   const requestedAllowRisky = args["allow-risky"] === "true";
   const headed = args.headless !== "true";
   const registryPath = args.registry ?? DEFAULT_REGISTRY_PATH;
+
+  // Opt-in only (§8 "Assisted fallback") -- omitted entirely by default, so replay's core
+  // promise ("never calls a model") holds unless this flag is explicitly passed.
+  const useAssistedRecovery = args["assisted-recovery"] === "true";
+  if (useAssistedRecovery && !process.env.GEMINI_API_KEY) {
+    console.error("--assisted-recovery requires GEMINI_API_KEY (see README.md).");
+    process.exitCode = 1;
+    return;
+  }
 
   const raw = JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
   const baseArtifact = CapabilityArtifactSchema.parse(raw);
@@ -44,11 +57,15 @@ async function main(): Promise<void> {
   const registry = loadRegistry(registryPath);
   const entry = getOrCreateEntry(registry, artifact);
   const confidence = computeConfidence(entry);
+  const drift = loadMatchingDriftReports(artifact, entry.fingerprint);
+  const adjustedConfidenceLabel = driftAdjustedLabel(confidence.label, drift);
 
   // Confidence & approval gate (Section 8 stretch goal): unattended replay of a risky step
-  // is only honored for an *approved* artifact. A draft artifact always requires
+  // is only honored for an *approved* artifact whose drift-adjusted confidence hasn't
+  // degraded to "low"/"unproven" -- the circuit breaker (execution-policy.ts). A draft
+  // artifact, or an approved one that drift has since undercut, always requires
   // interactive confirmation for risky steps, regardless of --allow-risky.
-  const allowRisky = requestedAllowRisky && entry.approvalState === "approved";
+  const allowRisky = effectiveAllowRisky({ requestedAllowRisky, approvalState: entry.approvalState, driftAdjustedLabel: adjustedConfidenceLabel });
 
   const runId = newRunId("replay");
   const logger = new EvidenceLogger({ runId, runType: "replay" });
@@ -73,6 +90,7 @@ async function main(): Promise<void> {
       fingerprint: entry.fingerprint,
       approvalState: entry.approvalState,
       confidence,
+      driftAdjustedConfidenceLabel: adjustedConfidenceLabel,
       allowRiskyRequested: requestedAllowRisky,
       allowRiskyEffective: allowRisky,
       params: redactedParams,
@@ -91,14 +109,32 @@ async function main(): Promise<void> {
     console.log(`Replay run: ${runId}`);
     console.log(`Artifact: ${artifact.name} v${artifact.version} (${entry.fingerprint})${appliedTenantId ? ` [tenant override: ${appliedTenantId}]` : ""}`);
     console.log(
-      `Approval: ${entry.approvalState} | Confidence: ${confidence.label} ` +
+      `Approval: ${entry.approvalState} | Confidence: ${confidence.label}` +
+        `${adjustedConfidenceLabel !== confidence.label ? ` (drift-capped to ${adjustedConfidenceLabel})` : ""} ` +
         `(${confidence.successCount}/${confidence.totalRuns} clean runs)`
     );
     if (requestedAllowRisky && !allowRisky) {
-      console.log(
-        "--allow-risky was requested but ignored: this artifact is still in draft state. " +
-          `Run \`npm run approve -- --artifact ${artifactPath}\` first, or confirm interactively below.`
-      );
+      if (entry.approvalState !== "approved") {
+        console.log(
+          "--allow-risky was requested but ignored: this artifact is still in draft state. " +
+            `Run \`npm run approve -- --artifact ${artifactPath}\` first, or confirm interactively below.`
+        );
+      } else if (adjustedConfidenceLabel !== confidence.label) {
+        console.log(
+          `--allow-risky was requested but ignored: this artifact is approved, but UI-drift has ` +
+            `capped its confidence to "${adjustedConfidenceLabel}" (run \`npm run drift-report\` for detail). ` +
+            "Falling back to interactive confirmation until a human reviews the drift."
+        );
+      } else {
+        console.log(
+          `--allow-risky was requested but ignored: this artifact is approved, but its confidence is ` +
+            `still "${adjustedConfidenceLabel}" (${confidence.successCount}/${confidence.totalRuns} clean runs so far -- not ` +
+            "drift, just not enough of a track record yet). Falling back to interactive confirmation until it's built up more history."
+        );
+      }
+    }
+    if (useAssistedRecovery) {
+      console.log("--assisted-recovery is on: a mechanical step failure with no known outcome gets one bounded LLM recovery attempt.");
     }
     console.log(`Params: ${JSON.stringify(redactedParams)}\n`);
 
@@ -111,6 +147,7 @@ async function main(): Promise<void> {
       runId,
       allowRisky,
       onRiskyStep: async ({ step }) => escalation.confirmRiskyAction(`Step ${step.id}: ${step.description}`),
+      assistedRecovery: useAssistedRecovery ? { genai: new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! }) } : undefined,
     });
 
     logger.writeJson("replay-result.json", result);

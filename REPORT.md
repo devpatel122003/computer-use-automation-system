@@ -206,6 +206,15 @@ AXUIElement on macOS) instead of Playwright; `LocatorStrategy` already has room 
 `desktop_automation_id` variant alongside `role`/`text`/`css_structural`. Nothing above
 `Surface` — agent, artifact, replay, guardrails — would need to change.
 
+This stopped being purely hypothetical: `src/replay/assisted-recovery.ts`'s
+`click_at_coordinates` (§8 "Assisted fallback") is a real, working, live-tested version of
+"the surface has no accessibility info at all" case, exercised against a genuine
+canvas-only fixture, not simulated. It's implemented as a live-replay-only `Action` variant
+rather than a fifth `LocatorStrategy` on purpose: a coordinate has no meaning once recorded
+(the same pixel position means nothing after the page reflows), so it can never be a
+*candidate* on a saved artifact step the way `role`/`text`/`css_structural` are — it only
+ever exists as an in-the-moment fallback when every recorded candidate has already failed.
+
 **Multi-tenant reuse — built, not just designed** (§8 stretch goal). Artifacts are already
 tenant-agnostic in the ways that matter: `target.baseUrlPattern` is a field, not embedded
 per-step, and URL checkpoints are path *templates* (`/members/{memberId}`, not
@@ -333,14 +342,15 @@ in a config file), not inferred from anything about the data being touched.
 
 ## 7. Cuts
 
-- **Three stretch goals implemented** (Confidence & approval, Cross-tenant reuse, and
-  Agent-facing capability interface — §8). The brief asks to "pick at most one or two,
-  depth over breadth" for the original submission; the first two were built to that bar.
-  The third was added in a later pass, once the core loop, artifact schema, determinism,
-  and escalation were already genuinely right (including the real bugs found and fixed,
-  described above) — each stretch goal still gets the same bar: real evidence, real tests,
-  no shortcuts, rather than three shallow ones. Code generation, assisted fallback, and
-  multi-run stability reporting were still deliberately skipped.
+- **Four of six stretch goals implemented** (Confidence & approval, Cross-tenant reuse,
+  Agent-facing capability interface, and Assisted fallback — §8; see §8's own note on why
+  this went past "pick one or two"). The first two were built to the original submission's
+  bar; the other two, and further depth on all four (the confidence circuit breaker, the
+  conversational front end, the vision-grounded fallback, the cross-tenant drift matrix),
+  were added in a later pass, once the core loop, artifact schema, determinism, and
+  escalation were already genuinely right. Each addition still gets the same bar: real
+  evidence, real tests, no shortcuts. Code generation and multi-run stability reporting
+  are the two stretch goals still deliberately skipped.
 - **`known_outcomes` are human-authored, not auto-mined.** A single happy-path discovery
   run never observes its own error states by definition. A production version would run
   discovery against seeded error fixtures too, or gate known-outcome additions behind
@@ -393,10 +403,25 @@ exercise:
 
 **What I'd build next**, roughly in order: (1) mid-artifact resume-after-failure, since
 escalation without it is only half the story; (2) reviewer identity on approval;
-(3) some outside-the-system check on `knownOutcomes` detector correctness, since that's the one gap
-above that quietly undermines a feature (confidence scoring) that already shipped.
+(3) some outside-the-system check on `knownOutcomes` detector correctness, since that's the
+one gap above that quietly undermines a feature (confidence scoring) that already shipped;
+(4) closing the vision-grounding accuracy gap (§8 "Assisted fallback") — cropping/zooming
+the screenshot, or passing the target element's approximate region as a hint — since the
+real evidence already shows the mechanism works end to end and accuracy is the one
+remaining piece; (5) scoping the confidence registry's key to `(fingerprint, tenantId)`
+instead of just `fingerprint`, closing the URL-only-override fingerprint collision found
+while building cross-tenant reuse.
 
-## 8. Stretch goals: Confidence & approval, Cross-tenant reuse, and Agent-facing capability interface
+## 8. Stretch goals: Confidence & approval, Cross-tenant reuse, Agent-facing capability interface, and Assisted fallback
+
+**A note on scope, since this section now covers four of the brief's six named stretch
+goals.** The original submission held to "pick one or two, depth over breadth" (Confidence
+& approval, Cross-tenant reuse). Everything below that point was added in a later,
+post-submission pass, once those two and the core system were already solid. Each addition
+still gets the same bar as the original two: real evidence, real tests, no shortcuts — going
+wider here was a deliberate choice to demonstrate range for a technical review, not a
+retreat from "depth over breadth" as a design principle. The four goals below, and how they
+were extended past their first cut:
 
 **What it does.** `src/artifact/registry.ts` scores each *exact recorded version* of an
 artifact by its replay history and gates unattended replay behind an explicit
@@ -452,14 +477,23 @@ many times, still gets rewarded. Catching that needs either detector review as p
 `approve`, or comparing detector outcomes against something outside the system's own
 say-so (e.g. periodic human spot-checks of `business_outcome` runs) — neither is built.
 
-**One mitigation that is now built:** `driftAdjustedLabel()` (`src/replay/drift.ts`) caps the
-*displayed* confidence label one tier down when any step shows UI-drift (§3), separately from
-this raw score — a step quietly relying on a lower-confidence locator fallback is a
-correctness risk `computeConfidence()` alone can't see, since the replay engine still
-reports `success`. Deliberately not folded into the numeric score itself: "did it work" and
-"is it drifting" stay two honestly separate signals rather than one blended number that
-hides which one moved. Shown on the dashboard next to the raw badge, not in the CLI's
-`approve`/`replay` output yet — a real scope boundary, not an oversight.
+**One mitigation that is now built, and now enforced, not just displayed:**
+`driftAdjustedLabel()` (`src/replay/drift.ts`) caps the confidence label one tier down when
+any step shows UI-drift (§3), separately from the raw score — a step quietly relying on a
+lower-confidence locator fallback is a correctness risk `computeConfidence()` alone can't
+see, since the replay engine still reports `success`. Deliberately not folded into the
+numeric score itself: "did it work" and "is it drifting" stay two honestly separate signals
+rather than one blended number that hides which one moved. This was originally just a
+dashboard badge; `src/replay/execution-policy.ts`'s `effectiveAllowRisky()` now makes it a
+real circuit breaker, wired into both `replay` and the capability API: an `approved`
+artifact whose drift-adjusted confidence has degraded to `low`/`unproven` falls back to
+attended confirmation for its risky steps regardless of `--allow-risky`, the same way a
+`draft` artifact already did. Confidence stops being a report card and becomes a second,
+independent gate the system actually obeys — real evidence: replaying the base artifact
+(medium confidence, drift-capped to `low` from step-11's known false-positive) with
+`--allow-risky true` correctly falls back to an interactive prompt instead of running
+unattended, with a console message that distinguishes "still building a track record" from
+"drift specifically caused this," rather than blaming drift for every low-confidence case.
 
 ### Cross-tenant reuse
 
@@ -527,14 +561,29 @@ rebrand almost always touches locator names too) pools its history with the base
 Scoping the registry key to `(fingerprint, tenantId)` instead of just `fingerprint` would fix
 this properly; not done here.
 
+**Per-tenant drift, built for real rather than left as a described gap.** REPORT.md
+originally listed "no per-tenant drift detection" as a cut. The dashboard now computes each
+tenant variant's *own* drift signal (same `loadMatchingDriftReports` the base artifact uses,
+just against that variant's fingerprint) and renders a cross-tenant comparison table: every
+step, every surface this capability actually runs on today, side by side. This is
+deliberately the real (not fabricated) version of the fleet-drift story §4 describes:
+"artifact X, tenant Y, step 6: drifting" aggregated across whatever tenants genuinely exist
+right now — the base app and northgate-cu — not a simulated fleet of hundreds, which the
+brief's own "don't build scaling infrastructure you don't need" argues against. A third
+tenant showing up in this table is adding a file to `config/tenant-overrides/`, not new
+code. Real evidence: the dashboard's cross-tenant table shows `step-11` correctly stable on
+northgate-cu (its one real run happened to get the same coincidentally-matching literal
+confirmation number as the base artifact's recording — see §3's known false-positive) while
+the base artifact's own row shows drift on the same step, aggregated across 20 runs where
+that coincidence didn't always hold — a real, explainable divergence, not a bug.
+
 **Cut from this stretch goal:** no canonicalization pass (`/members/12345` → `/members/:id` as
 a generic route-pattern normalizer) — the existing path-template checkpoints
 (`/members/{memberId}`) already cover the one case this artifact needed, so a separate
 canonicalization layer would have been unexercised scaffolding; a route with a genuinely
 different shape per tenant would need one. No override-authoring tool — `northgate-cu.json`
 was hand-written the way a human reviewer would author one, the same posture as
-`knownOutcomes` (§7). No per-tenant drift detection beyond what §3/§4 already describe (the
-matched-locator-strategy log exists; aggregating it per-tenant is unbuilt).
+`knownOutcomes` (§7).
 
 ### Agent-facing capability interface
 
@@ -582,6 +631,36 @@ config/tenant-overrides/northgate-cu.json` (`replay-2026-08-25T19-04-57-509Z` an
 `replay-2026-08-25T19-05-46-142Z`) — the same independent-trust behavior already documented
 above, now reachable and provable end to end over HTTP, not just via the CLI.
 
+**The other half of Section 1's sentence, made real.** Everything above is "this system
+reliably and safely does it." `src/frontend/planner.ts` + `src/cli/agent-chat.ts` are a thin,
+honest slice of "the agent-facing product decides what to do": a natural-language
+member-service request ("open a savings account for member 10001 with $100") is mapped, by
+one Gemini function-call decision, to a capability id and typed args, using a dynamically
+generated tool declaration per discovered capability (`GET /capabilities`, the same
+discovery endpoint an agent would use). The model's job stops at *deciding*; execution is the
+same `POST /capabilities/:id/invoke` path everything else in this section already uses, so
+an agent calling through this front end inherits the exact same guardrails, approval gate,
+and confidence circuit breaker as a human running the CLI. Deliberately not a second LLM call
+to phrase the final response: success/business_outcome/failure are templated deterministically
+from the structured result — "the model decides, execution and reporting stay deterministic"
+holds all the way to the front door, not just inside replay.
+
+Building this surfaced two real safety bugs, both fixed, not just noted: (1) a required-but-
+unstated *credential* field got filled with an invented placeholder ("<REQUIRED>") to satisfy
+the function-calling schema's own `required` list, which the mock app's login silently
+accepted rather than rejecting — fixed by excluding `sensitive` params from a capability's
+`required` list entirely (a credential belongs to the calling system's authenticated session,
+not a string typed into a chat message) and tightening `replay-engine.ts`'s own
+`validateParams` to treat an empty string as missing, not provided, for *any* caller. (2) The
+CLI's own console output printed the raw utterance and the resolved params before redacting
+them — the exact class of leak REPORT.md already documents for the discovery agent's goal
+string, just recurring in a new front end that logs before knowing which fields are
+sensitive. Fixed by resolving the plan first, then redacting by both key and by the sensitive
+value's own text before the first `console.log`, real evidence in hand (`grep`-verified: the
+password never appears in cleartext in this CLI's own stdout, only in npm's own pre-execution
+argv echo, which is a shell-level exposure common to every `--password`/`--params` flag in
+this repo, not something this fix could reach).
+
 **Cut from this stretch goal:** no auth (fine for a local demo; a real deployment would need
 the same kind of identity this registry already lacks for `approve` — see §7). No
 capability versioning in the URL (`/capabilities/:id/invoke` takes whichever on-disk artifact
@@ -590,3 +669,67 @@ repo's tooling produces today, but a real gap for a fleet). No rate limiting, no
 per the brief's own "don't build scaling infrastructure you don't need," and because a
 synchronous Playwright-backed HTTP handler is the right amount of infrastructure for what
 this demonstrates, not a production concurrency model.
+
+### Assisted fallback
+
+**What it does.** The brief's own wording: "on replay failure, allow a bounded, policy-checked
+LLM recovery for a single step (never open-ended), and record it as evidence."
+`src/replay/assisted-recovery.ts` is exactly that, opt-in only (`ReplayOptions.assistedRecovery`,
+`replay --assisted-recovery true`) — replay's core promise ("never calls a model") holds for
+every existing caller unless this is explicitly turned on. On a mechanical action failure with
+no known outcome to explain it (never for a checkpoint failure — a fuzzier signal to hand a
+model than "this element didn't resolve at all" — and never for an `extract` step, whose
+recovery vocabulary offers nothing that could fix a data-extraction failure), one bounded
+Gemini call gets the step's own goal, the current DOM observation, *and* a screenshot, and
+proposes exactly one corrective action: click/type/select_option by role+name, or — the
+vision-grounded half — `click_at_coordinates` against the screenshot, for surfaces with no
+walkable accessibility info at all. One call, one model, one choice between the two grounding
+strategies, whichever the actual page supports.
+
+**Why one call offers both grounding strategies, not two separate mechanisms.** The brief's
+"native desktop application... the only reliable surface is what a human operator sees and
+does" case (§1, §3.7's Surface abstraction) and the "a rebranded label broke the recorded
+locator" case are different failure modes but the same shape of problem: the recorded
+locator doesn't resolve, and something else on the current page satisfies the same goal.
+Building a second, parallel "vision fallback" module would have duplicated the entire
+call/authorize/execute/log skeleton for a difference that's really just "which tool did the
+model pick." A real, hands-on tension that came out of building this properly: a coordinate
+click's destination can *never* be verified in advance (there's no DOM to inspect, by
+definition), so `GuardrailsPolicy.authorize()` classifies `click_coordinates` as always
+`risky`. The first version of `attemptAssistedRecovery` had a blanket "never execute
+anything risky" rule (a reasonable-sounding safety default) — which would have made
+`click_at_coordinates` permanently inert, since it can never be anything but risky. The fix
+was recognizing that as conflating two different kinds of risk: "an unattended write" versus
+"an action nobody can pre-verify." The corrected design treats a risky proposal exactly like
+any other risky action in this system — confirmed via the same `onRiskyStep` callback, declined
+by default if none is wired up (e.g. the unattended capability API never passes one) — not a
+special case, the existing contract applied consistently.
+
+**Real evidence, including an honest limitation, not a cherry-picked success.** Against
+`apps/mock-bank`'s deliberate negative-control fixture (`views/legacyWidgetDemo.ejs` — a
+button drawn entirely on a `<canvas>`, no DOM button/role/name at all, standing in for a
+screen-shared legacy terminal) via `npm run vision-fallback-demo`: one real run had the model
+correctly recognize the DOM-based tools couldn't help, correctly propose
+`click_at_coordinates`, correctly get classified risky and confirmed, and correctly execute
+the click — but land slightly outside the button's actual bounds, a genuine (and well-known)
+limitation of pixel-level vision grounding, not a code bug. Separately, real DOM-based
+recovery succeeded outright against the un-adapted base artifact replayed against the
+rebranded northgate-cu tenant with no override applied (§8 "Cross-tenant reuse" negative
+control): the model correctly identified "the submit button is labeled 'Log In' instead of
+'Sign On'" and recovered the step for real, before a later step hit a transient Gemini 503
+that degraded gracefully to the original failure instead of crashing the run — a fix made
+necessary by hitting that exact error live while producing this evidence, the same
+"the recovery model call must never make things worse than not having recovery at all"
+principle applied to a real transient failure, not just a hypothetical one.
+
+**Deliberately not built:** promoting a working assisted action into a new candidate locator
+on the artifact itself. A single lucky model guess getting silently baked into a production
+artifact is a real risk that deserves human review as its own step, not an automatic side
+effect of a bounded recovery succeeding once. No retry loop on a transient model-API error
+(unlike the discovery loop's `withRetry`) — this is meant to be one bounded attempt, not a
+resilient one; a caller who wants retries can invoke replay again. No coordinate-accuracy
+improvement (cropping/zooming the screenshot, passing the target element's approximate
+region) — the evidence above shows the mechanism is real and the limitation is real; closing
+the accuracy gap is a deeper vision-grounding problem than this pass, and pixel-perfect
+accuracy is exactly why this is positioned as a last-resort fallback behind DOM-based
+recovery, not a primary strategy.

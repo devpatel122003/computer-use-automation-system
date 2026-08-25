@@ -4,8 +4,9 @@ import path from "node:path";
 import express from "express";
 import { loadCapabilityCatalog, loadTenantVariants } from "../artifact/catalog.js";
 import { driftAdjustedLabel, extractStepMatches, summarizeDrift } from "../replay/drift.js";
+import { loadMatchingRunLogs } from "../replay/drift-loader.js";
 import { aggregateRunMetrics, computeRunMetrics } from "./metrics.js";
-import { renderDashboard, type CapabilityView } from "./render.js";
+import { renderDashboard, type CapabilityView, type TenantVariantView } from "./render.js";
 import type { LogEvent } from "../evidence/logger.js";
 
 /**
@@ -36,7 +37,6 @@ function listRunDirs(prefix: string): string[] {
 
 function buildCapabilityViews(): CapabilityView[] {
   const catalog = loadCapabilityCatalog(ARTIFACTS_DIR);
-  const replayDirs = listRunDirs("replay-");
   const discoveryDirs = listRunDirs("discovery-");
 
   // Discovery runs aren't tied to a saved artifact (there isn't one yet when they run), so
@@ -51,12 +51,7 @@ function buildCapabilityViews(): CapabilityView[] {
   );
 
   return catalog.map(({ artifact, fingerprint, approvalState, confidence }) => {
-    const matchedRunLogs = replayDirs
-      .map((dir) => readRunLog(path.join(RUNS_DIR, dir)))
-      .filter((events) => {
-        const start = events.find((e) => e.phase === "start");
-        return (start?.detail as { fingerprint?: string } | undefined)?.fingerprint === fingerprint;
-      });
+    const matchedRunLogs = loadMatchingRunLogs(fingerprint, RUNS_DIR);
 
     const drift = summarizeDrift(artifact, matchedRunLogs.flatMap((events) => extractStepMatches(events)));
     const replayMetrics = aggregateRunMetrics(
@@ -64,6 +59,14 @@ function buildCapabilityViews(): CapabilityView[] {
         .map((events, i) => computeRunMetrics(`replay-${i}`, events))
         .filter((m): m is NonNullable<typeof m> => m !== null)
     );
+
+    // Each tenant variant's OWN drift signal -- the real fleet-drift slice (REPORT.md
+    // "Heterogeneity & multi-tenant"): a per-step comparison across every surface this
+    // capability actually runs on, built from whichever tenants actually exist today.
+    const tenantVariants: TenantVariantView[] = loadTenantVariants(artifact).map((variant) => {
+      const variantRunLogs = loadMatchingRunLogs(variant.fingerprint, RUNS_DIR);
+      return { ...variant, drift: summarizeDrift(variant.artifact, variantRunLogs.flatMap((events) => extractStepMatches(events))) };
+    });
 
     return {
       artifact,
@@ -73,7 +76,7 @@ function buildCapabilityViews(): CapabilityView[] {
       drift,
       driftRunsMatched: matchedRunLogs.length,
       driftAdjustedLabel: driftAdjustedLabel(confidence.label, drift),
-      tenantVariants: loadTenantVariants(artifact),
+      tenantVariants,
       discoveryMetrics,
       replayMetrics,
     } satisfies CapabilityView;

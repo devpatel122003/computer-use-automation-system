@@ -192,6 +192,16 @@ app.post("/__test__/reset", (_req, res) => {
   res.status(204).end();
 });
 
+// A deliberate negative-control fixture for the vision-grounded replay fallback (see
+// legacyWidgetDemo.ejs's own header comment) -- not a real banking feature, no auth
+// required, isolated from the rest of the app on purpose.
+app.get("/legacy-widget-demo", (_req, res) => {
+  res.render("legacyWidgetDemo");
+});
+app.get("/legacy-widget-demo/confirmed", (_req, res) => {
+  res.render("legacyWidgetConfirmed");
+});
+
 const PORT = Number(process.env.PORT ?? 4000);
 app.listen(PORT, () => {
   console.log(`mock-bank listening on http://localhost:${PORT} (tenant: ${labels.tenantId})`);

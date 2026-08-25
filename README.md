@@ -5,11 +5,17 @@ drives a live web app to accomplish a goal (**discovery**), the successful run i
 as a typed, versioned **capability artifact**, and that artifact **replays deterministically**
 — no model involved — with structured success / business-outcome / failure results, an
 allowlist-based guardrail layer, and a real (not mocked) human-escalation handoff. It also
-includes three Section 8 stretch goals: **confidence scoring + a draft→approved approval
-gate** on unattended replay, **cross-tenant reuse** — the same recorded artifact, applied to
-a second, differently-branded tenant running the identical underlying app via a small named
-override, not a re-recording — and an **agent-facing capability interface**: an HTTP surface
-an AI agent could discover and invoke by name with typed args.
+includes four of the brief's six Section 8 stretch goals (see `REPORT.md` "Stretch goals" for
+why this went past the original submission's "pick one or two"): **confidence scoring + a
+draft→approved approval gate** on unattended replay (now also a real circuit breaker: an
+approved artifact whose confidence UI-drift has degraded falls back to attended
+confirmation, not just a badge); **cross-tenant reuse** — the same recorded artifact, applied
+to a second, differently-branded tenant via a small named override, with a real cross-tenant
+drift comparison in the dashboard; an **agent-facing capability interface** — an HTTP surface
+an AI agent could discover and invoke by name with typed args, now paired with a small
+conversational front end that maps natural language to that same call; and **assisted
+fallback** — one bounded, policy-checked LLM recovery per failed step, including a
+vision-grounded fallback for surfaces with no DOM at all.
 
 See [`REPORT.md`](REPORT.md) for the design write-up (architecture, artifact schema,
 determinism & error handling, heterogeneity/multi-tenant story, escalation model, safety,
@@ -27,18 +33,27 @@ and cuts).
   a finished discovery run, the confidence/approval registry (stretch goal), and the
   tenant-override module for cross-tenant reuse (stretch goal).
 - `src/replay/` — the deterministic replay engine, the checkpoint/known-outcome evaluator,
-  and the UI-drift signal (`npm run drift-report` -- diffs each replay's matched locator
-  strategy against what was recorded, per step).
+  the UI-drift signal (`npm run drift-report` -- diffs each replay's matched locator
+  strategy against what was recorded, per step), the confidence circuit breaker
+  (`execution-policy.ts`), and the opt-in bounded LLM-assisted recovery
+  (`assisted-recovery.ts`, `--assisted-recovery true` -- includes a vision-grounded
+  fallback for surfaces with no DOM at all; replay never calls a model unless this is
+  explicitly turned on).
 - `src/dashboard/` — a small read-only ops page (`npm run dashboard`) that renders the
-  artifact contract, approval/confidence state, drift signal, and a discovery-vs-replay
-  time/model-call comparison for every capability, in one place instead of four CLI
-  invocations. Recomputes from disk on every request; makes no writes.
+  artifact contract, approval/confidence state, drift signal, a discovery-vs-replay
+  time/model-call comparison, per-tenant variant trust, and a cross-tenant drift comparison
+  for every capability, in one place instead of many CLI invocations. Recomputes from disk
+  on every request; makes no writes.
 - `src/api/` — the agent-facing capability interface (stretch goal): `GET /capabilities`
   to discover, `POST /capabilities/:id/invoke` to invoke by name with typed args (and an
   optional `tenantId` to invoke a specific tenant's variant -- see `tenant-resolution.ts`,
   which ties this directly to the cross-tenant reuse stretch goal). A thin wrapper around
   the same `replay()`/`GuardrailsPolicy`/registry gate the CLI uses -- see
   `src/cli/agent-invoke-demo.ts` for a script that calls it the way an agent would.
+- `src/frontend/` + `src/cli/agent-chat.ts` — the other half of "the agent-facing product
+  decides what to do; this system is how it reliably and safely does it": a natural-language
+  request mapped by one Gemini function-call decision to a capability + typed args, then
+  invoked through the exact same capability API above.
 - `src/guardrails/` — the allowlist policy, risk classification, and redaction utilities.
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
   drive the same live browser session, capture what they did, hand control back).
@@ -388,12 +403,81 @@ Real evidence: declined while the tenant's fingerprint was still `draft`
 (`replay-2026-08-25T19-04-57-509Z`, 422), then a real confirmation number once approved
 (`replay-2026-08-25T19-05-46-142Z`, 200).
 
+**10. Confidence circuit breaker.** Confidence isn't just a dashboard badge -- an `approved`
+artifact whose drift-adjusted confidence has degraded to `low`/`unproven` falls back to
+attended confirmation for risky steps, the same as a `draft` one, regardless of
+`--allow-risky`:
+
+```bash
+npm run replay -- --artifact evidence/artifacts/open-sub-account.artifact.json \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10001","accountType":"Savings","initialDeposit":"100"}' \
+  --allow-risky true
+```
+
+If this artifact's confidence is currently drift-capped (check with `npm run drift-report`),
+you'll see `--allow-risky was requested but ignored: this artifact is approved, but
+UI-drift has capped its confidence...` and a normal confirmation prompt, distinguished in
+the console output from the separate "not enough of a track record yet" case.
+
+**11. Conversational front end.** The other half of "the agent-facing product decides what
+to do": natural language, mapped to a capability + typed args by one Gemini call, then
+invoked through the same capability API as step 9.
+
+```bash
+npm run capability-api    # if not already running
+npm run agent-chat -- --message "Using operator demo_operator and password demo_password, open a savings account for member 10001 with a starting deposit of 100 dollars"
+```
+
+The model picks `open-sub-account` and the right typed params from plain English; execution
+and the final report stay fully deterministic -- no second LLM call phrases the result. Try
+a request that mentions a tenant by name (e.g. "...at Northgate Credit Union") to see
+`tenantId` get picked up too.
+
+**12. Assisted fallback (bounded LLM recovery).** Opt-in only -- `replay`'s own promise
+("never calls a model") holds unless you pass this:
+
+```bash
+npm run replay -- --artifact evidence/artifacts/open-sub-account.artifact.json \
+  --tenant-override config/tenant-overrides/_negative-control-url-only.json \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10001","accountType":"Savings","initialDeposit":"100"}' \
+  --assisted-recovery true
+```
+
+This points the *unmodified* base artifact at the rebranded northgate-cu tenant (mock-bank
+running with `TENANT=northgate-cu` on port 4100 -- see step 6) with no locator overrides at
+all, so several steps genuinely fail to resolve. With `--assisted-recovery true`, one bounded
+Gemini call per failed step proposes a correction (e.g. recognizing "Log In" now stands in
+for "Sign On") and gets past it for real -- or reports the original failure if the model
+call itself fails or can't find anything usable. Never auto-executes a risky step; you'll
+be prompted, same as any other risky action.
+
+**13. Vision-grounded fallback.** A dedicated negative-control fixture --
+`apps/mock-bank`'s `/legacy-widget-demo`, a button drawn entirely on a `<canvas>` with no
+DOM semantics at all, standing in for a screen-shared legacy terminal:
+
+```bash
+npm run vision-fallback-demo
+```
+
+The "recorded" step targets the button by role+name (as any DOM-based recorder would),
+which genuinely fails to resolve. `attemptAssistedRecovery` is then invoked directly: one
+real Gemini call, given both the DOM observation (empty) and a screenshot, correctly
+recognizes there's nothing DOM-addressable and proposes `click_at_coordinates` instead.
+Real evidence has shown both a full success and a real, honest miss (the coordinate lands
+slightly outside the button's actual bounds) -- pixel-level vision grounding is inherently
+imprecise, which is exactly why this stays a last-resort fallback behind DOM-based recovery,
+not a primary strategy. See `REPORT.md` "Assisted fallback" for both real outcomes.
+
 ## Running without live services
 
 The mock-bank app *is* the "live service" here -- there's no external dependency beyond
-it and (for discovery only) the Gemini API. `npm run replay` needs mock-bank running but
-never calls Gemini. There's no way to demo the discovery step without a real model call --
-per the assignment brief, that's intentional; the discovery run has to be real.
+it and, for anything that calls Gemini, the Gemini API. Plain `npm run replay` needs
+mock-bank running but never calls Gemini -- that's still the core, always-true promise.
+Steps 11-13 (the conversational front end, assisted fallback, and vision fallback) are
+opt-in extensions that *do* call Gemini, same as discovery; there's no way to demo any of
+them without a real model call, same reasoning as discovery itself -- per the assignment
+brief, that's intentional for discovery, and the same principle extends to anything that
+puts a model back in the loop on purpose.
 
 ## Type-checking & tests
 
@@ -402,7 +486,7 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (128 tests across 16 files, no network/browser
+`npm test` runs a real Vitest unit suite (167 tests across 21 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route
@@ -410,16 +494,22 @@ matching (including the origin-vs-prefix bypass cases described in `REPORT.md` "
 artifact schema cross-field validation, the confidence/registry math, the recorder's
 artifact-building, the tenant-override module (patch application, and that it throws on a
 stepId/strategy/known-outcome that doesn't exist rather than silently no-oping), the
-UI-drift signal's extraction/aggregation logic, the dashboard's cost/time math and its HTML
-escaping (a deliberate check that artifact-sourced free text can't inject markup into the
-rendered page), the capability API's result-to-HTTP-status mapping and its tenant-resolution
-logic (file-not-found and declared-vs-requested-tenantId mismatch, both against real temp
-files, not mocks), the replay
-engine's guardrail/recovery/retry behavior, and the discovery loop's own control flow
-(escalate/resume, dead-end detection, risky-action confirmation) -- using a stub `Surface`, a
-scripted fake model *output* (not a claim about what real Gemini would decide), and, where a
-class's own private state made a stub impractical, a real `GuardrailsPolicy` against a temp
-config. What's deliberately not unit-tested with mocks: the real Playwright surface, and
-Gemini's actual judgment about what to click next -- see `REPORT.md` "Architecture" for why
-real runs in `/evidence` (including `escalation-resume-demo`, the `failure`-result replay
-above, and the cross-tenant reuse pair in step 6) are the right verification for those instead.
+UI-drift signal's extraction/aggregation logic and the confidence circuit breaker it feeds,
+the dashboard's cost/time math, cross-tenant drift matrix, and HTML escaping (a deliberate
+check that artifact-sourced free text can't inject markup into the rendered page), the
+capability API's result-to-HTTP-status mapping and its tenant-resolution logic
+(file-not-found and declared-vs-requested-tenantId mismatch, both against real temp files,
+not mocks), the conversational front end's plan-extraction and credential-redaction logic,
+the bounded assisted-recovery module's DOM- and vision-tool resolution and its risky-action
+confirm/decline contract (using the same scripted-fake-model-output discipline as
+everything model-judgment-shaped below), the replay engine's guardrail/recovery/retry
+behavior (including the assisted-recovery wiring, end to end within a full `replay()` call,
+not just in isolation), and the discovery loop's own control flow (escalate/resume,
+dead-end detection, risky-action confirmation) -- using a stub `Surface`, a scripted fake
+model *output* (not a claim about what real Gemini would decide), and, where a class's own
+private state made a stub impractical, a real `GuardrailsPolicy` against a temp config.
+What's deliberately not unit-tested with mocks: the real Playwright surface, and Gemini's
+actual judgment about what to click/propose -- see `REPORT.md` "Architecture" for why real
+runs in `/evidence` (including `escalation-resume-demo`, the `failure`-result replay above,
+the cross-tenant reuse pair in step 6, and the assisted/vision-fallback runs in steps 12-13)
+are the right verification for those instead.

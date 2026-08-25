@@ -264,6 +264,14 @@ export class PlaywrightSurface implements Surface {
         return { ok: true, url: page.url() };
       }
 
+      if (action.type === "click_coordinates") {
+        await page.mouse.click(action.x, action.y);
+        await page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => undefined);
+        // No `matchedStrategy`: a coordinate click never consults a recorded
+        // LocatorCandidate at all, so there's no strategy tier to report.
+        return { ok: true, url: page.url() };
+      }
+
       const resolved = await this.resolve(action.target);
       if (!resolved) {
         return { ok: false, error: "No locator candidate resolved to an element.", url: page.url() };

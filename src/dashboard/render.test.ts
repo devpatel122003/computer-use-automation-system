@@ -45,6 +45,7 @@ describe("renderDashboard", () => {
           fingerprint: "cafebabecafebabe",
           approvalState: "draft",
           confidence: { totalRuns: 0, successCount: 0, hardFailureCount: 0, score: 0, label: "unproven" },
+          drift: [],
         },
       ],
       discoveryMetrics: null,
@@ -88,5 +89,63 @@ describe("renderDashboard", () => {
 
     expect(renderDashboard([baseView])).not.toContain("drift-capped");
     expect(renderDashboard([{ ...baseView, driftAdjustedLabel: "medium" }])).toContain("drift-capped to medium");
+  });
+
+  it("renders a cross-tenant drift comparison only once at least one tenant variant exists, covering every step seen across base+variants", () => {
+    const artifact = CapabilityArtifactSchema.parse({
+      id: "x",
+      name: "Cap Test",
+      description: "d",
+      version: "1.0.0",
+      createdAt: new Date().toISOString(),
+      target: { appId: "mock-bank", surfaceType: "web", baseUrlPattern: "http://localhost:4000" },
+      inputParams: [],
+      outputSchema: [],
+      steps: [],
+      successCheckpoint: { kind: "text_match", expr: "done", description: "d" },
+      knownOutcomes: [],
+    });
+    const baseDrift = [
+      { stepId: "step-4", description: 'Click "Sign On"', expectedStrategy: "role" as const, observedCounts: { role: 5 }, totalObservations: 5, driftCount: 0 },
+    ];
+    const viewNoVariants: CapabilityView = {
+      artifact,
+      fingerprint: "fp-base",
+      approvalState: "approved",
+      confidence: { totalRuns: 5, successCount: 5, hardFailureCount: 0, score: 1, label: "high" },
+      drift: baseDrift,
+      driftRunsMatched: 5,
+      driftAdjustedLabel: "high",
+      tenantVariants: [],
+      discoveryMetrics: null,
+      replayMetrics: null,
+    };
+    expect(renderDashboard([viewNoVariants])).not.toContain("Cross-tenant drift comparison");
+
+    const viewWithVariant: CapabilityView = {
+      ...viewNoVariants,
+      tenantVariants: [
+        {
+          tenantId: "northgate-cu",
+          artifact,
+          fingerprint: "fp-northgate",
+          approvalState: "approved",
+          confidence: { totalRuns: 1, successCount: 1, hardFailureCount: 0, score: 1, label: "low" },
+          drift: [
+            { stepId: "step-4", description: 'Click "Log In"', expectedStrategy: "role" as const, observedCounts: { css_structural: 1 }, totalObservations: 1, driftCount: 1 },
+          ],
+        },
+      ],
+    };
+    const html = renderDashboard([viewWithVariant]);
+    expect(html).toContain("Cross-tenant drift comparison");
+    expect(html).toContain("northgate-cu");
+    // step-4 is stable on base, drifting on northgate-cu -- both badges should appear on
+    // the same row (within the matrix section specifically, not the base-only drift table
+    // above it, which also has its own "step-4" row).
+    const matrixSection = html.slice(html.indexOf("Cross-tenant drift comparison"));
+    const rowMatch = matrixSection.match(/<tr><td>step-4<\/td>[\s\S]*?<\/tr>/);
+    expect(rowMatch?.[0]).toContain("stable");
+    expect(rowMatch?.[0]).toContain("drift");
   });
 });

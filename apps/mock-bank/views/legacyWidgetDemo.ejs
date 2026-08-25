@@ -1,0 +1,38 @@
+<html>
+<head><title>Legacy Widget Demo</title></head>
+<body bgcolor="#d6d3ce">
+<!--
+  Deliberate negative-control fixture for the vision-grounded replay fallback
+  (src/replay/assisted-recovery.ts's click_at_coordinates tool) -- not a real banking
+  feature. This button is drawn entirely on a <canvas>: there is no underlying DOM button,
+  link, or any element with an accessible role/name at all, so src/surface/dom-scan.ts's
+  walker finds nothing here. This is the brief's "native desktop application... the only
+  reliable surface is what a human operator sees and does" case, standing in for a
+  screen-shared legacy terminal, made real enough to click for real -- not simulated.
+-->
+<table width="100%" cellpadding="4" cellspacing="0" border="0">
+  <tr bgcolor="#003366"><td><font color="#ffffff" face="Arial" size="4"><b>Legacy Widget Demo (canvas-only, no DOM semantics)</b></font></td></tr>
+</table>
+<br/>
+<p>The button below is drawn on a &lt;canvas&gt; with no underlying DOM element -- click/role/name-based automation cannot see it at all.</p>
+<canvas id="legacyCanvas" width="300" height="120" style="border:1px solid #888"></canvas>
+<script>
+  const canvas = document.getElementById("legacyCanvas");
+  const ctx = canvas.getContext("2d");
+  const button = { x: 60, y: 40, w: 180, h: 50 };
+  ctx.fillStyle = "#003366";
+  ctx.fillRect(button.x, button.y, button.w, button.h);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "16px Arial";
+  ctx.fillText("Check Balance", button.x + 24, button.y + 30);
+  canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (x >= button.x && x <= button.x + button.w && y >= button.y && y <= button.y + button.h) {
+      window.location.href = "/legacy-widget-demo/confirmed";
+    }
+  });
+</script>
+</body>
+</html>

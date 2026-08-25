@@ -4,6 +4,15 @@ import type { TenantVariantEntry } from "../artifact/catalog.js";
 import type { ConfidenceLabel, StepDriftReport } from "../replay/drift.js";
 import { formatDuration, formatSpeedup, type AggregateMetrics } from "./metrics.js";
 
+/** A tenant variant plus its OWN drift signal -- computed by the caller (dashboard/server.ts),
+ *  same "artifact/catalog.ts stays about artifact+registry, replay-derived signals are
+ *  merged one layer up" split the base capability's own drift already follows. This is the
+ *  real (not fabricated) fleet-drift slice: a cross-tenant comparison built from whatever
+ *  tenants actually exist (today: the base app + northgate-cu), not a simulated fleet. */
+export interface TenantVariantView extends TenantVariantEntry {
+  drift: StepDriftReport[];
+}
+
 /**
  * Plain server-rendered HTML, no client JS -- a read-only ops view, not a product surface.
  * Colors follow the dataviz skill's validated status palette (tinted badge background +
@@ -21,7 +30,7 @@ export interface CapabilityView {
   drift: StepDriftReport[];
   driftRunsMatched: number;
   driftAdjustedLabel: ConfidenceLabel;
-  tenantVariants: TenantVariantEntry[];
+  tenantVariants: TenantVariantView[];
   discoveryMetrics: AggregateMetrics | null;
   replayMetrics: AggregateMetrics | null;
 }
@@ -158,16 +167,61 @@ function driftTable(view: CapabilityView): string {
 function tenantVariantsTable(view: CapabilityView): string {
   if (view.tenantVariants.length === 0) return "";
   const rows = view.tenantVariants
-    .map(
-      (v) =>
-        `<tr><td>${escapeHtml(v.tenantId)}</td><td><code>${v.fingerprint}</code></td><td>${approvalBadge(v.approvalState)}</td><td>${badge(v.confidence.label, confidenceLabelTone(v.confidence.label))}</td><td>${v.confidence.successCount}/${v.confidence.totalRuns}</td></tr>`
-    )
+    .map((v) => {
+      const driftCount = v.drift.filter((r) => r.driftCount > 0).length;
+      const driftCell = v.drift.length === 0 ? `<span class="muted">no runs yet</span>` : driftCount > 0 ? badge(`${driftCount} step(s) drifting`, "warning") : badge("stable", "good");
+      return `<tr><td>${escapeHtml(v.tenantId)}</td><td><code>${v.fingerprint}</code></td><td>${approvalBadge(v.approvalState)}</td><td>${badge(v.confidence.label, confidenceLabelTone(v.confidence.label))}</td><td>${v.confidence.successCount}/${v.confidence.totalRuns}</td><td>${driftCell}</td></tr>`;
+    })
     .join("");
   return `
     <h3>Tenant variants</h3>
     <div class="section-note">Same base artifact, adapted per tenant via config/tenant-overrides/ -- each earns its own trust independently (REPORT.md "Cross-tenant reuse").</div>
     <table class="data-table">
-      <thead><tr><th>Tenant</th><th>Fingerprint</th><th>Approval</th><th>Confidence</th><th>Clean runs</th></tr></thead>
+      <thead><tr><th>Tenant</th><th>Fingerprint</th><th>Approval</th><th>Confidence</th><th>Clean runs</th><th>Drift</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+/**
+ * The real (not fabricated) fleet-drift slice: a per-step comparison across every surface
+ * this capability actually runs on today -- the base app and whatever tenant variants have
+ * real replay history. REPORT.md's fleet vision describes aggregating "artifact X, tenant
+ * Y, step 6: drifting" across hundreds of tenants; this is that exact aggregation, just
+ * built honestly at the two real surfaces this repo has, rather than simulating a fleet
+ * that doesn't exist. Adding a third tenant is adding a row to config/tenant-overrides/,
+ * not new code.
+ */
+function crossTenantDriftMatrix(view: CapabilityView): string {
+  const columns: Array<{ label: string; drift: StepDriftReport[]; hasRuns: boolean }> = [
+    { label: "base", drift: view.drift, hasRuns: view.driftRunsMatched > 0 },
+    ...view.tenantVariants.map((v) => ({ label: v.tenantId, drift: v.drift, hasRuns: v.drift.length > 0 })),
+  ];
+  if (columns.length < 2) return ""; // no tenant variants exist yet -- nothing to compare
+
+  const stepIds = Array.from(new Set(columns.flatMap((c) => c.drift.map((r) => r.stepId))));
+  if (stepIds.length === 0) return "";
+
+  const stepDescriptions = new Map<string, string>();
+  for (const c of columns) for (const r of c.drift) stepDescriptions.set(r.stepId, r.description);
+
+  const rows = stepIds
+    .map((stepId) => {
+      const cells = columns
+        .map((c) => {
+          const r = c.drift.find((d) => d.stepId === stepId);
+          if (!r) return `<td>${c.hasRuns ? `<span class="muted">n/a</span>` : `<span class="muted">no runs</span>`}</td>`;
+          return `<td>${r.driftCount > 0 ? badge("drift", "warning") : badge("stable", "good")}</td>`;
+        })
+        .join("");
+      return `<tr><td>${escapeHtml(stepId)}</td><td>${escapeHtml(stepDescriptions.get(stepId) ?? "")}</td>${cells}</tr>`;
+    })
+    .join("");
+
+  return `
+    <h3>Cross-tenant drift comparison</h3>
+    <div class="section-note">Every surface this capability actually runs on today, side by side, per step.</div>
+    <table class="data-table">
+      <thead><tr><th>Step</th><th>Description</th>${columns.map((c) => `<th>${escapeHtml(c.label)}</th>`).join("")}</tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
 }
@@ -194,6 +248,7 @@ function capabilityCard(view: CapabilityView): string {
       ${driftTable(view)}
 
       ${tenantVariantsTable(view)}
+      ${crossTenantDriftMatrix(view)}
     </section>`;
 }
 
