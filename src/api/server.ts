@@ -8,6 +8,7 @@ import { redact } from "../guardrails/redaction.js";
 import { replay } from "../replay/replay-engine.js";
 import { getOrCreateEntry, loadRegistry, recordReplayOutcome, saveRegistry } from "../artifact/registry.js";
 import { statusCodeFor } from "./status.js";
+import { resolveEffectiveArtifact } from "./tenant-resolution.js";
 
 /**
  * The brief's §8 "agent-facing capability interface" stretch goal: a small HTTP surface an
@@ -53,29 +54,49 @@ app.post("/capabilities/:id/invoke", async (req, res) => {
     return;
   }
 
+  // Cross-tenant reuse (REPORT.md §8), reachable over HTTP: an agent can ask for a specific
+  // tenant's variant of this capability, not just the base artifact. Resolved -- and any
+  // bad tenantId rejected -- before a logger/browser/registry entry is ever created, same
+  // as the capability-not-found check above.
+  const tenantId = typeof req.body?.tenantId === "string" ? req.body.tenantId : undefined;
+  let artifact;
+  try {
+    artifact = resolveEffectiveArtifact(capability.artifact, tenantId);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    return;
+  }
+
   const params = (req.body?.params ?? {}) as Record<string, string>;
   const requestedAllowRisky = req.body?.allowRisky === true;
-  // Same gate as the CLI (src/cli/replay.ts): --allow-risky/allowRisky only takes effect
-  // once this exact artifact content has been reviewed and approved.
-  const allowRisky = requestedAllowRisky && capability.approvalState === "approved";
 
   const runId = newRunId("replay");
   const logger = new EvidenceLogger({ runId, runType: "replay" });
 
-  const sensitiveParamNames = capability.artifact.inputParams.filter((p) => p.sensitive).map((p) => p.name);
+  const sensitiveParamNames = artifact.inputParams.filter((p) => p.sensitive).map((p) => p.name);
   logger.addSensitiveKeys(sensitiveParamNames);
   for (const name of sensitiveParamNames) {
     const value = params[name];
     if (value) logger.addSensitiveValue(value);
   }
 
+  // A tenant override produces its own content fingerprint (steps/checkpoints differ from
+  // the base artifact -- see registry.ts), so it earns its own draft/approved trust
+  // independent of the base artifact's, exactly like the CLI/replay path.
+  const registry = loadRegistry(REGISTRY_PATH);
+  const entry = getOrCreateEntry(registry, artifact);
+  // Same gate as the CLI (src/cli/replay.ts): --allow-risky/allowRisky only takes effect
+  // once this exact artifact content -- base or tenant-overridden -- has been approved.
+  const allowRisky = requestedAllowRisky && entry.approvalState === "approved";
+
   logger.log({
     step: 0,
     phase: "start",
-    summary: `Capability API invoked ${capability.artifact.name} v${capability.artifact.version}`,
+    summary: `Capability API invoked ${artifact.name} v${artifact.version}`,
     detail: {
-      fingerprint: capability.fingerprint,
-      approvalState: capability.approvalState,
+      fingerprint: entry.fingerprint,
+      tenantId,
+      approvalState: entry.approvalState,
       allowRiskyRequested: requestedAllowRisky,
       allowRiskyEffective: allowRisky,
       params: redact(params, { sensitiveKeys: new Set(sensitiveParamNames) }),
@@ -90,7 +111,7 @@ app.post("/capabilities/:id/invoke", async (req, res) => {
     const policy = new GuardrailsPolicy();
 
     const result = await replay({
-      artifact: capability.artifact,
+      artifact,
       params,
       surface,
       policy,
@@ -101,8 +122,6 @@ app.post("/capabilities/:id/invoke", async (req, res) => {
 
     logger.writeJson("replay-result.json", result);
 
-    const registry = loadRegistry(REGISTRY_PATH);
-    const entry = getOrCreateEntry(registry, capability.artifact);
     recordReplayOutcome(entry, { runId, timestamp: new Date().toISOString(), status: result.status });
     saveRegistry(REGISTRY_PATH, registry);
 

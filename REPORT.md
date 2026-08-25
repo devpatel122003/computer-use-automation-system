@@ -560,6 +560,22 @@ writes through the same `EvidenceLogger`/registry path as the CLI, so an API-inv
 shows up in `npm run drift-report` and the dashboard exactly like a CLI-invoked one — this
 wasn't special-cased; it falls out of reusing the same engine underneath.
 
+**Tied to cross-tenant reuse, not just alongside it.** An optional `tenantId` on the invoke
+request (`src/api/tenant-resolution.ts`) loads `config/tenant-overrides/<tenantId>.json` and
+applies it (same `applyTenantOverride` as the `replay --tenant-override` CLI flag) before the
+registry lookup and replay — so an agent can ask for a specific tenant's variant of a
+capability, not just the base artifact. This wasn't in the first pass of this stretch goal;
+building it surfaced a real gap the first pass had left open — the tenant-overridden artifact
+only ever existed in memory at replay time, so there was no way to `approve` it at all, since
+`approve` only reads artifact files from disk. Fixed by giving `approve` the same
+`--tenant-override <path>` flag `replay` already has, rather than working around it. Real
+evidence: invoking `open-sub-account` for tenant `northgate-cu` over HTTP is declined (422,
+draft) before that fingerprint is approved, and completes with a real confirmation number
+(200) after `npm run approve -- --artifact ... --tenant-override
+config/tenant-overrides/northgate-cu.json` (`replay-2026-08-25T19-04-57-509Z` and
+`replay-2026-08-25T19-05-46-142Z`) — the same independent-trust behavior already documented
+above, now reachable and provable end to end over HTTP, not just via the CLI.
+
 **Cut from this stretch goal:** no auth (fine for a local demo; a real deployment would need
 the same kind of identity this registry already lacks for `approve` — see §7). No
 capability versioning in the URL (`/capabilities/:id/invoke` takes whichever on-disk artifact

@@ -1,0 +1,1 @@
+{"ts":"2026-08-25T18:47:03.110Z","step":0,"phase":"start","summary":"Replay CLI invoked for Open Sub-Account v1.0.0","detail":{"fingerprint":"dbc8265e73cb99c4","approvalState":"approved","confidence":{"totalRuns":4,"successCount":3,"hardFailureCount":1,"score":0.75,"label":"medium"},"allowRiskyRequested":false,"allowRiskyEffective":false,"params":{}}}

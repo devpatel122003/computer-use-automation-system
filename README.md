@@ -34,9 +34,11 @@ and cuts).
   time/model-call comparison for every capability, in one place instead of four CLI
   invocations. Recomputes from disk on every request; makes no writes.
 - `src/api/` — the agent-facing capability interface (stretch goal): `GET /capabilities`
-  to discover, `POST /capabilities/:id/invoke` to invoke by name with typed args. A thin
-  wrapper around the same `replay()`/`GuardrailsPolicy`/registry gate the CLI uses --
-  see `src/cli/agent-invoke-demo.ts` for a script that calls it the way an agent would.
+  to discover, `POST /capabilities/:id/invoke` to invoke by name with typed args (and an
+  optional `tenantId` to invoke a specific tenant's variant -- see `tenant-resolution.ts`,
+  which ties this directly to the cross-tenant reuse stretch goal). A thin wrapper around
+  the same `replay()`/`GuardrailsPolicy`/registry gate the CLI uses -- see
+  `src/cli/agent-invoke-demo.ts` for a script that calls it the way an agent would.
 - `src/guardrails/` — the allowlist policy, risk classification, and redaction utilities.
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
   drive the same live browser session, capture what they did, hand control back).
@@ -357,6 +359,29 @@ success (200), business_outcome (200), and a parameter-validation error (400) --
 `evidence/runs/replay-2026-08-25T18-3*`. No auth on this endpoint; fine for a local demo,
 not for a real deployment (see `REPORT.md` "Stretch goals").
 
+**Tenant-aware invocation.** The invoke body also takes an optional `tenantId`, applying
+that tenant's override (from step 6) before replaying -- so an agent can ask for a specific
+tenant's variant of a capability over HTTP, not just the base artifact. It has its own
+independent approval state, same as replaying it via the CLI, so approve that exact content
+first (note the extra `--tenant-override` flag, mirroring `replay`'s):
+
+```bash
+npm run mock-bank:northgate     # if not already running
+
+npm run approve -- \
+  --artifact evidence/artifacts/open-sub-account.artifact.json \
+  --tenant-override config/tenant-overrides/northgate-cu.json
+
+curl -s -X POST http://localhost:4100/__test__/reset
+
+npm run agent-invoke-demo -- --tenant northgate-cu \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10001","accountType":"Savings","initialDeposit":"100"}'
+```
+
+Real evidence: declined while the tenant's fingerprint was still `draft`
+(`replay-2026-08-25T19-04-57-509Z`, 422), then a real confirmation number once approved
+(`replay-2026-08-25T19-05-46-142Z`, 200).
+
 ## Running without live services
 
 The mock-bank app *is* the "live service" here -- there's no external dependency beyond
@@ -371,7 +396,7 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (113 tests across 14 files, no network/browser
+`npm test` runs a real Vitest unit suite (117 tests across 15 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route
@@ -381,7 +406,9 @@ artifact-building, the tenant-override module (patch application, and that it th
 stepId/strategy/known-outcome that doesn't exist rather than silently no-oping), the
 UI-drift signal's extraction/aggregation logic, the dashboard's cost/time math and its HTML
 escaping (a deliberate check that artifact-sourced free text can't inject markup into the
-rendered page), the capability API's result-to-HTTP-status mapping, the replay
+rendered page), the capability API's result-to-HTTP-status mapping and its tenant-resolution
+logic (file-not-found and declared-vs-requested-tenantId mismatch, both against real temp
+files, not mocks), the replay
 engine's guardrail/recovery/retry behavior, and the discovery loop's own control flow
 (escalate/resume, dead-end detection, risky-action confirmation) -- using a stub `Surface`, a
 scripted fake model *output* (not a claim about what real Gemini would decide), and, where a

@@ -56,11 +56,21 @@
     "artifactId": "open-sub-account",
     "version": "1.0.0",
     "fingerprint": "62b2d1a1fb853f5a",
-    "approvalState": "draft",
+    "approvalState": "approved",
     "history": [
       {
         "runId": "replay-2026-08-25T17-52-53-914Z",
         "timestamp": "2026-08-25T17:52:56.864Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-25T19-04-57-509Z",
+        "timestamp": "2026-08-25T19:04:59.699Z",
+        "status": "failure"
+      },
+      {
+        "runId": "replay-2026-08-25T19-05-46-142Z",
+        "timestamp": "2026-08-25T19:05:48.585Z",
         "status": "success"
       }
     ]

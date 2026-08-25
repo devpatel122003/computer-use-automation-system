@@ -24,6 +24,7 @@ async function main(): Promise<void> {
   const paramsJson =
     args.params ?? '{"username":"demo_operator","password":"demo_password","memberId":"10002","accountType":"Savings","initialDeposit":"100"}';
   const allowRisky = args["allow-risky"] !== "false";
+  const tenantId = args.tenant;
 
   console.log(`Discovering capabilities: GET ${apiBase}/capabilities`);
   const listRes = await fetch(`${apiBase}/capabilities`);
@@ -41,11 +42,12 @@ async function main(): Promise<void> {
     throw new Error(`Capability "${capabilityId}" not found. Run \`npm run run-agent\` first to record it.`);
   }
 
-  console.log(`\nInvoking "${target.id}" by name with typed args (allowRisky=${allowRisky}): POST ${apiBase}/capabilities/${target.id}/invoke`);
+  const tenantSuffix = tenantId ? ` for tenant "${tenantId}"` : "";
+  console.log(`\nInvoking "${target.id}"${tenantSuffix} by name with typed args (allowRisky=${allowRisky}): POST ${apiBase}/capabilities/${target.id}/invoke`);
   const invokeRes = await fetch(`${apiBase}/capabilities/${target.id}/invoke`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ params: JSON.parse(paramsJson), allowRisky }),
+    body: JSON.stringify({ params: JSON.parse(paramsJson), allowRisky, tenantId }),
   });
   const result = await invokeRes.json();
   console.log(`\nHTTP ${invokeRes.status}`);

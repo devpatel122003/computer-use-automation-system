@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { CapabilityArtifactSchema } from "../artifact/schema.js";
 import { computeConfidence, getOrCreateEntry, loadRegistry, saveRegistry, setApprovalState } from "../artifact/registry.js";
+import { applyTenantOverride, TenantOverrideSchema } from "../artifact/tenant-override.js";
 import { parseArgs } from "./args.js";
 
 const DEFAULT_REGISTRY_PATH = "evidence/artifacts/registry.json";
@@ -12,7 +13,20 @@ function main(): void {
   const revoke = args.revoke === "true";
 
   const raw = JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
-  const artifact = CapabilityArtifactSchema.parse(raw);
+  const baseArtifact = CapabilityArtifactSchema.parse(raw);
+
+  // A tenant-overridden artifact (same flag as `replay --tenant-override`) has its own
+  // content fingerprint and so its own draft/approved state, independent of the base
+  // artifact's -- without this, there was no way to approve a tenant's variant at all,
+  // since it only ever exists in-memory at replay/invoke time, never as a file on disk.
+  const tenantOverridePath = args["tenant-override"];
+  let artifact = baseArtifact;
+  if (tenantOverridePath) {
+    const overrideRaw = JSON.parse(fs.readFileSync(tenantOverridePath, "utf-8"));
+    const override = TenantOverrideSchema.parse(overrideRaw);
+    artifact = applyTenantOverride(baseArtifact, override);
+    console.log(`Applying tenant override "${override.tenantId}" from ${tenantOverridePath}`);
+  }
 
   const registry = loadRegistry(registryPath);
   const entry = getOrCreateEntry(registry, artifact);
