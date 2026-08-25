@@ -1,5 +1,6 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import session from "express-session";
+import helmet from "helmet";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { consumeSessionTimeoutArm, createSubAccount, findMember, findSubAccount, resetData, subAccounts } from "./data.js";
@@ -25,6 +26,16 @@ const app = express();
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "..", "views"));
+
+// contentSecurityPolicy off: this app is the automated system's fake *target*, standing in
+// for a real third-party bank we don't control -- hardening it isn't the point (see
+// SECURITY.md). It's off specifically because legacyWidgetDemo.ejs's inline <canvas> script
+// (the vision-fallback negative-control fixture, README step 13) would otherwise be blocked
+// by helmet's default script-src.
+app.use(helmet({ contentSecurityPolicy: false }));
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
 
 app.use(express.urlencoded({ extended: false }));
 app.use(

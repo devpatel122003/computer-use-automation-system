@@ -12,6 +12,15 @@ import type { CapabilityArtifact } from "../artifact/schema.js";
 
 export const TENANT_OVERRIDES_DIR = "config/tenant-overrides";
 
+// tenantId reaches here straight from an HTTP request body (or, via the conversational
+// front end, from a model's own output) -- an untrusted caller, not an operator typing a
+// CLI flag. Without this check, `path.join(overridesDir, \`${tenantId}.json\`)` below is a
+// real path-traversal read: a tenantId of "../../../../etc/passwd\0" (or, more realistically
+// reachable without a null byte, "../../../some/other/config") would let a caller read any
+// *.json file on disk the process can access, not just a tenant override. Restricting to the
+// same charset filenames on disk actually use closes that off before any path is built.
+const SAFE_TENANT_ID = /^[a-zA-Z0-9_-]+$/;
+
 /** Convention: a tenant's override file lives at `<overridesDir>/<tenantId>.json`, and the
  *  file's own declared `tenantId` must match the filename it was requested by -- a
  *  mismatch is refused rather than silently applying whichever override happened to be
@@ -23,6 +32,9 @@ export function resolveEffectiveArtifact(
   overridesDir: string = TENANT_OVERRIDES_DIR
 ): CapabilityArtifact {
   if (!tenantId) return baseArtifact;
+  if (!SAFE_TENANT_ID.test(tenantId)) {
+    throw new Error(`Invalid tenantId "${tenantId}" -- must match ${SAFE_TENANT_ID}.`);
+  }
 
   const overridePath = path.join(overridesDir, `${tenantId}.json`);
   if (!fs.existsSync(overridePath)) {

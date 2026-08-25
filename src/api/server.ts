@@ -1,5 +1,7 @@
 import "dotenv/config";
 import express from "express";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { findCapabilityById, loadCapabilityCatalog } from "../artifact/catalog.js";
 import { PlaywrightSurface } from "../surface/playwright-surface.js";
 import { GuardrailsPolicy } from "../guardrails/policy.js";
@@ -12,6 +14,8 @@ import { resolveEffectiveArtifact } from "./tenant-resolution.js";
 import { driftAdjustedLabel } from "../replay/drift.js";
 import { loadMatchingDriftReports } from "../replay/drift-loader.js";
 import { effectiveAllowRisky } from "../replay/execution-policy.js";
+import { requireApiKey } from "../http/api-key-auth.js";
+import { requestLog } from "../http/request-log.js";
 
 /**
  * The brief's §8 "agent-facing capability interface" stretch goal: a small HTTP surface an
@@ -24,14 +28,33 @@ import { effectiveAllowRisky } from "../replay/execution-policy.js";
  * the CLI would. Unlike the CLI, there is no operator to prompt for a risky-step
  * confirmation, so a risky step on a non-`approved` artifact is declined automatically
  * (no `onRiskyStep` callback is passed) rather than hanging the request on stdin that will
- * never arrive. No auth -- fine for a local demo, not for a real deployment (see README).
+ * never arrive. Requires a real API key (CAPABILITY_API_KEY -- see .env.example and
+ * SECURITY.md) on every route except /health: this endpoint can both read capability
+ * confidence state and trigger a real action, so both legs need the same gate, not just
+ * /invoke.
  */
 
 const ARTIFACTS_DIR = "evidence/artifacts";
 const REGISTRY_PATH = "evidence/artifacts/registry.json";
 
 const app = express();
+app.disable("x-powered-by");
+app.use(helmet());
 app.use(express.json());
+app.use(requestLog("capability-api"));
+
+// Unauthenticated on purpose -- container orchestrators and uptime checks need this to work
+// without a credential, and it discloses nothing beyond "the process is up."
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.use(requireApiKey("CAPABILITY_API_KEY"));
+
+// Invocation can trigger a real (guardrail-checked) action against the target system --
+// throttled independently of read traffic so a runaway/malicious caller can't exhaust the
+// same budget a normal discovery (`GET /capabilities`) call would need.
+const invokeLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false });
 
 app.get("/capabilities", (_req, res) => {
   const catalog = loadCapabilityCatalog(ARTIFACTS_DIR);
@@ -50,7 +73,7 @@ app.get("/capabilities", (_req, res) => {
   );
 });
 
-app.post("/capabilities/:id/invoke", async (req, res) => {
+app.post("/capabilities/:id/invoke", invokeLimiter, async (req, res) => {
   const capability = findCapabilityById(req.params.id, ARTIFACTS_DIR);
   if (!capability) {
     res.status(404).json({ error: `No capability artifact found with id "${req.params.id}".` });

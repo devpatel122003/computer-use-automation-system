@@ -26,8 +26,13 @@ async function main(): Promise<void> {
   const allowRisky = args["allow-risky"] !== "false";
   const tenantId = args.tenant;
 
+  if (!process.env.CAPABILITY_API_KEY) {
+    throw new Error("CAPABILITY_API_KEY is not set. Export it or add it to a .env file (see .env.example) -- it must match the key the capability API was started with.");
+  }
+  const authHeaders = { Authorization: `Bearer ${process.env.CAPABILITY_API_KEY}` };
+
   console.log(`Discovering capabilities: GET ${apiBase}/capabilities`);
-  const listRes = await fetch(`${apiBase}/capabilities`);
+  const listRes = await fetch(`${apiBase}/capabilities`, { headers: authHeaders });
   if (!listRes.ok) throw new Error(`GET /capabilities failed: HTTP ${listRes.status}`);
   const capabilities = (await listRes.json()) as CatalogEntry[];
 
@@ -46,7 +51,7 @@ async function main(): Promise<void> {
   console.log(`\nInvoking "${target.id}"${tenantSuffix} by name with typed args (allowRisky=${allowRisky}): POST ${apiBase}/capabilities/${target.id}/invoke`);
   const invokeRes = await fetch(`${apiBase}/capabilities/${target.id}/invoke`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders },
     body: JSON.stringify({ params: JSON.parse(paramsJson), allowRisky, tenantId }),
   });
   const result = await invokeRes.json();

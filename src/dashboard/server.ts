@@ -2,19 +2,26 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import express from "express";
+import helmet from "helmet";
 import { loadCapabilityCatalog, loadTenantVariants } from "../artifact/catalog.js";
 import { driftAdjustedLabel, extractStepMatches, summarizeDrift } from "../replay/drift.js";
 import { loadMatchingRunLogs } from "../replay/drift-loader.js";
 import { aggregateRunMetrics, computeRunMetrics } from "./metrics.js";
 import { renderDashboard, type CapabilityView, type TenantVariantView } from "./render.js";
 import type { LogEvent } from "../evidence/logger.js";
+import { requireBasicAuth } from "../http/api-key-auth.js";
+import { requestLog } from "../http/request-log.js";
 
 /**
  * Read-only ops dashboard: turns the artifact schema, confidence registry, and UI-drift
  * signal (each already real and separately CLI-accessible) into one page instead of five
  * commands. Recomputes from disk on every request -- no state of its own, nothing to get
  * out of sync, safe to leave running through a live demo while other commands mutate
- * evidence/runs and evidence/artifacts/registry.json underneath it.
+ * evidence/runs and evidence/artifacts/registry.json underneath it. Confidence/approval/
+ * drift state is real operational data about a production capability, not public
+ * documentation, so it sits behind HTTP Basic auth (DASHBOARD_PASSWORD -- see
+ * .env.example; the browser prompts for the credential natively, no login form needed);
+ * /health stays open for orchestrator checks.
  */
 
 const ARTIFACTS_DIR = "evidence/artifacts";
@@ -87,6 +94,15 @@ function buildCapabilityViews(): CapabilityView[] {
 }
 
 const app = express();
+app.disable("x-powered-by");
+app.use(helmet());
+app.use(requestLog("dashboard"));
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.use(requireBasicAuth("DASHBOARD_PASSWORD"));
 
 app.get("/", (_req, res) => {
   res.send(renderDashboard(buildCapabilityViews()));

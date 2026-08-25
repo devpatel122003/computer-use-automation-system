@@ -80,9 +80,15 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
+  if (!process.env.CAPABILITY_API_KEY) {
+    console.error("CAPABILITY_API_KEY is not set. Export it or add it to a .env file (see .env.example) -- it must match the key the capability API was started with.");
+    process.exitCode = 1;
+    return;
+  }
+  const authHeaders = { Authorization: `Bearer ${process.env.CAPABILITY_API_KEY}` };
 
   console.log(`Discovering capabilities: GET ${apiBase}/capabilities`);
-  const listRes = await fetch(`${apiBase}/capabilities`);
+  const listRes = await fetch(`${apiBase}/capabilities`, { headers: authHeaders });
   if (!listRes.ok) throw new Error(`GET /capabilities failed: HTTP ${listRes.status}`);
   const catalog = (await listRes.json()) as Array<{ id: string; description: string; inputParams: DiscoveredCapability["inputParams"] }>;
   const capabilities: DiscoveredCapability[] = catalog.map((c) => ({ id: c.id, description: c.description, inputParams: c.inputParams }));
@@ -105,7 +111,7 @@ async function main(): Promise<void> {
 
   const invokeRes = await fetch(`${apiBase}/capabilities/${plan.capabilityId}/invoke`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders },
     body: JSON.stringify({ params: plan.params, allowRisky, tenantId: plan.tenantId }),
   });
   const result = (await invokeRes.json()) as InvokeResponse;
