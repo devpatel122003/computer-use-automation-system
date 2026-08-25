@@ -20,6 +20,8 @@
     "agent-invoke-demo": "tsx src/cli/agent-invoke-demo.ts",
     "agent-chat": "tsx src/cli/agent-chat.ts",
     "vision-fallback-demo": "tsx src/cli/vision-fallback-demo.ts",
+    "compliance-report": "tsx src/cli/compliance-report.ts",
+    "canary-check": "tsx src/cli/canary-check.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "playwright:install": "playwright install chromium"
