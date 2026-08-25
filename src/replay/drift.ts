@@ -79,3 +79,27 @@ export function summarizeDrift(
 
   return Array.from(reports.values()).filter((r) => r.totalObservations > 0);
 }
+
+export type ConfidenceLabel = "unproven" | "low" | "medium" | "high";
+
+const LABEL_DOWNGRADE: Record<ConfidenceLabel, ConfidenceLabel> = {
+  high: "medium",
+  medium: "low",
+  low: "low",
+  unproven: "unproven",
+};
+
+/**
+ * REPORT.md's own "what I'd build next": a step that keeps falling back to a lower-
+ * confidence locator strategy should pull an artifact's trust down even while it's still
+ * technically succeeding. Deliberately NOT folded into `computeConfidence()`'s numeric
+ * score itself (registry.ts) -- "did the replay engine correctly explain what happened"
+ * and "is a step quietly relying on a fallback" are two honestly separate signals, and
+ * blending them into one number would hide which one moved. This caps the *displayed*
+ * label one tier down when any step shows drift; the underlying success/business_outcome
+ * ratio is untouched and still available for anyone who wants the raw number.
+ */
+export function driftAdjustedLabel(rawLabel: ConfidenceLabel, drift: StepDriftReport[]): ConfidenceLabel {
+  const hasDrift = drift.some((r) => r.driftCount > 0);
+  return hasDrift ? LABEL_DOWNGRADE[rawLabel] : rawLabel;
+}

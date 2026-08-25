@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { CapabilityArtifactSchema, type CapabilityArtifact } from "./schema.js";
 import { computeConfidence, fingerprintArtifact, loadRegistry, type ApprovalState, type ConfidenceScore } from "./registry.js";
+import { applyTenantOverride, TenantOverrideSchema } from "./tenant-override.js";
 
 /**
  * One place that turns "whatever *.artifact.json files are on disk" into "capabilities with
@@ -51,4 +52,51 @@ export function loadCapabilityCatalog(
  *  limitation for a fleet, not a bug at this repo's current one-file-per-id scale. */
 export function findCapabilityById(id: string, artifactsDir = "evidence/artifacts"): CapabilityCatalogEntry | undefined {
   return loadCapabilityCatalog(artifactsDir).find((entry) => entry.artifact.id === id);
+}
+
+export interface TenantVariantEntry {
+  tenantId: string;
+  artifact: CapabilityArtifact;
+  fingerprint: string;
+  approvalState: ApprovalState;
+  confidence: ConfidenceScore;
+}
+
+/**
+ * A tenant override (src/artifact/tenant-override.ts) never exists as a file under
+ * evidence/artifacts/ -- it's computed in memory at replay/invoke time -- so without this,
+ * a tenant variant that's been approved and replayed for real (see REPORT.md "Stretch
+ * goals") was invisible to anything that only reads *.artifact.json files, including the
+ * dashboard. This reconstructs each variant's current trust state the same way
+ * `resolveEffectiveArtifact` (src/api/tenant-resolution.ts) does at request time, just for
+ * every override file instead of one named tenantId.
+ */
+export function loadTenantVariants(
+  baseArtifact: CapabilityArtifact,
+  overridesDir = "config/tenant-overrides",
+  registryPath = "evidence/artifacts/registry.json"
+): TenantVariantEntry[] {
+  if (!fs.existsSync(overridesDir)) return [];
+  const registry = loadRegistry(registryPath);
+
+  return fs
+    .readdirSync(overridesDir)
+    .filter((f) => f.endsWith(".json") && !f.startsWith("_")) // "_"-prefixed = a fixture, not a real tenant -- see _negative-control-url-only.json
+    .flatMap((file) => {
+      const parsed = TenantOverrideSchema.safeParse(JSON.parse(fs.readFileSync(path.join(overridesDir, file), "utf-8")));
+      if (!parsed.success || parsed.data.vendorProductId !== baseArtifact.target.appId) return [];
+
+      const artifact = applyTenantOverride(baseArtifact, parsed.data);
+      const fingerprint = fingerprintArtifact(artifact);
+      const entry = registry[`${artifact.id}@${fingerprint}`];
+      return [
+        {
+          tenantId: parsed.data.tenantId,
+          artifact,
+          fingerprint,
+          approvalState: entry?.approvalState ?? "draft",
+          confidence: entry ? computeConfidence(entry) : unprovenConfidence(),
+        } satisfies TenantVariantEntry,
+      ];
+    });
 }

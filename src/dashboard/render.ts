@@ -1,6 +1,7 @@
 import type { CapabilityArtifact } from "../artifact/schema.js";
 import type { ApprovalState, ConfidenceScore } from "../artifact/registry.js";
-import type { StepDriftReport } from "../replay/drift.js";
+import type { TenantVariantEntry } from "../artifact/catalog.js";
+import type { ConfidenceLabel, StepDriftReport } from "../replay/drift.js";
 import { formatDuration, formatSpeedup, type AggregateMetrics } from "./metrics.js";
 
 /**
@@ -19,6 +20,8 @@ export interface CapabilityView {
   confidence: ConfidenceScore;
   drift: StepDriftReport[];
   driftRunsMatched: number;
+  driftAdjustedLabel: ConfidenceLabel;
+  tenantVariants: TenantVariantEntry[];
   discoveryMetrics: AggregateMetrics | null;
   replayMetrics: AggregateMetrics | null;
 }
@@ -41,10 +44,16 @@ function approvalBadge(state: ApprovalState): string {
   return badge(state, state === "approved" ? "good" : "warning");
 }
 
-function confidenceBadge(confidence: ConfidenceScore): string {
-  const tone: Tone =
-    confidence.label === "high" ? "good" : confidence.label === "medium" ? "warning" : confidence.label === "low" ? "serious" : "muted";
-  return badge(confidence.label, tone);
+function confidenceLabelTone(label: ConfidenceLabel): Tone {
+  return label === "high" ? "good" : label === "medium" ? "warning" : label === "low" ? "serious" : "muted";
+}
+
+function confidenceBadges(confidence: ConfidenceScore, driftAdjusted: ConfidenceLabel): string {
+  const raw = badge(confidence.label, confidenceLabelTone(confidence.label));
+  // Only show the second badge when drift actually changed the picture -- a redundant
+  // badge that always repeats the same word next to itself is noise, not a signal.
+  if (driftAdjusted === confidence.label) return raw;
+  return `${raw} ${badge(`drift-capped to ${driftAdjusted}`, "warning")}`;
 }
 
 export function escapeHtml(value: string): string {
@@ -146,13 +155,30 @@ function driftTable(view: CapabilityView): string {
     </table>`;
 }
 
+function tenantVariantsTable(view: CapabilityView): string {
+  if (view.tenantVariants.length === 0) return "";
+  const rows = view.tenantVariants
+    .map(
+      (v) =>
+        `<tr><td>${escapeHtml(v.tenantId)}</td><td><code>${v.fingerprint}</code></td><td>${approvalBadge(v.approvalState)}</td><td>${badge(v.confidence.label, confidenceLabelTone(v.confidence.label))}</td><td>${v.confidence.successCount}/${v.confidence.totalRuns}</td></tr>`
+    )
+    .join("");
+  return `
+    <h3>Tenant variants</h3>
+    <div class="section-note">Same base artifact, adapted per tenant via config/tenant-overrides/ -- each earns its own trust independently (REPORT.md "Cross-tenant reuse").</div>
+    <table class="data-table">
+      <thead><tr><th>Tenant</th><th>Fingerprint</th><th>Approval</th><th>Confidence</th><th>Clean runs</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 function capabilityCard(view: CapabilityView): string {
   const { artifact, confidence } = view;
   return `
     <section class="card">
       <div class="card-header">
         <h2>${escapeHtml(artifact.name)} <span class="muted">v${escapeHtml(artifact.version)}</span></h2>
-        <div class="badges">${approvalBadge(view.approvalState)} ${confidenceBadge(confidence)}</div>
+        <div class="badges">${approvalBadge(view.approvalState)} ${confidenceBadges(confidence, view.driftAdjustedLabel)}</div>
       </div>
       <p class="description">${escapeHtml(artifact.description)}</p>
       <div class="meta">fingerprint <code>${view.fingerprint}</code> · ${confidence.successCount}/${confidence.totalRuns} clean runs · app: ${escapeHtml(artifact.target.appId)}</div>
@@ -166,6 +192,8 @@ function capabilityCard(view: CapabilityView): string {
 
       <h3>UI-drift signal</h3>
       ${driftTable(view)}
+
+      ${tenantVariantsTable(view)}
     </section>`;
 }
 

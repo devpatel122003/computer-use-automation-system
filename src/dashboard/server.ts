@@ -2,8 +2,8 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import express from "express";
-import { loadCapabilityCatalog } from "../artifact/catalog.js";
-import { extractStepMatches, summarizeDrift } from "../replay/drift.js";
+import { loadCapabilityCatalog, loadTenantVariants } from "../artifact/catalog.js";
+import { driftAdjustedLabel, extractStepMatches, summarizeDrift } from "../replay/drift.js";
 import { aggregateRunMetrics, computeRunMetrics } from "./metrics.js";
 import { renderDashboard, type CapabilityView } from "./render.js";
 import type { LogEvent } from "../evidence/logger.js";
@@ -72,6 +72,8 @@ function buildCapabilityViews(): CapabilityView[] {
       confidence,
       drift,
       driftRunsMatched: matchedRunLogs.length,
+      driftAdjustedLabel: driftAdjustedLabel(confidence.label, drift),
+      tenantVariants: loadTenantVariants(artifact),
       discoveryMetrics,
       replayMetrics,
     } satisfies CapabilityView;

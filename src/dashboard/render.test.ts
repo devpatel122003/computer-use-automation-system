@@ -37,6 +37,16 @@ describe("renderDashboard", () => {
       confidence: { totalRuns: 0, successCount: 0, hardFailureCount: 0, score: 0, label: "unproven" },
       drift: [],
       driftRunsMatched: 0,
+      driftAdjustedLabel: "unproven",
+      tenantVariants: [
+        {
+          tenantId: `"><script>alert(2)</script>`,
+          artifact,
+          fingerprint: "cafebabecafebabe",
+          approvalState: "draft",
+          confidence: { totalRuns: 0, successCount: 0, hardFailureCount: 0, score: 0, label: "unproven" },
+        },
+      ],
       discoveryMetrics: null,
       replayMetrics: null,
     };
@@ -45,6 +55,38 @@ describe("renderDashboard", () => {
     expect(html).not.toContain("<img src=x onerror=alert(1)>");
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).not.toContain(`"><b>bold</b>`);
+    expect(html).not.toContain(`"><script>alert(2)</script>`);
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+
+  it("shows a drift-capped badge only when the drift-adjusted label actually differs from the raw one", () => {
+    const artifact = CapabilityArtifactSchema.parse({
+      id: "x",
+      name: "Cap Test",
+      description: "d",
+      version: "1.0.0",
+      createdAt: new Date().toISOString(),
+      target: { appId: "mock-bank", surfaceType: "web", baseUrlPattern: "http://localhost:4000" },
+      inputParams: [],
+      outputSchema: [],
+      steps: [],
+      successCheckpoint: { kind: "text_match", expr: "done", description: "d" },
+      knownOutcomes: [],
+    });
+    const baseView: CapabilityView = {
+      artifact,
+      fingerprint: "deadbeefdeadbeef",
+      approvalState: "approved",
+      confidence: { totalRuns: 5, successCount: 5, hardFailureCount: 0, score: 1, label: "high" },
+      drift: [],
+      driftRunsMatched: 5,
+      driftAdjustedLabel: "high",
+      tenantVariants: [],
+      discoveryMetrics: null,
+      replayMetrics: null,
+    };
+
+    expect(renderDashboard([baseView])).not.toContain("drift-capped");
+    expect(renderDashboard([{ ...baseView, driftAdjustedLabel: "medium" }])).toContain("drift-capped to medium");
   });
 });

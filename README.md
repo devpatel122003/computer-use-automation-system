@@ -330,6 +330,12 @@ npm run dashboard
 Open `http://localhost:4600` in a browser. It reads straight from `evidence/artifacts/` and
 `evidence/runs/` on every request (no writes, no state of its own), so it stays accurate
 while you run more discovery/replay/approve commands in other terminals and just refresh.
+Two things worth pointing at: a second confidence badge appears ("drift-capped to ...")
+whenever any step's UI-drift signal (§3) would otherwise leave a misleadingly-high
+label unchallenged; and a "Tenant variants" table lists every `config/tenant-overrides/`
+entry for this capability with its *own* approval/confidence state -- a tenant override
+never exists as a file under `evidence/artifacts/`, so without this the dashboard would only
+ever show the base artifact, not the tenants actually running on top of it.
 
 **9. Agent-facing capability interface (Section 8 stretch goal).** The seam Section 1
 describes -- "the agent-facing product decides what to do; this system is how it reliably
@@ -396,7 +402,7 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (117 tests across 15 files, no network/browser
+`npm test` runs a real Vitest unit suite (128 tests across 16 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route

@@ -392,11 +392,8 @@ exercise:
     on a toolchain upgrade.
 
 **What I'd build next**, roughly in order: (1) mid-artifact resume-after-failure, since
-escalation without it is only half the story; (2) feeding the UI-drift signal (now built,
-§3) into the confidence score itself — a step that keeps falling back to a lower-confidence
-locator strategy should pull an artifact's score down even if it's still technically
-succeeding, which isn't wired up yet; (3) reviewer identity on approval; (4) some
-outside-the-system check on `knownOutcomes` detector correctness, since that's the one gap
+escalation without it is only half the story; (2) reviewer identity on approval;
+(3) some outside-the-system check on `knownOutcomes` detector correctness, since that's the one gap
 above that quietly undermines a feature (confidence scoring) that already shipped.
 
 ## 8. Stretch goals: Confidence & approval, Cross-tenant reuse, and Agent-facing capability interface
@@ -454,6 +451,15 @@ label. That doesn't touch the underlying risk — a *systematically* wrong detec
 many times, still gets rewarded. Catching that needs either detector review as part of
 `approve`, or comparing detector outcomes against something outside the system's own
 say-so (e.g. periodic human spot-checks of `business_outcome` runs) — neither is built.
+
+**One mitigation that is now built:** `driftAdjustedLabel()` (`src/replay/drift.ts`) caps the
+*displayed* confidence label one tier down when any step shows UI-drift (§3), separately from
+this raw score — a step quietly relying on a lower-confidence locator fallback is a
+correctness risk `computeConfidence()` alone can't see, since the replay engine still
+reports `success`. Deliberately not folded into the numeric score itself: "did it work" and
+"is it drifting" stay two honestly separate signals rather than one blended number that
+hides which one moved. Shown on the dashboard next to the raw badge, not in the CLI's
+`approve`/`replay` output yet — a real scope boundary, not an oversight.
 
 ### Cross-tenant reuse
 

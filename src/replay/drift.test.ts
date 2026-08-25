@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractStepMatches, summarizeDrift } from "./drift.js";
+import { driftAdjustedLabel, extractStepMatches, summarizeDrift, type StepDriftReport } from "./drift.js";
 import { CapabilityArtifactSchema, type CapabilityArtifact } from "../artifact/schema.js";
 import type { LogEvent } from "../evidence/logger.js";
 
@@ -103,5 +103,32 @@ describe("summarizeDrift", () => {
     const report = summarizeDrift(artifact, [{ stepNum: 2, matchedStrategy: "role" as const }]);
     expect(report).toHaveLength(1);
     expect(report[0]?.stepId).toBe("step-2");
+  });
+});
+
+function driftReport(driftCount: number): StepDriftReport {
+  return { stepId: "step-2", description: "d", expectedStrategy: "role", observedCounts: {}, totalObservations: 1, driftCount };
+}
+
+describe("driftAdjustedLabel", () => {
+  it("leaves the label unchanged when no step shows drift", () => {
+    expect(driftAdjustedLabel("high", [driftReport(0), driftReport(0)])).toBe("high");
+  });
+
+  it("leaves the label unchanged when there is no drift data at all", () => {
+    expect(driftAdjustedLabel("high", [])).toBe("high");
+  });
+
+  it("caps high down to medium when any step shows drift", () => {
+    expect(driftAdjustedLabel("high", [driftReport(0), driftReport(2)])).toBe("medium");
+  });
+
+  it("caps medium down to low", () => {
+    expect(driftAdjustedLabel("medium", [driftReport(1)])).toBe("low");
+  });
+
+  it("leaves low and unproven as themselves -- there's nowhere lower to cap them", () => {
+    expect(driftAdjustedLabel("low", [driftReport(1)])).toBe("low");
+    expect(driftAdjustedLabel("unproven", [driftReport(1)])).toBe("unproven");
   });
 });
