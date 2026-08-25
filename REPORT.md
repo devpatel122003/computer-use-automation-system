@@ -26,6 +26,16 @@ with one clear responsibility each, wired together by three CLI entry points
   replay before every action, plus a redaction utility used by the logger.
 - **`escalation`** is the pause/human-takeover/resume controller, shared by both paths.
 - **`evidence`** is one structured JSONL logger + screenshot capture, used by everyone else.
+- **`dashboard`** (`npm run dashboard`, `src/dashboard`) is a small read-only ops view, not
+  a fourth stretch goal or the brief's "agent-facing capability interface" (§8) — it doesn't
+  expose anything callable by an agent, it's a human-facing page. It recomputes from disk on
+  every request and adds no new backend logic: it just renders what `replay --tenant-override`
+  patched, what `registry.ts` scored, and what `drift-report` diffed, in one place instead of
+  four CLI invocations, plus a discovery-vs-replay time/model-call comparison computed from
+  the same log timestamps every run already writes. Built because the artifact schema, the
+  confidence registry, and the drift signal are each real but only visible as JSON/stdout;
+  turning that into a page a non-engineer can read in one glance is presentation on existing
+  depth, not new surface area.
 
 Key trade-off: I chose to make locator resolution and the risk/allowlist check the *same
 code path* for discovery and replay (both go through `Surface.perform`/`predictNavigation`

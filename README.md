@@ -28,6 +28,10 @@ and cuts).
 - `src/replay/` — the deterministic replay engine, the checkpoint/known-outcome evaluator,
   and the UI-drift signal (`npm run drift-report` -- diffs each replay's matched locator
   strategy against what was recorded, per step).
+- `src/dashboard/` — a small read-only ops page (`npm run dashboard`) that renders the
+  artifact contract, approval/confidence state, drift signal, and a discovery-vs-replay
+  time/model-call comparison for every capability, in one place instead of four CLI
+  invocations. Recomputes from disk on every request; makes no writes.
 - `src/guardrails/` — the allowlist policy, risk classification, and redaction utilities.
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
   drive the same live browser session, capture what they did, hand control back).
@@ -307,6 +311,19 @@ confirmation number observed at *recording* time, which by construction never ma
 See `REPORT.md` "Determinism & error handling" for both, and why the second one is a known
 false-positive category rather than a real drift signal.
 
+**8. Capability dashboard.** One page that renders everything above -- contract, approval/
+confidence, drift, and a discovery-vs-replay time/model-call comparison -- instead of four
+separate commands:
+
+```bash
+npm run dashboard
+# -> Capability dashboard listening on http://localhost:4600
+```
+
+Open `http://localhost:4600` in a browser. It reads straight from `evidence/artifacts/` and
+`evidence/runs/` on every request (no writes, no state of its own), so it stays accurate
+while you run more discovery/replay/approve commands in other terminals and just refresh.
+
 ## Running without live services
 
 The mock-bank app *is* the "live service" here -- there's no external dependency beyond
@@ -321,7 +338,7 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (98 tests across 11 files, no network/browser
+`npm test` runs a real Vitest unit suite (110 tests across 13 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route
@@ -329,7 +346,9 @@ matching (including the origin-vs-prefix bypass cases described in `REPORT.md` "
 artifact schema cross-field validation, the confidence/registry math, the recorder's
 artifact-building, the tenant-override module (patch application, and that it throws on a
 stepId/strategy/known-outcome that doesn't exist rather than silently no-oping), the
-UI-drift signal's extraction/aggregation logic, the replay
+UI-drift signal's extraction/aggregation logic, the dashboard's cost/time math and its HTML
+escaping (a deliberate check that artifact-sourced free text can't inject markup into the
+rendered page), the replay
 engine's guardrail/recovery/retry behavior, and the discovery loop's own control flow
 (escalate/resume, dead-end detection, risky-action confirmation) -- using a stub `Surface`, a
 scripted fake model *output* (not a claim about what real Gemini would decide), and, where a
