@@ -1,5 +1,5 @@
 {
-  "allowedBaseUrls": ["http://localhost:4000"],
+  "allowedBaseUrls": ["http://localhost:4000", "http://localhost:4100"],
   "routes": [
     { "pattern": "/login", "methods": ["GET", "POST"], "risk": "safe" },
     { "pattern": "/logout", "methods": ["GET"], "risk": "safe" },

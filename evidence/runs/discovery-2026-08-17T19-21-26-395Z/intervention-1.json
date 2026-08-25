@@ -1,0 +1,9 @@
+{
+  "runId": "discovery-2026-08-17T19-21-26-395Z",
+  "capability": "open-sub-account",
+  "step": 6,
+  "reason": "Member 99999 cannot be accessed (Access denied. Operator demo_operator is not permitted to view member 99999). Escalating to human operator as requested by goal instructions.",
+  "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-17T19-21-26-395Z/screenshots/intervention-1.png",
+  "url": "http://localhost:4000/members/99999",
+  "createdAt": "2026-08-17T19:21:32.743Z"
+}

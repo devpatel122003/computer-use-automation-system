@@ -1,5 +1,5 @@
 <html>
-<head><title>CU Core &mdash; Open Sub-Account</title></head>
+<head><title><%= labels.brandName %> &mdash; Open Sub-Account</title></head>
 <body bgcolor="#d6d3ce">
 <table width="100%" cellpadding="4" cellspacing="0" border="0">
   <tr bgcolor="#003366">
@@ -7,6 +7,11 @@
     <td align="right"><font color="#ffffff" face="Arial" size="2">Signed on as <%= username %> &nbsp; | &nbsp; <a href="/logout"><font color="#ffffff">Sign Off</font></a></font></td>
   </tr>
 </table>
+<% if (labels.bannerText) { %>
+  <table width="100%" cellpadding="6" cellspacing="0" border="0">
+    <tr bgcolor="#e8edf5"><td><font face="Arial" size="2"><i><%= labels.bannerText %></i></font></td></tr>
+  </table>
+<% } %>
 <br/>
 <table cellpadding="2" cellspacing="0" border="0">
   <tr><td><a href="/members/<%= memberId %>">&laquo; Back to Member</a></td></tr>
@@ -26,7 +31,7 @@
       <form method="POST" action="/members/<%= memberId %>/sub-accounts">
         <table cellpadding="4" cellspacing="0" border="0">
           <tr>
-            <td><label for="accountType">Account Type</label></td>
+            <td><label for="accountType"><%= labels.accountTypeLabel %></label></td>
             <td>
               <select id="accountType" name="accountType">
                 <option value="Savings" <%= (typeof accountType !== 'undefined' && accountType === 'Savings') ? 'selected' : '' %>>Savings</option>
@@ -36,11 +41,11 @@
             </td>
           </tr>
           <tr>
-            <td><label for="initialDeposit">Initial Deposit ($)</label></td>
+            <td><label for="initialDeposit"><%= labels.initialDepositLabel %></label></td>
             <td><input type="text" id="initialDeposit" name="initialDeposit" value="<%= typeof initialDeposit !== 'undefined' ? initialDeposit : '' %>" /></td>
           </tr>
           <tr>
-            <td colspan="2" align="right"><input type="submit" value="Submit" /></td>
+            <td colspan="2" align="right"><input type="submit" value="<%= labels.submitLabel %>" /></td>
           </tr>
         </table>
       </form>

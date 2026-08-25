@@ -1,5 +1,5 @@
 <html>
-<head><title>CU Core &mdash; Member Detail</title></head>
+<head><title><%= labels.brandName %> &mdash; Member Detail</title></head>
 <body bgcolor="#d6d3ce">
 <table width="100%" cellpadding="4" cellspacing="0" border="0">
   <tr bgcolor="#003366">
@@ -7,6 +7,11 @@
     <td align="right"><font color="#ffffff" face="Arial" size="2">Signed on as <%= username %> &nbsp; | &nbsp; <a href="/logout"><font color="#ffffff">Sign Off</font></a></font></td>
   </tr>
 </table>
+<% if (labels.bannerText) { %>
+  <table width="100%" cellpadding="6" cellspacing="0" border="0">
+    <tr bgcolor="#e8edf5"><td><font face="Arial" size="2"><i><%= labels.bannerText %></i></font></td></tr>
+  </table>
+<% } %>
 <br/>
 <table cellpadding="2" cellspacing="0" border="0">
   <tr><td><a href="/search">&laquo; Back to Search</a></td></tr>
@@ -15,7 +20,7 @@
 
 <% if (accessDenied) { %>
   <table bgcolor="#f8d0d0" cellpadding="8" border="1">
-    <tr><td><font color="#7a0000"><b>Access denied.</b> Operator <%= username %> is not permitted to view member <%= member.id %>.</font></td></tr>
+    <tr><td><font color="#7a0000"><b><%= labels.accessDeniedText %></b> Operator <%= username %> is not permitted to view member <%= member.id %>.</font></td></tr>
   </table>
 <% } else { %>
   <table cellpadding="8" cellspacing="0" border="1">
@@ -42,7 +47,11 @@
     <% } %>
   </table>
   <br/>
-  <a href="/members/<%= member.id %>/sub-accounts/new">Open New Sub-Account</a>
+  <% if (labels.bannerText) { %>
+    <div><a href="/members/<%= member.id %>/sub-accounts/new"><%= labels.openNewSubAccountLabel %></a></div>
+  <% } else { %>
+    <a href="/members/<%= member.id %>/sub-accounts/new"><%= labels.openNewSubAccountLabel %></a>
+  <% } %>
 <% } %>
 </body>
 </html>

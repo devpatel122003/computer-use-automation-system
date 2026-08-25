@@ -10,6 +10,7 @@ import { replay } from "../replay/replay-engine.js";
 import { EscalationController } from "../escalation/controller.js";
 import { parseArgs } from "./args.js";
 import { computeConfidence, getOrCreateEntry, loadRegistry, recordReplayOutcome, saveRegistry } from "../artifact/registry.js";
+import { applyTenantOverride, TenantOverrideSchema } from "../artifact/tenant-override.js";
 
 const DEFAULT_REGISTRY_PATH = "evidence/artifacts/registry.json";
 
@@ -22,8 +23,23 @@ async function main(): Promise<void> {
   const registryPath = args.registry ?? DEFAULT_REGISTRY_PATH;
 
   const raw = JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
-  const artifact = CapabilityArtifactSchema.parse(raw);
+  const baseArtifact = CapabilityArtifactSchema.parse(raw);
   const params = JSON.parse(paramsJson) as Record<string, string>;
+
+  // Cross-tenant reuse (REPORT.md "Heterogeneity & multi-tenant"): the same recorded
+  // artifact, adapted to a second tenant running the same underlying vendor product via a
+  // small named patch instead of a re-recording. Applied before anything else touches the
+  // artifact, so registry/confidence/replay all operate on the tenant-effective content.
+  const tenantOverridePath = args["tenant-override"];
+  let artifact = baseArtifact;
+  let appliedTenantId: string | undefined;
+  if (tenantOverridePath) {
+    const overrideRaw = JSON.parse(fs.readFileSync(tenantOverridePath, "utf-8"));
+    const override = TenantOverrideSchema.parse(overrideRaw);
+    artifact = applyTenantOverride(baseArtifact, override);
+    appliedTenantId = override.tenantId;
+    console.log(`Applying tenant override "${override.tenantId}" from ${tenantOverridePath}`);
+  }
 
   const registry = loadRegistry(registryPath);
   const entry = getOrCreateEntry(registry, artifact);
@@ -60,6 +76,7 @@ async function main(): Promise<void> {
       allowRiskyRequested: requestedAllowRisky,
       allowRiskyEffective: allowRisky,
       params: redactedParams,
+      tenantOverride: tenantOverridePath ? { path: tenantOverridePath, tenantId: appliedTenantId } : undefined,
     },
   });
 
@@ -72,7 +89,7 @@ async function main(): Promise<void> {
     const escalation = new EscalationController(surface.getPage(), logger, runId, "replay", artifact.name);
 
     console.log(`Replay run: ${runId}`);
-    console.log(`Artifact: ${artifact.name} v${artifact.version} (${entry.fingerprint})`);
+    console.log(`Artifact: ${artifact.name} v${artifact.version} (${entry.fingerprint})${appliedTenantId ? ` [tenant override: ${appliedTenantId}]` : ""}`);
     console.log(
       `Approval: ${entry.approvalState} | Confidence: ${confidence.label} ` +
         `(${confidence.successCount}/${confidence.totalRuns} clean runs)`

@@ -3,6 +3,7 @@ import session from "express-session";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { consumeSessionTimeoutArm, createSubAccount, findMember, findSubAccount, resetData, subAccounts } from "./data.js";
+import { getTenantLabels } from "./tenants.js";
 
 declare module "express-session" {
   interface SessionData {
@@ -13,6 +14,11 @@ declare module "express-session" {
 // Reserved member ID that simulates a session timing out mid-flow, exactly once per
 // resetData() -- a transient glitch, not a permanently broken member.
 const TIMEOUT_TRIGGER_ID = "90909";
+
+// Which tenant's copy this instance serves -- e.g. TENANT=northgate-cu PORT=4100. Same
+// routes, same form field name/id attributes, same business rules; only visible text
+// (and, per the view templates, one extra banner row) differs. See tenants.ts.
+const labels = getTenantLabels(process.env.TENANT ?? "mock-bank");
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -29,6 +35,13 @@ app.use(
     cookie: { maxAge: 1000 * 60 * 60 },
   })
 );
+
+// Every view reads tenant copy from `labels` via res.locals rather than an explicit
+// render() argument -- one middleware line instead of threading it through every route.
+app.use((_req, res, next) => {
+  res.locals.labels = labels;
+  next();
+});
 
 function requireAuth(req: Request, res: Response, next: NextFunction): void {
   if (!req.session.username) {
@@ -81,7 +94,7 @@ app.get("/search", requireAuth, async (req, res) => {
   if (!member) {
     res.render("search", {
       username: req.session.username,
-      error: `No member found with ID ${memberId}.`,
+      error: `${labels.memberNotFoundText} ${memberId}.`,
       memberId,
     });
     return;
@@ -154,7 +167,7 @@ app.post("/members/:id/sub-accounts", requireAuth, (req, res) => {
       memberId: id,
       accountType,
       initialDeposit: rawDeposit,
-      error: "Initial deposit must be at least $25.00.",
+      error: labels.minDepositErrorText,
     });
     return;
   }
@@ -181,5 +194,5 @@ app.post("/__test__/reset", (_req, res) => {
 
 const PORT = Number(process.env.PORT ?? 4000);
 app.listen(PORT, () => {
-  console.log(`mock-bank listening on http://localhost:${PORT}`);
+  console.log(`mock-bank listening on http://localhost:${PORT} (tenant: ${labels.tenantId})`);
 });

@@ -1,0 +1,8 @@
+{
+  "_note": "Not a real tenant override -- a deliberately incomplete fixture used once to prove the override layer is load-bearing rather than decorative: pointing the base artifact at the northgate-cu tenant's URL WITHOUT the locator/checkpoint patches still fails at step-4 (Sign On), because the base artifact's recorded role+name/text locators don't match this tenant's rebranded copy. See REPORT.md 'Heterogeneity & multi-tenant' and evidence/runs/replay-<negative-control timestamp> for the real run this produced.",
+  "tenantId": "northgate-cu-url-only-negative-control",
+  "vendorProductId": "mock-bank",
+  "baseUrlPattern": "http://localhost:4100",
+  "locatorOverrides": [],
+  "checkpointOverrides": []
+}

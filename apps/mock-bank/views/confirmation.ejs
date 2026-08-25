@@ -1,5 +1,5 @@
 <html>
-<head><title>CU Core &mdash; Confirmation</title></head>
+<head><title><%= labels.brandName %> &mdash; Confirmation</title></head>
 <body bgcolor="#d6d3ce">
 <table width="100%" cellpadding="4" cellspacing="0" border="0">
   <tr bgcolor="#003366">
@@ -7,10 +7,15 @@
     <td align="right"><font color="#ffffff" face="Arial" size="2">Signed on as <%= username %> &nbsp; | &nbsp; <a href="/logout"><font color="#ffffff">Sign Off</font></a></font></td>
   </tr>
 </table>
+<% if (labels.bannerText) { %>
+  <table width="100%" cellpadding="6" cellspacing="0" border="0">
+    <tr bgcolor="#e8edf5"><td><font face="Arial" size="2"><i><%= labels.bannerText %></i></font></td></tr>
+  </table>
+<% } %>
 <br/>
 <table bgcolor="#d6f5d6" cellpadding="8" cellspacing="0" border="1">
   <tr><td>
-    <font color="#0a5d0a" size="3"><b><span id="confirmationBanner">Sub-account opened successfully.</span></b></font>
+    <font color="#0a5d0a" size="3"><b><span id="confirmationBanner"><%= labels.confirmationBannerText %></span></b></font>
   </td></tr>
 </table>
 <br/>

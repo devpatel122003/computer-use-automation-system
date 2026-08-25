@@ -3,7 +3,7 @@
   "name": "Open Sub-Account",
   "description": "Signs on, looks up a member by ID, opens a new sub-account with a specified type and initial deposit, and confirms the result.",
   "version": "1.0.0",
-  "createdAt": "2026-08-14T20:25:39.344Z",
+  "createdAt": "2026-08-17T20:11:44.425Z",
   "target": {
     "appId": "mock-bank",
     "surfaceType": "web",
@@ -51,7 +51,7 @@
       "name": "confirmationNumber",
       "type": "string",
       "sourceStepId": "step-11",
-      "description": "Extracted from text \"SA-00001\""
+      "description": "Extracted from text \"SA-00004\""
     }
   ],
   "steps": [
@@ -410,11 +410,11 @@
     {
       "id": "step-11",
       "actionType": "extract",
-      "description": "Extract value from text \"SA-00001\"",
+      "description": "Extract value from text \"SA-00004\"",
       "locator": [
         {
           "strategy": "text",
-          "name": "SA-00001",
+          "name": "SA-00004",
           "nth": 0,
           "confidence": "medium",
           "rationale": "Exact visible text match; stable as long as copy doesn't change."

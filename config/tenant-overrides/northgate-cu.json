@@ -1,0 +1,22 @@
+{
+  "tenantId": "northgate-cu",
+  "vendorProductId": "mock-bank",
+  "baseUrlPattern": "http://localhost:4100",
+  "locatorOverrides": [
+    { "stepId": "step-4", "strategy": "role", "name": "Log In" },
+    { "stepId": "step-4", "strategy": "text", "name": "Log In" },
+    { "stepId": "step-6", "strategy": "role", "name": "Find Member" },
+    { "stepId": "step-6", "strategy": "text", "name": "Find Member" },
+    { "stepId": "step-7", "strategy": "role", "name": "Open New Account" },
+    { "stepId": "step-7", "strategy": "text", "name": "Open New Account" },
+    { "stepId": "step-10", "strategy": "role", "name": "Confirm & Open" },
+    { "stepId": "step-10", "strategy": "text", "name": "Confirm & Open" }
+  ],
+  "checkpointOverrides": [
+    { "target": "success", "expr": "Account opened successfully" },
+    { "target": "member_not_found", "expr": "We could not locate a member with number" },
+    { "target": "permission_denied", "expr": "Not authorized to view this member" },
+    { "target": "validation_error", "expr": "Minimum opening deposit is" },
+    { "target": "session_timeout", "expr": "session timed out" }
+  ]
+}

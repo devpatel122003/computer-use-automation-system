@@ -51,5 +51,31 @@
         "status": "failure"
       }
     ]
+  },
+  "open-sub-account@62b2d1a1fb853f5a": {
+    "artifactId": "open-sub-account",
+    "version": "1.0.0",
+    "fingerprint": "62b2d1a1fb853f5a",
+    "approvalState": "draft",
+    "history": [
+      {
+        "runId": "replay-2026-08-25T17-52-53-914Z",
+        "timestamp": "2026-08-25T17:52:56.864Z",
+        "status": "success"
+      }
+    ]
+  },
+  "open-sub-account@dbc8265e73cb99c4": {
+    "artifactId": "open-sub-account",
+    "version": "1.0.0",
+    "fingerprint": "dbc8265e73cb99c4",
+    "approvalState": "draft",
+    "history": [
+      {
+        "runId": "replay-2026-08-25T18-05-12-756Z",
+        "timestamp": "2026-08-25T18:05:15.803Z",
+        "status": "success"
+      }
+    ]
   }
 }

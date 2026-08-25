@@ -183,15 +183,19 @@ AXUIElement on macOS) instead of Playwright; `LocatorStrategy` already has room 
 `desktop_automation_id` variant alongside `role`/`text`/`css_structural`. Nothing above
 `Surface` — agent, artifact, replay, guardrails — would need to change.
 
-**Multi-tenant reuse.** Artifacts are already tenant-agnostic in the ways that matter:
-`target.baseUrlPattern` is a field, not embedded per-step, and URL checkpoints are path
-*templates* (`/members/{memberId}`, not `/members/10001`). The natural extension (not
-built, since Section 3.7 says design-not-build) is an **override layer** keyed by
-`(vendorProductId, tenantId)` that can patch specific `locatorCandidates` or copy strings
-without forking the whole artifact — the same idea as a CSS theme override, applied to the
-base artifact at load time before replay. Two tenants running the same vendor product would
-share one base artifact; a tenant with a rebranded button label gets a one-line override to
-its `text` locator candidate, not a re-recording.
+**Multi-tenant reuse — built, not just designed** (§8 stretch goal). Artifacts are already
+tenant-agnostic in the ways that matter: `target.baseUrlPattern` is a field, not embedded
+per-step, and URL checkpoints are path *templates* (`/members/{memberId}`, not
+`/members/10001`). On top of that, `src/artifact/tenant-override.ts` implements the override
+layer this section originally only described: a small, schema-validated patch — keyed by
+`vendorProductId` (must match `target.appId`) and carrying a `tenantId` — that can rewrite a
+specific step's `role`/`text` locator candidate name, a checkpoint's `expr`, or the artifact's
+`baseUrlPattern`, without forking or re-recording the base artifact. `replay`'s
+`--tenant-override <path>` flag applies it before anything else touches the artifact, so the
+registry/confidence/replay pipeline all operate on the tenant-effective content. Two tenants
+running the same vendor product share one base artifact; a tenant with a rebranded button
+label gets a one-line override to its `text`/`role` candidate, not a re-recording. See §8 for
+the real evidence and why the override is deliberately narrow in what it's allowed to touch.
 
 **Drift detection at scale** falls out of the same mechanism described in §3: replay already
 logs which locator strategy matched per step. A fleet-level job could aggregate "artifact X,
@@ -306,11 +310,12 @@ in a config file), not inferred from anything about the data being touched.
 
 ## 7. Cuts
 
-- **One stretch goal implemented** (Confidence & approval, §8); the rest were deliberately
-  skipped per Section 8's "pick at most one or two, depth over breadth" — time went into
-  getting the core loop, artifact schema, determinism, and escalation genuinely right
-  (including finding and fixing the real bugs described above) rather than adding a
-  capability catalog, code generation, assisted fallback, or cross-tenant canonicalization.
+- **Two stretch goals implemented** (Confidence & approval, and Cross-tenant reuse — §8,
+  within the brief's own "pick at most one or two, depth over breadth"); the rest were
+  deliberately skipped — time went into getting the core loop, artifact schema,
+  determinism, and escalation genuinely right (including finding and fixing the real bugs
+  described above) rather than adding a capability catalog, code generation, assisted
+  fallback, or multi-run stability reporting.
 - **`known_outcomes` are human-authored, not auto-mined.** A single happy-path discovery
   run never observes its own error states by definition. A production version would run
   discovery against seeded error fixtures too, or gate known-outcome additions behind
@@ -364,7 +369,7 @@ score down even if it's still technically succeeding); (3) reviewer identity on 
 (4) some outside-the-system check on `knownOutcomes` detector correctness, since that's the
 one gap above that quietly undermines a feature (confidence scoring) that already shipped.
 
-## 8. Stretch goal: Confidence & approval
+## 8. Stretch goals: Confidence & approval, and Cross-tenant reuse
 
 **What it does.** `src/artifact/registry.ts` scores each *exact recorded version* of an
 artifact by its replay history and gates unattended replay behind an explicit
@@ -419,3 +424,78 @@ label. That doesn't touch the underlying risk — a *systematically* wrong detec
 many times, still gets rewarded. Catching that needs either detector review as part of
 `approve`, or comparing detector outcomes against something outside the system's own
 say-so (e.g. periodic human spot-checks of `business_outcome` runs) — neither is built.
+
+### Cross-tenant reuse
+
+**What it does.** `src/artifact/tenant-override.ts` lets one recorded artifact serve a second
+tenant running the same underlying vendor product, configured/branded differently — the exact
+shape of the real environment described in §1/§4 ("hundreds of tenants, many running the same
+underlying vendor product configured, branded, and versioned differently"). A `TenantOverride`
+(Zod-validated, like everything else this system produces or consumes) names a `tenantId` and
+a `vendorProductId` that must match the base artifact's `target.appId`, and carries a small,
+deliberately narrow set of patches: a step's `role` or `text` locator candidate's `name`, a
+checkpoint or known-outcome detector's `expr`, and/or a replacement `baseUrlPattern`.
+`applyTenantOverride()` clones the base artifact, applies the patches, and re-validates the
+result against `CapabilityArtifactSchema` before returning it — the same "validate what we
+produce" discipline the recorder applies to its own output. It throws (rather than silently
+no-oping) if an override names a step, strategy, or known-outcome that doesn't actually exist
+in the base artifact, since a stale override silently leaving the *old* tenant's locator in
+place against the *new* tenant's page is worse than a loud config error. `replay`'s
+`--tenant-override <path>` flag applies this before the registry/confidence/replay pipeline
+ever sees the artifact.
+
+**Why the override is deliberately narrow.** It can only change *copy* (locator names,
+checkpoint text, base URL) — never add/remove steps or change action types, input/output
+contracts, or risk classifications. That's a real constraint, not a limitation I ran out of
+time on: "this tenant's UI uses different words for the same flow" is a copy-only override;
+"this tenant's flow is actually different" needs its own recording and its own review, the
+same way a materially different artifact gets its own confidence-registry entry (below) rather
+than inheriting trust it hasn't earned.
+
+**Real evidence in `/evidence`, including a negative control.** `apps/mock-bank` now serves
+two tenants from the identical Express app and `.ejs` views (`npm run mock-bank` on :4000,
+`npm run mock-bank:northgate` on :4100) — same routes, same form field `name`/`id` attributes,
+same business rules, different visible copy ("Sign On" → "Log In", "Member ID" → "Member
+Number", etc.) *and* an extra per-tenant banner row that shifts every position-based DOM path,
+so `css_structural` fallbacks for the un-`id`'d buttons/links break too, not just the
+higher-confidence candidates. `config/tenant-overrides/northgate-cu.json` is the real,
+committed override; replaying the *exact* artifact recorded against `:4000` against `:4100`
+with `--tenant-override config/tenant-overrides/northgate-cu.json` completes end to end and
+reaches a real confirmation number (`replay-2026-08-25T17-52-53-914Z`, `status: success`) —
+no re-recording. To make sure this was actually load-bearing and not a coincidence (the five
+form-field steps still resolve on the variant *without* any override, since they happen to
+carry `id` attributes and this app's `css_structural` candidate collapses to `#id` when one is
+present — a real, honest limit of relying on structural fallbacks), I also replayed the same
+base artifact against `:4100` with a `baseUrlPattern`-only override and *no* locator/checkpoint
+patches (`config/tenant-overrides/_negative-control-url-only.json`): it fails at `step-4`
+("No locator candidate resolved to an element") — `replay-2026-08-25T17-58-23-091Z`,
+`status: failure`. Pointing an artifact at the right URL is not the same as adapting it to the
+tenant; the override layer is what actually closes that gap.
+
+**Interaction with the confidence registry.** `fingerprintArtifact()` hashes `steps`
+(including locator candidates) and `knownOutcomes`/`successCheckpoint`, so an overridden
+artifact — whose patched steps differ in content from the base — gets its *own* registry
+entry, starting at `draft`/`unproven`, independent of the base artifact's approval state. This
+wasn't special-cased for tenant overrides; it falls out of keying the registry by content
+fingerprint instead of `id`+`version` (§8, Confidence & approval) for exactly the same reason a
+re-recording doesn't inherit trust it hasn't earned — an override is also unproven content
+until it's actually been replayed against that tenant. One honest gap this surfaced: the
+fingerprint deliberately excludes `baseUrlPattern` (so a re-recorded-but-identical artifact
+shares history across environments), which means an override that changes *only*
+`baseUrlPattern` — like the negative-control fixture above — collides with the base
+artifact's *own* fingerprint. I hit this for real: the negative control's failure briefly
+showed up in the base artifact's own confidence history until I removed that one entry by
+hand. The registry has no notion of "environment" separate from "content," so a tenant
+override that happens to change nothing fingerprint-relevant (rare in practice -- a real
+rebrand almost always touches locator names too) pools its history with the base artifact's.
+Scoping the registry key to `(fingerprint, tenantId)` instead of just `fingerprint` would fix
+this properly; not done here.
+
+**Cut from this stretch goal:** no canonicalization pass (`/members/12345` → `/members/:id` as
+a generic route-pattern normalizer) — the existing path-template checkpoints
+(`/members/{memberId}`) already cover the one case this artifact needed, so a separate
+canonicalization layer would have been unexercised scaffolding; a route with a genuinely
+different shape per tenant would need one. No override-authoring tool — `northgate-cu.json`
+was hand-written the way a human reviewer would author one, the same posture as
+`knownOutcomes` (§7). No per-tenant drift detection beyond what §3/§4 already describe (the
+matched-locator-strategy log exists; aggregating it per-tenant is unbuilt).

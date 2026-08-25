@@ -5,8 +5,10 @@ drives a live web app to accomplish a goal (**discovery**), the successful run i
 as a typed, versioned **capability artifact**, and that artifact **replays deterministically**
 — no model involved — with structured success / business-outcome / failure results, an
 allowlist-based guardrail layer, and a real (not mocked) human-escalation handoff. It also
-includes one Section 8 stretch goal: **confidence scoring + a draft→approved approval gate**
-on unattended replay.
+includes two Section 8 stretch goals: **confidence scoring + a draft→approved approval gate**
+on unattended replay, and **cross-tenant reuse** — the same recorded artifact, applied to a
+second, differently-branded tenant running the identical underlying app via a small named
+override, not a re-recording.
 
 See [`REPORT.md`](REPORT.md) for the design write-up (architecture, artifact schema,
 determinism & error handling, heterogeneity/multi-tenant story, escalation model, safety,
@@ -21,7 +23,8 @@ and cuts).
 - `src/surface/` — the `Surface` abstraction (observe/act) and its Playwright implementation.
 - `src/agent/` — the discovery loop: observe → Gemini function-call decision → act.
 - `src/artifact/` — the capability artifact schema (Zod), the recorder that builds one from
-  a finished discovery run, and the confidence/approval registry (stretch goal).
+  a finished discovery run, the confidence/approval registry (stretch goal), and the
+  tenant-override module for cross-tenant reuse (stretch goal).
 - `src/replay/` — the deterministic replay engine and checkpoint/known-outcome evaluator.
 - `src/guardrails/` — the allowlist policy, risk classification, and redaction utilities.
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
@@ -30,14 +33,19 @@ and cuts).
 - `src/cli/` — the entry points (`run-agent`, `replay`, `approve`, `escalation-resume-demo`)
   and the `open-sub-account` capability's domain config (param mappings, checkpoints, known
   outcomes).
+- `apps/mock-bank/src/tenants.ts` + `config/tenant-overrides/` — a second tenant ("Northgate
+  Credit Union") served from the *same* mock-bank app/routes/views with different copy and
+  DOM structure, and the override file that adapts the base artifact to it.
 - `evidence/` — three real discovery runs (a clean success; an escalation resolved with
   `abort` against a nonexistent member, with a real intervention screenshot/log; and an
   escalation resolved with `resume` against a permission-denied member, where the run
   continues on the same live session and actually completes the goal afterward), a real
   artifact, its confidence/approval registry, and real replay runs covering success, a
   recovered session-timeout, "member not found," "permission denied," a validation error,
-  simulated slow load, the draft→approved gating flow, and a genuine `failure` result (an
-  account type the app's dropdown doesn't offer, with no known outcome to explain it).
+  simulated slow load, the draft→approved gating flow, a genuine `failure` result (an
+  account type the app's dropdown doesn't offer, with no known outcome to explain it), and
+  the cross-tenant reuse pair described in step 6 below (the same artifact succeeding
+  against a rebranded second tenant via an override, and failing against it without one).
 
 ## Setup
 
@@ -243,6 +251,42 @@ so a re-recorded artifact with materially different steps starts back at `draft`
 automatically, rather than silently inheriting an approval it never earned. Use
 `npm run approve -- --artifact <path> --revoke true` to send an artifact back to draft.
 
+**6. Cross-tenant reuse (Section 8 stretch goal).** The same artifact recorded against
+`mock-bank` on port 4000, replayed against a *second*, differently-branded tenant on port
+4100 running the identical underlying app -- no re-recording, just a small named override.
+
+```bash
+npm run mock-bank:northgate
+# -> mock-bank listening on http://localhost:4100 (tenant: northgate-cu)
+```
+
+```bash
+curl -s -X POST http://localhost:4100/__test__/reset
+
+npm run replay -- \
+  --artifact evidence/artifacts/open-sub-account.artifact.json \
+  --tenant-override config/tenant-overrides/northgate-cu.json \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10001","accountType":"Savings","initialDeposit":"100"}'
+```
+
+Type `yes` at the risky-action prompt (this artifact's own fingerprint on this tenant starts
+back at `draft` -- see below). This completes end to end against a page that says "Log In"
+instead of "Sign On," "Find Member" instead of "Look Up Member," and "Confirm & Open" instead
+of "Submit" -- real evidence at `evidence/runs/replay-2026-08-25T17-52-53-914Z`.
+
+To see that the override is actually load-bearing and not just a URL pointer, the same base
+artifact run against `:4100` with a `baseUrlPattern`-only override and no locator/checkpoint
+patches (`config/tenant-overrides/_negative-control-url-only.json`) fails at `step-4`
+("No locator candidate resolved to an element") -- `evidence/runs/replay-2026-08-25T17-58-23-091Z`.
+Worth noting honestly: the five plain form-field steps (username/password/memberId/
+accountType/initialDeposit) keep working on the variant even *without* an override, because
+this app happens to give those inputs `id` attributes and this system's `css_structural`
+locator candidate collapses to `#id` when one is present -- a real (if narrow) source of
+free resilience to rebranding, and also why `northgate-cu.json` only patches the four
+steps that don't have that safety net (the Sign On/Look Up Member/Open New Account/Submit
+controls). See REPORT.md "Heterogeneity & multi-tenant" and "Stretch goals" for the full
+design and why the override is deliberately restricted to copy, not flow structure.
+
 ## Running without live services
 
 The mock-bank app *is* the "live service" here -- there's no external dependency beyond
@@ -257,17 +301,19 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (89 tests across 9 files, no network/browser
+`npm test` runs a real Vitest unit suite (94 tests across 10 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route
 matching (including the origin-vs-prefix bypass cases described in `REPORT.md` "Safety"),
 artifact schema cross-field validation, the confidence/registry math, the recorder's
-artifact-building, the replay engine's guardrail/recovery/retry behavior, and the discovery
-loop's own control flow (escalate/resume, dead-end detection, risky-action confirmation) --
-using a stub `Surface`, a scripted fake model *output* (not a claim about what real Gemini
-would decide), and, where a class's own private state made a stub impractical, a real
-`GuardrailsPolicy` against a temp config. What's deliberately not unit-tested with mocks:
-the real Playwright surface, and Gemini's actual judgment about what to click next -- see
-`REPORT.md` "Architecture" for why real runs in `/evidence` (including `escalation-resume-
-demo` and the `failure`-result replay above) are the right verification for those instead.
+artifact-building, the tenant-override module (patch application, and that it throws on a
+stepId/strategy/known-outcome that doesn't exist rather than silently no-oping), the replay
+engine's guardrail/recovery/retry behavior, and the discovery loop's own control flow
+(escalate/resume, dead-end detection, risky-action confirmation) -- using a stub `Surface`, a
+scripted fake model *output* (not a claim about what real Gemini would decide), and, where a
+class's own private state made a stub impractical, a real `GuardrailsPolicy` against a temp
+config. What's deliberately not unit-tested with mocks: the real Playwright surface, and
+Gemini's actual judgment about what to click next -- see `REPORT.md` "Architecture" for why
+real runs in `/evidence` (including `escalation-resume-demo`, the `failure`-result replay
+above, and the cross-tenant reuse pair in step 6) are the right verification for those instead.
