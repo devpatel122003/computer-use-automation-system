@@ -5,6 +5,7 @@ import type { Action, Surface } from "../surface/types.js";
 import type { GuardrailsPolicy } from "../guardrails/policy.js";
 import type { EvidenceLogger } from "../evidence/logger.js";
 import { findElement, formatObservation } from "../agent/observation-format.js";
+import { withModelRetry } from "../agent/model-retry.js";
 
 /**
  * Brief §8 "Assisted fallback": on a genuine replay failure, one bounded, policy-checked
@@ -137,23 +138,31 @@ export async function attemptAssistedRecovery(params: {
 
   let response;
   try {
-    response = await config.genai.models.generateContent({
-      model,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: `Step goal: ${step.description}\nWhat went wrong: ${failureContext}\n\nCurrent observation:\n${formatObservation(snapshot)}` },
-            imagePart,
+    // Transient-failure resilience (src/agent/model-retry.ts), not a second recovery
+    // attempt: retrying on a 429/503 blip is getting the ONE bounded attempt to actually
+    // go through, not reasoning about the failure again. Hit for real, repeatedly, while
+    // producing evidence for this exact module.
+    response = await withModelRetry(
+      () =>
+        config.genai.models.generateContent({
+          model,
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: `Step goal: ${step.description}\nWhat went wrong: ${failureContext}\n\nCurrent observation:\n${formatObservation(snapshot)}` },
+                imagePart,
+              ],
+            },
           ],
-        },
-      ],
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        tools: [{ functionDeclarations: [...DOM_RECOVERY_TOOLS, VISION_RECOVERY_TOOL] }],
-        toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.ANY } },
-      },
-    });
+          config: {
+            systemInstruction: SYSTEM_PROMPT,
+            tools: [{ functionDeclarations: [...DOM_RECOVERY_TOOLS, VISION_RECOVERY_TOOL] }],
+            toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.ANY } },
+          },
+        }),
+      logger
+    );
   } catch (err) {
     // A transient model-API error (rate limit, 5xx) during a bounded assist must never be
     // WORSE than not having assisted recovery at all -- degrade to "didn't recover" so the

@@ -1,4 +1,5 @@
 import { FunctionCallingConfigMode, Type, type FunctionDeclaration, type GoogleGenAI } from "@google/genai";
+import { withModelRetry } from "../agent/model-retry.js";
 
 /**
  * The other half of the sentence in REPORT.md/the brief's Section 1: "the agent-facing
@@ -102,15 +103,21 @@ export async function planInvocation(
 
   const nameToId = new Map(capabilities.map((c) => [toFunctionName(c.id), c.id]));
 
-  const response = await genai.models.generateContent({
-    model,
-    contents: [{ role: "user", parts: [{ text: utterance }] }],
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      tools: [{ functionDeclarations: buildToolDeclarations(capabilities) }],
-      toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.ANY } },
-    },
-  });
+  // Same transient-failure resilience the discovery loop has always had (src/agent/
+  // model-retry.ts) -- hit for real, repeatedly, while producing evidence for this exact
+  // module; a single 429/503 blip shouldn't fail the whole plan when a short backoff would
+  // ride it out.
+  const response = await withModelRetry(() =>
+    genai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text: utterance }] }],
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        tools: [{ functionDeclarations: buildToolDeclarations(capabilities) }],
+        toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.ANY } },
+      },
+    })
+  );
 
   const call = response.candidates?.[0]?.content?.parts?.find((p) => p.functionCall !== undefined)?.functionCall;
   if (!call?.name) {

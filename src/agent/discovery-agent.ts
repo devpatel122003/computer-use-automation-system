@@ -4,6 +4,7 @@ import type { GuardrailsPolicy } from "../guardrails/policy.js";
 import type { EvidenceLogger } from "../evidence/logger.js";
 import { DISCOVERY_TOOLS } from "./tool-schemas.js";
 import { findElement, formatObservation } from "./observation-format.js";
+import { withModelRetry } from "./model-retry.js";
 import type { DiscoveryResult, DiscoveryStatus, DiscoveryStep } from "./types.js";
 
 export interface DiscoveryAgentOptions {
@@ -39,42 +40,6 @@ function findFunctionCallPart(parts: Part[]): Part | undefined {
   return parts.find((part) => part.functionCall !== undefined);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** Free-tier Gemini quotas are tight (e.g. 5 req/min); back off on 429s using the
- *  server-suggested retryDelay. Also retries transient 5xx ("Internal error encountered")
- *  responses, which are a real, observed failure mode distinct from quota exhaustion --
- *  worth a short fixed backoff rather than failing the whole discovery run outright. */
-async function withRetry<T>(fn: () => Promise<T>, logger: EvidenceLogger, maxAttempts = 6): Promise<T> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      const status = (err as { status?: number })?.status;
-      const message = err instanceof Error ? err.message : String(err);
-      const isRateLimit = status === 429 || message.includes("RESOURCE_EXHAUSTED");
-      const isServerError = status !== undefined && status >= 500;
-      if ((!isRateLimit && !isServerError) || attempt === maxAttempts) throw err;
-
-      let delayMs: number;
-      if (isRateLimit) {
-        const match = message.match(/"retryDelay":"(\d+(?:\.\d+)?)s"/);
-        delayMs = (match ? Number(match[1]) : 15) * 1000 + 1000;
-      } else {
-        delayMs = 5000 * attempt; // simple linear backoff for transient server errors
-      }
-      logger.log({
-        step: 0,
-        phase: "error",
-        summary: `Gemini ${isRateLimit ? "rate-limited" : "returned a server error"} (attempt ${attempt}/${maxAttempts}); waiting ${delayMs}ms before retry.`,
-      });
-      await sleep(delayMs);
-    }
-  }
-  throw new Error("unreachable");
-}
 
 function findTextPart(parts: Part[]): Part | undefined {
   return parts.find((part) => typeof part.text === "string" && !part.thought);
@@ -154,7 +119,7 @@ export class DiscoveryAgent {
         pendingFunctionResponsePart = null;
       }
 
-      const response = await withRetry(
+      const response = await withModelRetry(
         () =>
           genai.models.generateContent({
             model: this.model,

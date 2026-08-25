@@ -28,7 +28,9 @@ and cuts).
   member-search → member-detail → open-sub-account flow, plus seeded scenarios for
   not-found / permission-denied / validation-error / session-timeout / slow-load.
 - `src/surface/` — the `Surface` abstraction (observe/act) and its Playwright implementation.
-- `src/agent/` — the discovery loop: observe → Gemini function-call decision → act.
+- `src/agent/` — the discovery loop: observe → Gemini function-call decision → act; also
+  `model-retry.ts`, the shared 429/503 backoff-and-retry used by every real Gemini call in
+  this repo (discovery, the conversational front end, and assisted recovery alike).
 - `src/artifact/` — the capability artifact schema (Zod), the recorder that builds one from
   a finished discovery run, the confidence/approval registry (stretch goal), and the
   tenant-override module for cross-tenant reuse (stretch goal).
@@ -486,7 +488,7 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (171 tests across 21 files, no network/browser
+`npm test` runs a real Vitest unit suite (177 tests across 22 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route

@@ -757,14 +757,23 @@ control): the model correctly identified "the submit button is labeled 'Log In' 
 that degraded gracefully to the original failure instead of crashing the run — a fix made
 necessary by hitting that exact error live while producing this evidence, the same
 "the recovery model call must never make things worse than not having recovery at all"
-principle applied to a real transient failure, not just a hypothetical one.
+principle applied to a real transient failure, not just a hypothetical one. Hitting that
+503 (and several more, across every model-calling module, while producing evidence for
+this whole later pass) also surfaced that only the discovery loop had ever had real
+backoff-and-retry for exactly this failure mode. `src/agent/model-retry.ts` extracts that
+into a shared `withModelRetry`, now used by discovery, the conversational front end's
+planner, and assisted recovery alike -- a transient blip gets a short backoff and a retry
+before any of them gives up, rather than three copies of "maybe write this resilience
+someday."
 
 **Deliberately not built:** promoting a working assisted action into a new candidate locator
 on the artifact itself. A single lucky model guess getting silently baked into a production
 artifact is a real risk that deserves human review as its own step, not an automatic side
-effect of a bounded recovery succeeding once. No retry loop on a transient model-API error
-(unlike the discovery loop's `withRetry`) — this is meant to be one bounded attempt, not a
-resilient one; a caller who wants retries can invoke replay again. No coordinate-accuracy
+effect of a bounded recovery succeeding once. Retrying on a *transient* model-API error
+(`withModelRetry`, above) isn't the same as retrying the *recovery attempt itself* -- it's
+getting the one bounded attempt to actually go through despite an infrastructure hiccup,
+not a second chance to reason about the failure differently; that distinction is what keeps
+this "bounded" claim honest even with retry added. No coordinate-accuracy
 improvement (cropping/zooming the screenshot, passing the target element's approximate
 region) — the evidence above shows the mechanism is real and the limitation is real; closing
 the accuracy gap is a deeper vision-grounding problem than this pass, and pixel-perfect
