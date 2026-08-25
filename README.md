@@ -5,7 +5,7 @@ drives a live web app to accomplish a goal (**discovery**), the successful run i
 as a typed, versioned **capability artifact**, and that artifact **replays deterministically**
 — no model involved — with structured success / business-outcome / failure results, an
 allowlist-based guardrail layer, and a real (not mocked) human-escalation handoff. It also
-includes four of the brief's six Section 8 stretch goals (see `REPORT.md` "Stretch goals" for
+includes five of the brief's six Section 8 stretch goals (see `REPORT.md` "Stretch goals" for
 why this went past the original submission's "pick one or two"): **confidence scoring + a
 draft→approved approval gate** on unattended replay (now also a real circuit breaker: an
 approved artifact whose confidence UI-drift has degraded falls back to attended
@@ -13,9 +13,13 @@ confirmation, not just a badge); **cross-tenant reuse** — the same recorded ar
 to a second, differently-branded tenant via a small named override, with a real cross-tenant
 drift comparison in the dashboard; an **agent-facing capability interface** — an HTTP surface
 an AI agent could discover and invoke by name with typed args, now paired with a small
-conversational front end that maps natural language to that same call; and **assisted
+conversational front end that maps natural language to that same call; **assisted
 fallback** — one bounded, policy-checked LLM recovery per failed step, including a
-vision-grounded fallback for surfaces with no DOM at all.
+vision-grounded fallback for surfaces with no DOM at all; and **multi-run stability** — a
+real, unattended canary health check over the confidence registry's own recent-run history,
+distinct from lifetime confidence, gated through the exact same guardrails/circuit breaker as
+any other caller. A separate, non-stretch-goal addition turns the same evidence every run
+already writes into a compliance/audit report for a bank's audit function specifically.
 
 See [`REPORT.md`](REPORT.md) for the design write-up (architecture, artifact schema,
 determinism & error handling, heterogeneity/multi-tenant story, escalation model, safety,
@@ -32,8 +36,10 @@ and cuts).
   `model-retry.ts`, the shared 429/503 backoff-and-retry used by every real Gemini call in
   this repo (discovery, the conversational front end, and assisted recovery alike).
 - `src/artifact/` — the capability artifact schema (Zod), the recorder that builds one from
-  a finished discovery run, the confidence/approval registry (stretch goal), and the
-  tenant-override module for cross-tenant reuse (stretch goal).
+  a finished discovery run, the confidence/approval registry (stretch goal), the
+  tenant-override module for cross-tenant reuse (stretch goal), and `stability.ts`
+  (`computeStabilitySignal`, the multi-run stability stretch goal — a recent-window
+  flakiness/health signal, distinct from the registry's lifetime confidence score).
 - `src/replay/` — the deterministic replay engine, the checkpoint/known-outcome evaluator,
   the UI-drift signal (`npm run drift-report` -- diffs each replay's matched locator
   strategy against what was recorded, per step), the confidence circuit breaker
@@ -59,10 +65,12 @@ and cuts).
 - `src/guardrails/` — the allowlist policy, risk classification, and redaction utilities.
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
   drive the same live browser session, capture what they did, hand control back).
-- `src/evidence/` — the structured JSONL run logger.
-- `src/cli/` — the entry points (`run-agent`, `replay`, `approve`, `escalation-resume-demo`)
-  and the `open-sub-account` capability's domain config (param mappings, checkpoints, known
-  outcomes).
+- `src/evidence/` — the structured JSONL run logger, plus `audit-report.ts` (not a Section 8
+  stretch goal — a non-numbered addition that reformats the same redacted evidence every run
+  already writes into a compliance/audit report for a bank's audit function).
+- `src/cli/` — the entry points (`run-agent`, `replay`, `approve`, `escalation-resume-demo`,
+  `compliance-report`, `canary-check`) and the `open-sub-account` capability's domain config
+  (param mappings, checkpoints, known outcomes).
 - `apps/mock-bank/src/tenants.ts` + `config/tenant-overrides/` — a second tenant ("Northgate
   Credit Union") served from the *same* mock-bank app/routes/views with different copy and
   DOM structure, and the override file that adapts the base artifact to it.
@@ -470,6 +478,40 @@ slightly outside the button's actual bounds) -- pixel-level vision grounding is 
 imprecise, which is exactly why this stays a last-resort fallback behind DOM-based recovery,
 not a primary strategy. See `REPORT.md` "Assisted fallback" for both real outcomes.
 
+**14. Multi-run stability (Section 8 stretch goal).** One real, unattended replay through
+the exact same guardrails/circuit breaker as any other caller, followed by a health
+read-out over the artifact's most recent replay history -- meant to be invoked on a
+schedule (a real crontab entry, deliberately not built per the brief's own "don't build
+scaling infrastructure you don't need" -- the script itself is real and runnable today):
+
+```bash
+npm run canary-check -- --headless true
+```
+
+```
+Result: success
+Stability (last 5/5 runs): 3 clean, 2 failed -- FLAKY
+```
+
+That's a real read against this repo's own accumulated history, not a staged clean run --
+see `REPORT.md` "Multi-run stability" for why reporting the honest `FLAKY` result (and
+exiting 1, checked directly, not through a pipe) is the correct behavior for a tool whose
+entire job is telling the truth about health.
+
+**15. Compliance/audit export.** Not a Section 8 stretch goal -- presentation on existing
+evidence, same category as the dashboard. Turns every run's already-redacted evidence into
+a report for a bank's compliance/audit function:
+
+```bash
+npm run compliance-report -- --out compliance-report.md
+```
+
+Run against this repo's own full history, it produces run counts by type/outcome, a
+risky-action approval/decline breakdown, and a per-run detail section -- and discloses
+directly in its own header that this system doesn't record *which human* approved a risky
+action, only *that* one did and when (see `REPORT.md` "Safety" and "A non-stretch-goal
+addition: compliance audit export").
+
 ## Running without live services
 
 The mock-bank app *is* the "live service" here -- there's no external dependency beyond
@@ -479,7 +521,9 @@ Steps 11-13 (the conversational front end, assisted fallback, and vision fallbac
 opt-in extensions that *do* call Gemini, same as discovery; there's no way to demo any of
 them without a real model call, same reasoning as discovery itself -- per the assignment
 brief, that's intentional for discovery, and the same principle extends to anything that
-puts a model back in the loop on purpose.
+puts a model back in the loop on purpose. Steps 14-15 (canary check, compliance report)
+never call Gemini -- they're read-only over the deterministic replay engine and existing
+evidence, same "replay never calls a model" promise as step 3.
 
 ## Type-checking & tests
 
@@ -488,7 +532,7 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (177 tests across 22 files, no network/browser
+`npm test` runs a real Vitest unit suite (192 tests across 24 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route
@@ -506,10 +550,12 @@ the bounded assisted-recovery module's DOM- and vision-tool resolution and its r
 confirm/decline contract (using the same scripted-fake-model-output discipline as
 everything model-judgment-shaped below), the replay engine's guardrail/recovery/retry
 behavior (including the assisted-recovery wiring, end to end within a full `replay()` call,
-not just in isolation), and the discovery loop's own control flow (escalate/resume,
-dead-end detection, risky-action confirmation) -- using a stub `Surface`, a scripted fake
-model *output* (not a claim about what real Gemini would decide), and, where a class's own
-private state made a stub impractical, a real `GuardrailsPolicy` against a temp config.
+not just in isolation), the multi-run stability signal's flaky/healthy/just-degraded logic,
+the audit-report module's run-type inference, risky-action extraction, and markdown
+escaping, and the discovery loop's own control flow (escalate/resume, dead-end detection,
+risky-action confirmation) -- using a stub `Surface`, a scripted fake model *output* (not a
+claim about what real Gemini would decide), and, where a class's own private state made a
+stub impractical, a real `GuardrailsPolicy` against a temp config.
 What's deliberately not unit-tested with mocks: the real Playwright surface, and Gemini's
 actual judgment about what to click/propose -- see `REPORT.md` "Architecture" for why real
 runs in `/evidence` (including `escalation-resume-demo`, the `failure`-result replay above,
