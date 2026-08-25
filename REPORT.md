@@ -333,12 +333,14 @@ in a config file), not inferred from anything about the data being touched.
 
 ## 7. Cuts
 
-- **Two stretch goals implemented** (Confidence & approval, and Cross-tenant reuse — §8,
-  within the brief's own "pick at most one or two, depth over breadth"); the rest were
-  deliberately skipped — time went into getting the core loop, artifact schema,
-  determinism, and escalation genuinely right (including finding and fixing the real bugs
-  described above) rather than adding a capability catalog, code generation, assisted
-  fallback, or multi-run stability reporting.
+- **Three stretch goals implemented** (Confidence & approval, Cross-tenant reuse, and
+  Agent-facing capability interface — §8). The brief asks to "pick at most one or two,
+  depth over breadth" for the original submission; the first two were built to that bar.
+  The third was added in a later pass, once the core loop, artifact schema, determinism,
+  and escalation were already genuinely right (including the real bugs found and fixed,
+  described above) — each stretch goal still gets the same bar: real evidence, real tests,
+  no shortcuts, rather than three shallow ones. Code generation, assisted fallback, and
+  multi-run stability reporting were still deliberately skipped.
 - **`known_outcomes` are human-authored, not auto-mined.** A single happy-path discovery
   run never observes its own error states by definition. A production version would run
   discovery against seeded error fixtures too, or gate known-outcome additions behind
@@ -397,7 +399,7 @@ succeeding, which isn't wired up yet; (3) reviewer identity on approval; (4) som
 outside-the-system check on `knownOutcomes` detector correctness, since that's the one gap
 above that quietly undermines a feature (confidence scoring) that already shipped.
 
-## 8. Stretch goals: Confidence & approval, and Cross-tenant reuse
+## 8. Stretch goals: Confidence & approval, Cross-tenant reuse, and Agent-facing capability interface
 
 **What it does.** `src/artifact/registry.ts` scores each *exact recorded version* of an
 artifact by its replay history and gates unattended replay behind an explicit
@@ -527,3 +529,42 @@ different shape per tenant would need one. No override-authoring tool — `north
 was hand-written the way a human reviewer would author one, the same posture as
 `knownOutcomes` (§7). No per-tenant drift detection beyond what §3/§4 already describe (the
 matched-locator-strategy log exists; aggregating it per-tenant is unbuilt).
+
+### Agent-facing capability interface
+
+**What it does.** `src/api` exposes saved artifacts as a small HTTP surface — `GET
+/capabilities` (discover: id, contract, approval state, confidence) and `POST
+/capabilities/:id/invoke` (invoke by name with typed `params`) — the literal seam Section 1
+describes: "the agent-facing product decides what to do; this system is how it reliably and
+safely does it." `src/cli/agent-invoke-demo.ts` plays the role of that agent-facing product:
+it calls `GET /capabilities` to discover what's available, then `POST .../invoke` with typed
+args, and prints the structured result — the brief's own wording for this stretch goal
+("show one being invoked"), done for real.
+
+**Why a thin wrapper, not a new implementation.** The route handler is almost entirely
+plumbing around the exact same `replay()`, `GuardrailsPolicy`, and confidence-registry gate
+the CLI uses — an agent calling this cannot get looser guardrails than a human running
+`npm run replay` would. The one real difference: there's no operator to prompt for a risky
+step's confirmation over HTTP, so `onRiskyStep` is simply omitted, and a risky step on a
+non-`approved` artifact is declined automatically — same outcome as the CLI's own default
+when no confirmation callback is wired up, not a new code path.
+
+**Real evidence, all four legs of the contract exercised over HTTP, not asserted:**
+declining a risky step on a draft artifact (`replay-2026-08-25T18-35-47-036Z`, HTTP 422),
+a full success once approved (`replay-2026-08-25T18-36-01-086Z`, HTTP 200, a real
+confirmation number), a `business_outcome` (`replay-2026-08-25T18-36-13-650Z`, HTTP 200,
+`member_not_found`), and a parameter-validation error (`replay-2026-08-25T18-36-14-997Z`,
+HTTP 400) — plus a 404 for an unknown capability id, which (correctly) never even creates a
+run directory, since there's no artifact context yet to log against. Every one of these
+writes through the same `EvidenceLogger`/registry path as the CLI, so an API-invoked run
+shows up in `npm run drift-report` and the dashboard exactly like a CLI-invoked one — this
+wasn't special-cased; it falls out of reusing the same engine underneath.
+
+**Cut from this stretch goal:** no auth (fine for a local demo; a real deployment would need
+the same kind of identity this registry already lacks for `approve` — see §7). No
+capability versioning in the URL (`/capabilities/:id/invoke` takes whichever on-disk artifact
+matches that id; two versions of the same id on disk would be ambiguous — not a scenario this
+repo's tooling produces today, but a real gap for a fleet). No rate limiting, no queueing —
+per the brief's own "don't build scaling infrastructure you don't need," and because a
+synchronous Playwright-backed HTTP handler is the right amount of infrastructure for what
+this demonstrates, not a production concurrency model.

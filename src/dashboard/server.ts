@@ -2,8 +2,7 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import express from "express";
-import { CapabilityArtifactSchema } from "../artifact/schema.js";
-import { computeConfidence, fingerprintArtifact, loadRegistry, type ConfidenceScore } from "../artifact/registry.js";
+import { loadCapabilityCatalog } from "../artifact/catalog.js";
 import { extractStepMatches, summarizeDrift } from "../replay/drift.js";
 import { aggregateRunMetrics, computeRunMetrics } from "./metrics.js";
 import { renderDashboard, type CapabilityView } from "./render.js";
@@ -19,7 +18,6 @@ import type { LogEvent } from "../evidence/logger.js";
 
 const ARTIFACTS_DIR = "evidence/artifacts";
 const RUNS_DIR = "evidence/runs";
-const REGISTRY_PATH = path.join(ARTIFACTS_DIR, "registry.json");
 
 function readRunLog(runDir: string): LogEvent[] {
   const logPath = path.join(runDir, "log.jsonl");
@@ -36,15 +34,8 @@ function listRunDirs(prefix: string): string[] {
   return fs.readdirSync(RUNS_DIR).filter((d) => d.startsWith(prefix));
 }
 
-function unproven(): ConfidenceScore {
-  return { totalRuns: 0, successCount: 0, hardFailureCount: 0, score: 0, label: "unproven" };
-}
-
 function buildCapabilityViews(): CapabilityView[] {
-  if (!fs.existsSync(ARTIFACTS_DIR)) return [];
-  const registry = loadRegistry(REGISTRY_PATH);
-
-  const artifactFiles = fs.readdirSync(ARTIFACTS_DIR).filter((f) => f.endsWith(".artifact.json"));
+  const catalog = loadCapabilityCatalog(ARTIFACTS_DIR);
   const replayDirs = listRunDirs("replay-");
   const discoveryDirs = listRunDirs("discovery-");
 
@@ -59,13 +50,7 @@ function buildCapabilityViews(): CapabilityView[] {
       .filter((m): m is NonNullable<typeof m> => m !== null)
   );
 
-  return artifactFiles.map((file) => {
-    const raw = JSON.parse(fs.readFileSync(path.join(ARTIFACTS_DIR, file), "utf-8"));
-    const artifact = CapabilityArtifactSchema.parse(raw);
-    const fingerprint = fingerprintArtifact(artifact);
-    const entry = registry[`${artifact.id}@${fingerprint}`];
-    const confidence = entry ? computeConfidence(entry) : unproven();
-
+  return catalog.map(({ artifact, fingerprint, approvalState, confidence }) => {
     const matchedRunLogs = replayDirs
       .map((dir) => readRunLog(path.join(RUNS_DIR, dir)))
       .filter((events) => {
@@ -83,7 +68,7 @@ function buildCapabilityViews(): CapabilityView[] {
     return {
       artifact,
       fingerprint,
-      approvalState: entry?.approvalState ?? "draft",
+      approvalState,
       confidence,
       drift,
       driftRunsMatched: matchedRunLogs.length,

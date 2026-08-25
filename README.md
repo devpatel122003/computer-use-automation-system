@@ -5,10 +5,11 @@ drives a live web app to accomplish a goal (**discovery**), the successful run i
 as a typed, versioned **capability artifact**, and that artifact **replays deterministically**
 — no model involved — with structured success / business-outcome / failure results, an
 allowlist-based guardrail layer, and a real (not mocked) human-escalation handoff. It also
-includes two Section 8 stretch goals: **confidence scoring + a draft→approved approval gate**
-on unattended replay, and **cross-tenant reuse** — the same recorded artifact, applied to a
-second, differently-branded tenant running the identical underlying app via a small named
-override, not a re-recording.
+includes three Section 8 stretch goals: **confidence scoring + a draft→approved approval
+gate** on unattended replay, **cross-tenant reuse** — the same recorded artifact, applied to
+a second, differently-branded tenant running the identical underlying app via a small named
+override, not a re-recording — and an **agent-facing capability interface**: an HTTP surface
+an AI agent could discover and invoke by name with typed args.
 
 See [`REPORT.md`](REPORT.md) for the design write-up (architecture, artifact schema,
 determinism & error handling, heterogeneity/multi-tenant story, escalation model, safety,
@@ -32,6 +33,10 @@ and cuts).
   artifact contract, approval/confidence state, drift signal, and a discovery-vs-replay
   time/model-call comparison for every capability, in one place instead of four CLI
   invocations. Recomputes from disk on every request; makes no writes.
+- `src/api/` — the agent-facing capability interface (stretch goal): `GET /capabilities`
+  to discover, `POST /capabilities/:id/invoke` to invoke by name with typed args. A thin
+  wrapper around the same `replay()`/`GuardrailsPolicy`/registry gate the CLI uses --
+  see `src/cli/agent-invoke-demo.ts` for a script that calls it the way an agent would.
 - `src/guardrails/` — the allowlist policy, risk classification, and redaction utilities.
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
   drive the same live browser session, capture what they did, hand control back).
@@ -324,6 +329,34 @@ Open `http://localhost:4600` in a browser. It reads straight from `evidence/arti
 `evidence/runs/` on every request (no writes, no state of its own), so it stays accurate
 while you run more discovery/replay/approve commands in other terminals and just refresh.
 
+**9. Agent-facing capability interface (Section 8 stretch goal).** The seam Section 1
+describes -- "the agent-facing product decides what to do; this system is how it reliably
+and safely does it" -- as an actual HTTP surface:
+
+```bash
+npm run capability-api
+# -> Capability API listening on http://localhost:4700
+
+npm run agent-invoke-demo
+```
+
+The demo script discovers capabilities via `GET /capabilities`, then invokes
+`open-sub-account` by name with typed args via `POST /capabilities/:id/invoke` -- exactly
+like an AI agent would. If the artifact is still `draft`, the risky step (opening the
+account) is declined automatically over HTTP, the same as the CLI would without
+confirmation -- there's no operator to prompt on an unattended API call. Run `npm run
+approve -- --artifact evidence/artifacts/open-sub-account.artifact.json` first to see it
+complete end to end with a real confirmation number instead:
+
+```bash
+npm run agent-invoke-demo -- --params '{"username":"demo_operator","password":"demo_password","memberId":"10001","accountType":"Savings","initialDeposit":"100"}'
+```
+
+Real evidence for all four legs of the contract over HTTP -- declined-risky (422),
+success (200), business_outcome (200), and a parameter-validation error (400) -- is in
+`evidence/runs/replay-2026-08-25T18-3*`. No auth on this endpoint; fine for a local demo,
+not for a real deployment (see `REPORT.md` "Stretch goals").
+
 ## Running without live services
 
 The mock-bank app *is* the "live service" here -- there's no external dependency beyond
@@ -338,7 +371,7 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (110 tests across 13 files, no network/browser
+`npm test` runs a real Vitest unit suite (113 tests across 14 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route
@@ -348,7 +381,7 @@ artifact-building, the tenant-override module (patch application, and that it th
 stepId/strategy/known-outcome that doesn't exist rather than silently no-oping), the
 UI-drift signal's extraction/aggregation logic, the dashboard's cost/time math and its HTML
 escaping (a deliberate check that artifact-sourced free text can't inject markup into the
-rendered page), the replay
+rendered page), the capability API's result-to-HTTP-status mapping, the replay
 engine's guardrail/recovery/retry behavior, and the discovery loop's own control flow
 (escalate/resume, dead-end detection, risky-action confirmation) -- using a stub `Surface`, a
 scripted fake model *output* (not a claim about what real Gemini would decide), and, where a

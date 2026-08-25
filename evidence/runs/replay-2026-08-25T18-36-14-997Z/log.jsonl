@@ -1,0 +1,2 @@
+{"ts":"2026-08-25T18:36:14.997Z","step":0,"phase":"start","summary":"Capability API invoked Open Sub-Account v1.0.0","detail":{"fingerprint":"dbc8265e73cb99c4","approvalState":"approved","allowRiskyRequested":false,"allowRiskyEffective":false,"params":{"username":"demo_operator"}}}
+{"ts":"2026-08-25T18:36:15.124Z","step":0,"phase":"error","summary":"Capability API invocation error: Missing required input params: password, memberId, accountType, initialDeposit"}

@@ -16,6 +16,8 @@
     "approve": "tsx src/cli/approve.ts",
     "drift-report": "tsx src/cli/drift-report.ts",
     "dashboard": "tsx src/dashboard/server.ts",
+    "capability-api": "tsx src/api/server.ts",
+    "agent-invoke-demo": "tsx src/cli/agent-invoke-demo.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "playwright:install": "playwright install chromium"
