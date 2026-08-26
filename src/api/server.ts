@@ -135,9 +135,15 @@ app.post("/capabilities/:id/invoke", invokeLimiter, async (req, res) => {
     },
   });
 
-  // Headless: this path stands in for an unattended agent calling into production, not a
-  // human watching a demo window (contrast with run-agent/replay's default headed mode).
-  const surface = new PlaywrightSurface({ evidenceDir: logger.screenshotsDir, headed: false });
+  // Headed by default: an agent (or a chat message) invoking a capability should visibly
+  // drive the same live browser a human running `replay` would watch -- the point of this
+  // whole system is that a real UI actually gets clicked/typed through, not a black box
+  // that just returns JSON. Deliberately configurable, not hardcoded either way: a genuinely
+  // unattended, high-throughput caller (a scheduled canary check, a load test) has no one
+  // watching and no reason to pay for a rendered window, so CAPABILITY_API_HEADED=false
+  // opts back into the original headless behavior for exactly that case.
+  const headed = process.env.CAPABILITY_API_HEADED !== "false";
+  const surface = new PlaywrightSurface({ evidenceDir: logger.screenshotsDir, headed });
   try {
     await surface.launch("about:blank");
     const policy = new GuardrailsPolicy();

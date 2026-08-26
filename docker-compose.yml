@@ -60,6 +60,11 @@ services:
     env_file: .env # supplies CAPABILITY_API_KEY -- the server throws at startup without it
     environment:
       - CAPABILITY_API_PORT=4700
+      # capability-api now launches a HEADED browser by default outside a container (so an
+      # agent/chat invocation is visibly watchable, not a black box) -- but a container has
+      # no display to render one on, so this stays explicitly headless here regardless of
+      # that new default. See src/api/server.ts's own comment for the full reasoning.
+      - CAPABILITY_API_HEADED=false
     # Shares mock-bank's netns so the real Playwright browser launched in here can
     # navigate to the literal http://localhost:4000 / http://localhost:4100 baked
     # into the checked-in recorded evidence and tenant overrides.

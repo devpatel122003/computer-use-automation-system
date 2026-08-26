@@ -129,9 +129,12 @@ so the shipped image only contains what's needed to actually run, not to build.
 ### How
 
 **Why `capability-api` needs a heavier base image.** `mock-bank` and `dashboard` are plain
-Express apps — `node:20-slim` is enough. `capability-api` actually launches a real headless
-Playwright/Chromium browser to drive mock-bank on `POST /capabilities/:id/invoke`, which
-needs real browser binaries, not just `node_modules`. Its runtime stage uses
+Express apps — `node:20-slim` is enough. `capability-api` actually launches a real
+Playwright/Chromium browser to drive mock-bank on `POST /capabilities/:id/invoke` — headed
+by default outside a container, but explicitly pinned back to headless here via
+`CAPABILITY_API_HEADED=false` in `docker-compose.yml`, since a container has no display to
+render a window on either way. Headed or headless, it needs real browser binaries, not just
+`node_modules`. Its runtime stage uses
 `mcr.microsoft.com/playwright:v1.49.1-jammy` instead — a base image Microsoft publishes with
 browser binaries already baked in, version-matched to a specific Playwright release. That
 version, `v1.49.1-jammy`, was chosen to exactly match `"playwright": "^1.49.1"` in

@@ -100,8 +100,12 @@ if (SpeechRecognitionImpl) {
 
   recognizer.addEventListener("result", (event) => {
     const transcript = event.results[0][0].transcript;
+    // Briefly show the transcript in the box (useful feedback that recognition worked)
+    // then clear it before sending -- the typed-message path (the form submit handler)
+    // already clears the input on send; this path just forgot to.
     input.value = transcript;
     sendMessage(transcript);
+    input.value = "";
   });
 
   recognizer.addEventListener("end", () => {

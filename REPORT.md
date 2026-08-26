@@ -50,7 +50,7 @@ flowchart TD
         VisionDemo["CLI: vision-fallback-demo"]
     end
 
-    subgraph Unattended["Unattended (headless services)"]
+    subgraph Unattended["Unattended (no interactive confirmation)"]
         ReplayCLI["CLI: replay / approve / drift-report"]
         CapAPI["Capability API :4700<br/>(API key + rate limit)"]
         Dashboard["Dashboard :4600<br/>(HTTP Basic auth)"]
@@ -96,10 +96,16 @@ flowchart TD
 
 Solid arrows are real runtime calls into shared logic; dashed arrows are read-only or
 one-shot data flow (a finished discovery transcript becoming an artifact; the dashboard and
-compliance report reading, never writing, evidence on disk). The interactive/unattended split
-at the top mirrors a real constraint, not a style choice: `run-agent` opens a *headed*
-browser window meant to be watched, which is fundamentally incompatible with a container —
-see `SECURITY.md` and the Docker/CI notes below for what actually gets containerized and why.
+compliance report reading, never writing, evidence on disk). "Unattended" here means *no
+interactive human confirmation callback is wired* (a risky step is declined outright rather
+than prompted for), not "runs invisibly" -- the capability API now launches a real, visible
+Chromium window by default too (`CAPABILITY_API_HEADED`, defaulting to headed), so an agent
+or a chat message actually drives the same watchable browser `run-agent`/`replay` do, rather
+than being a black box that only returns JSON. The one context where that default is
+overridden is the one where it has to be: `docker-compose.yml` pins
+`CAPABILITY_API_HEADED=false` for the containerized capability API specifically, since a
+container has no display to render a window on regardless of the setting -- see
+`SECURITY.md` and the Docker/CI notes below for what actually gets containerized and why.
 
 Key trade-off: I chose to make locator resolution and the risk/allowlist check the *same
 code path* for discovery and replay (both go through `Surface.perform`/`predictNavigation`

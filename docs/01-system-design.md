@@ -67,7 +67,7 @@ flowchart TD
         VisionDemo["CLI: vision-fallback-demo"]
     end
 
-    subgraph Unattended["Unattended (headless services)"]
+    subgraph Unattended["Unattended (no interactive confirmation)"]
         ReplayCLI["CLI: replay / approve / drift-report"]
         CapAPI["Capability API :4700"]
         Dashboard["Dashboard :4600"]
@@ -113,9 +113,13 @@ flowchart TD
 ```
 
 Solid arrows are real runtime calls into shared logic. Dashed arrows are read-only or
-one-shot data flow. The interactive/unattended split at the top mirrors a real constraint:
-`run-agent` and the two resume demos open a **headed** browser window meant to be watched
-live — fundamentally incompatible with running inside a container (see
+one-shot data flow. "Unattended" here means *no interactive human confirmation callback is
+wired* — a risky step is declined outright rather than prompted for — not "invisible": the
+capability API launches a real, visible browser window by default too
+(`CAPABILITY_API_HEADED`), so an agent or a chat message drives the same watchable browser
+`run-agent`/`replay` do, not a black box. `docker-compose.yml` pins that back to headless
+specifically for the containerized capability API, since a container has no display to
+render a window on regardless of the setting (see
 [`22-docker-and-containers.md`](22-docker-and-containers.md)).
 
 ### The one architectural decision that matters most

@@ -153,8 +153,11 @@ Handling, in order:
    content (base or tenant-overridden) is `approved` *and* its confidence hasn't degraded to
    `low`/`unproven`.
 5. Run `replay({ artifact, params, surface, policy, logger, runId, allowRisky })` — a fresh
-   headless `PlaywrightSurface`, not the headed one `run-agent`/`replay` use interactively;
-   this path stands in for an unattended agent calling into production.
+   `PlaywrightSurface`, headed by default (`CAPABILITY_API_HEADED`, defaulting to true) so an
+   agent or chat-driven invocation is actually watchable, the same real browser
+   `run-agent`/`replay` use interactively, not a black box. Set to `false` for a genuinely
+   unattended, high-throughput caller with no one watching; `docker-compose.yml` already does
+   this for the containerized deployment, since a container has no display regardless.
 6. Map the result to an HTTP status via `statusCodeFor()` (`src/api/status.ts`):
    `success`/`business_outcome` → 200, `failure` → 422 — so a caller can `if (response.ok)`
    and still branch on `status` for the success-vs-business-outcome distinction it actually
