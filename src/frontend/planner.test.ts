@@ -66,7 +66,7 @@ describe("planInvocation", () => {
       tenantId: "northgate-cu",
     });
 
-    const plan = await planInvocation(genai, "gemini-3.7-flash", capabilities, "open a savings account for member 10001 with $100 at northgate");
+    const plan = await planInvocation(genai, ["gemini-3.7-flash"], capabilities, "open a savings account for member 10001 with $100 at northgate");
 
     expect(plan.capabilityId).toBe("open-sub-account");
     expect(plan.params).toEqual({ memberId: "10001", initialDeposit: "100" });
@@ -76,24 +76,24 @@ describe("planInvocation", () => {
 
   it("omits tenantId when the model doesn't supply one", async () => {
     const genai = scriptedGenai("invoke__open_sub_account", { reasoning: "r", memberId: "10001", initialDeposit: "100" });
-    const plan = await planInvocation(genai, "gemini-3.7-flash", capabilities, "open an account for member 10001");
+    const plan = await planInvocation(genai, ["gemini-3.7-flash"], capabilities, "open an account for member 10001");
     expect(plan.tenantId).toBeUndefined();
   });
 
   it("coerces non-string arg values (e.g. a number) to strings for the invoke API's param contract", async () => {
     const genai = scriptedGenai("invoke__open_sub_account", { reasoning: "r", memberId: "10001", initialDeposit: 100 });
-    const plan = await planInvocation(genai, "gemini-3.7-flash", capabilities, "open an account for member 10001 with 100");
+    const plan = await planInvocation(genai, ["gemini-3.7-flash"], capabilities, "open an account for member 10001 with 100");
     expect(plan.params.initialDeposit).toBe("100");
     expect(typeof plan.params.initialDeposit).toBe("string");
   });
 
   it("throws when there are no capabilities to plan against", async () => {
     const genai = scriptedGenai("anything", {});
-    await expect(planInvocation(genai, "gemini-3.7-flash", [], "do something")).rejects.toThrow(/no capabilities/i);
+    await expect(planInvocation(genai, ["gemini-3.7-flash"], [], "do something")).rejects.toThrow(/no capabilities/i);
   });
 
   it("throws when the model calls a function name that doesn't map to any known capability", async () => {
     const genai = scriptedGenai("invoke__totally_unknown", { reasoning: "r" });
-    await expect(planInvocation(genai, "gemini-3.7-flash", capabilities, "do something")).rejects.toThrow(/unknown function/i);
+    await expect(planInvocation(genai, ["gemini-3.7-flash"], capabilities, "do something")).rejects.toThrow(/unknown function/i);
   });
 });

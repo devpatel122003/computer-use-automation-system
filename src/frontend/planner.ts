@@ -1,5 +1,5 @@
 import { FunctionCallingConfigMode, Type, type FunctionDeclaration, type GoogleGenAI } from "@google/genai";
-import { withModelRetry } from "../agent/model-retry.js";
+import { withModelFallback } from "../agent/model-retry.js";
 
 /**
  * The other half of the sentence in REPORT.md/the brief's Section 1: "the agent-facing
@@ -93,7 +93,7 @@ states one verbatim; a missing credential should block the call, not get papered
  */
 export async function planInvocation(
   genai: GoogleGenAI,
-  model: string,
+  models: string[],
   capabilities: DiscoveredCapability[],
   utterance: string
 ): Promise<CapabilityInvocationPlan> {
@@ -106,8 +106,8 @@ export async function planInvocation(
   // Same transient-failure resilience the discovery loop has always had (src/agent/
   // model-retry.ts) -- hit for real, repeatedly, while producing evidence for this exact
   // module; a single 429/503 blip shouldn't fail the whole plan when a short backoff would
-  // ride it out.
-  const response = await withModelRetry(() =>
+  // ride it out. Falls back across `models` on a daily-quota exhaustion, same as discovery.
+  const response = await withModelFallback(models, (model) =>
     genai.models.generateContent({
       model,
       contents: [{ role: "user", parts: [{ text: utterance }] }],

@@ -4,7 +4,7 @@ import type { GuardrailsPolicy } from "../guardrails/policy.js";
 import type { EvidenceLogger } from "../evidence/logger.js";
 import { DISCOVERY_TOOLS } from "./tool-schemas.js";
 import { findElement, formatObservation } from "./observation-format.js";
-import { withModelRetry } from "./model-retry.js";
+import { resolveModelList, withModelFallback } from "./model-retry.js";
 import type { DiscoveryResult, DiscoveryStatus, DiscoveryStep } from "./types.js";
 
 export interface DiscoveryAgentOptions {
@@ -20,7 +20,6 @@ export interface DiscoveryAgentOptions {
   onEscalate?: (ctx: { step: number; reason: string; snapshot: StateSnapshot }) => Promise<"resume" | "abort">;
 }
 
-const DEFAULT_MODEL = process.env.GEMINI_MODEL ?? "gemini-3.7-flash";
 const DEFAULT_MAX_STEPS = 20;
 const REPEATED_FAILURE_LIMIT = 3;
 
@@ -66,11 +65,11 @@ function actionSignature(toolName: string, input: Record<string, unknown>): stri
 }
 
 export class DiscoveryAgent {
-  private readonly model: string;
+  private readonly models: string[];
   private readonly maxSteps: number;
 
   constructor(private readonly options: DiscoveryAgentOptions) {
-    this.model = options.model ?? DEFAULT_MODEL;
+    this.models = options.model ? [options.model] : resolveModelList();
     this.maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
   }
 
@@ -119,10 +118,11 @@ export class DiscoveryAgent {
         pendingFunctionResponsePart = null;
       }
 
-      const response = await withModelRetry(
-        () =>
+      const response = await withModelFallback(
+        this.models,
+        (model) =>
           genai.models.generateContent({
-            model: this.model,
+            model,
             contents,
             config: {
               systemInstruction: SYSTEM_PROMPT,

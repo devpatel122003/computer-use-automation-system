@@ -5,7 +5,7 @@ import type { Action, Surface } from "../surface/types.js";
 import type { GuardrailsPolicy } from "../guardrails/policy.js";
 import type { EvidenceLogger } from "../evidence/logger.js";
 import { findElement, formatObservation } from "../agent/observation-format.js";
-import { withModelRetry } from "../agent/model-retry.js";
+import { resolveModelList, withModelFallback } from "../agent/model-retry.js";
 
 /**
  * Brief §8 "Assisted fallback": on a genuine replay failure, one bounded, policy-checked
@@ -40,6 +40,10 @@ import { withModelRetry } from "../agent/model-retry.js";
 
 export interface AssistedRecoveryConfig {
   genai: GoogleGenAI;
+  /** Explicit single-model override (mainly for tests). Unset means "honor GEMINI_MODEL /
+   *  GEMINI_FALLBACK_MODELS like every other real Gemini call in this repo" -- previously
+   *  this hardcoded "gemini-3.7-flash" regardless of .env, a real inconsistency with
+   *  discovery and the conversational front end, both of which already read GEMINI_MODEL. */
   model?: string;
 }
 
@@ -130,7 +134,7 @@ export async function attemptAssistedRecovery(params: {
   onRiskyStep?: (ctx: { step: ArtifactStep }) => Promise<boolean>;
 }): Promise<AssistedRecoveryOutcome> {
   const { config, surface, policy, logger, step, stepNum, failureContext, onRiskyStep } = params;
-  const model = config.model ?? "gemini-3.7-flash";
+  const models = config.model ? [config.model] : resolveModelList();
 
   const snapshot = await surface.observe();
   const screenshotPath = await surface.screenshot(`assisted-recovery-${step.id}`);
@@ -142,8 +146,9 @@ export async function attemptAssistedRecovery(params: {
     // attempt: retrying on a 429/503 blip is getting the ONE bounded attempt to actually
     // go through, not reasoning about the failure again. Hit for real, repeatedly, while
     // producing evidence for this exact module.
-    response = await withModelRetry(
-      () =>
+    response = await withModelFallback(
+      models,
+      (model) =>
         config.genai.models.generateContent({
           model,
           contents: [

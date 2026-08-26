@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { planInvocation, type DiscoveredCapability } from "../frontend/planner.js";
 import { redact } from "../guardrails/redaction.js";
 import { parseArgs } from "./args.js";
+import { resolveModelList } from "../agent/model-retry.js";
 
 /**
  * The conversational front end this repo was missing: takes a natural-language
@@ -16,7 +17,7 @@ import { parseArgs } from "./args.js";
  * hallucination surface for zero benefit.
  */
 
-const DEFAULT_MODEL = process.env.GEMINI_MODEL ?? "gemini-3.7-flash";
+const MODELS = resolveModelList();
 
 export interface InvokeResponse {
   status: "success" | "business_outcome" | "failure";
@@ -94,7 +95,7 @@ async function main(): Promise<void> {
   const capabilities: DiscoveredCapability[] = catalog.map((c) => ({ id: c.id, description: c.description, inputParams: c.inputParams }));
 
   const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const plan = await planInvocation(genai, DEFAULT_MODEL, capabilities, message);
+  const plan = await planInvocation(genai, MODELS, capabilities, message);
 
   // Redact before printing anything, not after: the raw utterance itself can carry a
   // credential in plain English (e.g. "using password demo_password..."), the same real

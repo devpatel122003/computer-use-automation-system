@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { withModelRetry } from "./model-retry.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveModelList, withModelFallback, withModelRetry } from "./model-retry.js";
 import type { EvidenceLogger } from "../evidence/logger.js";
 
 function fakeLogger(): EvidenceLogger {
@@ -8,6 +8,13 @@ function fakeLogger(): EvidenceLogger {
 
 function errorWithStatus(status: number, message = "error"): Error {
   return Object.assign(new Error(message), { status });
+}
+
+function dailyQuotaError(): Error {
+  return Object.assign(
+    new Error('{"error":{"code":429,"status":"RESOURCE_EXHAUSTED","details":[{"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}}'),
+    { status: 429 }
+  );
 }
 
 describe("withModelRetry", () => {
@@ -62,5 +69,82 @@ describe("withModelRetry", () => {
     await expectation;
     expect(fn).toHaveBeenCalledTimes(3);
     vi.useRealTimers();
+  });
+});
+
+describe("withModelFallback", () => {
+  it("returns the result immediately on success against the primary model, no fallback needed", async () => {
+    const fn = vi.fn().mockResolvedValue("ok");
+    const result = await withModelFallback(["primary", "secondary"], fn, fakeLogger());
+    expect(result).toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn).toHaveBeenCalledWith("primary");
+  });
+
+  it("retries the SAME model on a per-minute rate limit, same as withModelRetry, before ever trying the next model", async () => {
+    vi.useFakeTimers();
+    const fn = vi.fn().mockRejectedValueOnce(errorWithStatus(429, "rate limited")).mockResolvedValueOnce("ok");
+    const promise = withModelFallback(["primary", "secondary"], fn, fakeLogger());
+    await vi.runAllTimersAsync();
+    expect(await promise).toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(fn).toHaveBeenNthCalledWith(1, "primary");
+    expect(fn).toHaveBeenNthCalledWith(2, "primary");
+    vi.useRealTimers();
+  });
+
+  it("falls back to the next model immediately (no backoff wait) on a daily-quota-exhausted error", async () => {
+    const fn = vi.fn().mockRejectedValueOnce(dailyQuotaError()).mockResolvedValueOnce("ok");
+    const result = await withModelFallback(["primary", "secondary"], fn, fakeLogger());
+    expect(result).toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(fn).toHaveBeenNthCalledWith(1, "primary");
+    expect(fn).toHaveBeenNthCalledWith(2, "secondary");
+  });
+
+  it("throws a clear error once every configured model has exhausted its daily quota", async () => {
+    const fn = vi.fn().mockRejectedValue(dailyQuotaError());
+    await expect(withModelFallback(["primary", "secondary"], fn, fakeLogger())).rejects.toThrow(/all configured gemini models/i);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry or fall back on a non-transient error (e.g. a 400 bad request)", async () => {
+    const fn = vi.fn().mockRejectedValue(errorWithStatus(400, "bad request"));
+    await expect(withModelFallback(["primary", "secondary"], fn, fakeLogger())).rejects.toThrow("bad request");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an empty model list rather than silently doing nothing", async () => {
+    await expect(withModelFallback([], vi.fn(), fakeLogger())).rejects.toThrow(/at least one model/i);
+  });
+});
+
+describe("resolveModelList", () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it("defaults to gemini-3.7-flash with no fallbacks when nothing is configured", () => {
+    delete process.env.GEMINI_MODEL;
+    delete process.env.GEMINI_FALLBACK_MODELS;
+    expect(resolveModelList()).toEqual(["gemini-3.7-flash"]);
+  });
+
+  it("puts GEMINI_MODEL first, then each GEMINI_FALLBACK_MODELS entry in order", () => {
+    process.env.GEMINI_MODEL = "gemini-3.5-flash-lite";
+    process.env.GEMINI_FALLBACK_MODELS = "gemini-2.5-flash, gemini-2.0-flash";
+    expect(resolveModelList()).toEqual(["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash"]);
+  });
+
+  it("drops a fallback entry that duplicates the primary model, and tolerates blank entries", () => {
+    process.env.GEMINI_MODEL = "gemini-3.5-flash-lite";
+    process.env.GEMINI_FALLBACK_MODELS = "gemini-3.5-flash-lite,,gemini-2.0-flash,";
+    expect(resolveModelList()).toEqual(["gemini-3.5-flash-lite", "gemini-2.0-flash"]);
   });
 });

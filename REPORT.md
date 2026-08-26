@@ -858,6 +858,21 @@ planner, and assisted recovery alike -- a transient blip gets a short backoff an
 before any of them gives up, rather than three copies of "maybe write this resilience
 someday."
 
+A later pass added `withModelFallback` alongside it, in the same file, for the one failure
+mode backoff genuinely cannot fix: a *daily* quota exhaustion (README's own disclosed risk
+-- free-tier flash-model quotas are single-digit-to-low-tens of requests/day, and this
+project's own evidence had to be re-produced on a second model after an earlier one hit its
+cap during testing). The two error shapes look almost identical on the wire (both are a 429
+with `RESOURCE_EXHAUSTED`), but Gemini's own error payload names which quota bucket was hit
+in `quotaId`, and the per-day bucket's name always contains `PerDay` -- the one reliable
+signal that distinguishes "wait a few seconds" from "this model cannot answer again until
+tomorrow, no matter how long this process waits." On that specific signal, every real Gemini
+call in this repo now moves to the next model in `GEMINI_FALLBACK_MODELS` (`.env`) instead
+of burning retries against a model that cannot possibly respond; a per-minute rate limit or
+transient 5xx still retries the current model first, unchanged. This turns a failure mode
+that previously required noticing the error, editing `.env`, and restarting the process into
+one the process rides out on its own, mid-run.
+
 **Deliberately not built:** promoting a working assisted action into a new candidate locator
 on the artifact itself. A single lucky model guess getting silently baked into a production
 artifact is a real risk that deserves human review as its own step, not an automatic side

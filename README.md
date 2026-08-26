@@ -37,7 +37,10 @@ guardrail design in one place.
 - `src/surface/` — the `Surface` abstraction (observe/act) and its Playwright implementation.
 - `src/agent/` — the discovery loop: observe → Gemini function-call decision → act; also
   `model-retry.ts`, the shared 429/503 backoff-and-retry used by every real Gemini call in
-  this repo (discovery, the conversational front end, and assisted recovery alike).
+  this repo (discovery, the conversational front end, and assisted recovery alike), plus
+  `withModelFallback` -- the same modules falling back across `GEMINI_FALLBACK_MODELS` the
+  moment a *daily* quota (not just a per-minute rate limit) is exhausted, see "Gemini quota
+  fallback" below.
 - `src/artifact/` — the capability artifact schema (Zod), the recorder that builds one from
   a finished discovery run, the confidence/approval registry (stretch goal), the
   tenant-override module for cross-tenant reuse (stretch goal), and `stability.ts`
@@ -121,11 +124,19 @@ GEMINI_API_KEY=your-key-here
 # optional -- defaults to gemini-3.7-flash. Free-tier daily quotas on Gemini's flash models
 # are small (single digits to low tens of requests/day) and a ~10-step discovery run can
 # exhaust one in a single attempt; the code retries 429s with backoff, but once a model's
-# whole daily quota is gone, no amount of retrying helps. If you see RESOURCE_EXHAUSTED,
-# switch GEMINI_MODEL to a different Gemini flash-tier model and try again -- the evidence
-# in this repo was itself produced on gemini-3.5-flash-lite after several other models hit
-# their daily cap during testing.
+# whole daily quota is gone, no amount of retrying the same model helps. As of this pass,
+# every real Gemini call falls back to GEMINI_FALLBACK_MODELS automatically when that
+# happens -- see "Gemini quota fallback" below -- so switching this by hand is now a manual
+# fallback, not the only one. The evidence in this repo was itself produced on
+# gemini-3.5-flash-lite after several other models hit their daily cap during testing.
 GEMINI_MODEL=gemini-3.7-flash
+
+# Optional, comma-separated, tried in order after GEMINI_MODEL. Every real Gemini call in
+# this repo now falls back to the next model here the moment it detects GEMINI_MODEL's
+# *daily* quota is exhausted specifically (a per-minute rate limit still just backs off and
+# retries the same model, same as before) -- see "Gemini quota fallback" below. Leave unset
+# to keep the single-model behavior.
+GEMINI_FALLBACK_MODELS=gemini-3.5-flash-lite,gemini-2.5-flash,gemini-2.0-flash
 
 # Required to start the capability API and dashboard -- both now refuse to start without
 # these set (see SECURITY.md "Authentication"). Generate your own; don't reuse the
@@ -138,6 +149,30 @@ Get a Gemini key at https://ai.google.dev. `CAPABILITY_API_KEY`/`DASHBOARD_PASSW
 yours to generate, e.g. `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"`.
 Plain `npm run replay` and `npm run mock-bank` need neither -- replay never calls the model,
 and mock-bank is the target app, not one of the two secured surfaces.
+
+### Gemini quota fallback
+
+`src/agent/model-retry.ts`'s `withModelFallback` (used by discovery, the conversational
+front end's planner, and assisted/vision recovery -- every real Gemini call in this repo)
+distinguishes two failure modes that used to be handled identically:
+
+- A **per-minute rate limit** (`429`, no `PerDay` in the quota id) -- still just backs off
+  and retries the *same* model, exactly as before. Waiting genuinely helps here.
+- A **daily quota exhaustion** (`429`, quota id contains `PerDay`) -- backing off cannot
+  help until tomorrow, so the very next attempt uses the next model in
+  `GEMINI_FALLBACK_MODELS` instead, with no wasted wait. If every configured model is
+  exhausted, the error says so explicitly (`All configured Gemini models (...) have
+  exhausted their daily quota`) instead of a bare timeout.
+
+This re-checks from `GEMINI_MODEL` (not the last model that worked) on every new discovery
+step or invocation -- deliberately: a run only makes a handful of these calls, so the worst
+case is one extra fast-failing request to an already-exhausted primary per step, not a
+meaningful delay, and that's a simpler design than persisting which model last worked across
+calls for a saving this small.
+
+**If you have no fallback models configured (or all of them are also exhausted) mid-demo:**
+edit `GEMINI_FALLBACK_MODELS` (or `GEMINI_MODEL`) in `.env` and re-run the command -- nothing
+else needs to change, since every entry point reads the model list fresh at process start.
 
 ## Demo path
 
@@ -213,7 +248,7 @@ curl -s -X POST http://localhost:4000/__test__/reset
 
 npm run replay -- \
   --artifact evidence/artifacts/open-sub-account.artifact.json \
-  --params '{"username":"demo_operator","password":"demo_password","memberId":"10002","initialDeposit":"100"}' \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10002","accountType":"Savings","initialDeposit":"100"}' \
   --allow-risky true
 ```
 
@@ -237,7 +272,7 @@ trigger IDs baked in (see `apps/mock-bank/src/data.ts`):
 ```bash
 npm run replay -- \
   --artifact evidence/artifacts/open-sub-account.artifact.json \
-  --params '{"username":"demo_operator","password":"demo_password","memberId":"40404","initialDeposit":"100"}' \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"40404","accountType":"Savings","initialDeposit":"100"}' \
   --allow-risky true
 ```
 
@@ -308,7 +343,7 @@ Now `--allow-risky true` runs fully unattended — no prompt, no stdin needed at
 ```bash
 npm run replay -- \
   --artifact evidence/artifacts/open-sub-account.artifact.json \
-  --params '{"username":"demo_operator","password":"demo_password","memberId":"10002","initialDeposit":"100"}' \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10002","accountType":"Savings","initialDeposit":"100"}' \
   --allow-risky true < /dev/null
 ```
 
