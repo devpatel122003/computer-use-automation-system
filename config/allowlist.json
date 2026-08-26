@@ -11,6 +11,12 @@
     { "pattern": "/members/:id/sub-accounts/new", "methods": ["GET"], "risk": "safe" },
     { "pattern": "/members/:id/sub-accounts", "methods": ["POST"], "risk": "risky" },
     { "pattern": "/members/:id/sub-accounts/:subId/confirm", "methods": ["GET"], "risk": "safe" },
+    { "pattern": "/members/:id/transfer", "methods": ["GET"], "risk": "safe" },
+    { "pattern": "/members/:id/transfer", "methods": ["POST"], "risk": "risky" },
+    { "pattern": "/members/:id/transfer/confirm", "methods": ["GET"], "risk": "safe" },
+    { "pattern": "/members/:id/sub-accounts/:subId/close", "methods": ["GET"], "risk": "safe" },
+    { "pattern": "/members/:id/sub-accounts/:subId/close", "methods": ["POST"], "risk": "risky" },
+    { "pattern": "/members/:id/sub-accounts/:subId/closed", "methods": ["GET"], "risk": "safe" },
     { "pattern": "/legacy-widget-demo", "methods": ["GET"], "risk": "safe" },
     { "pattern": "/legacy-widget-demo/confirmed", "methods": ["GET"], "risk": "safe" }
   ]

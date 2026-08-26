@@ -3,7 +3,18 @@ import session from "express-session";
 import helmet from "helmet";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { consumeSessionTimeoutArm, createMember, createSubAccount, findMember, findSubAccount, resetData, subAccounts } from "./data.js";
+import {
+  closeSubAccount,
+  consumeSessionTimeoutArm,
+  createMember,
+  createSubAccount,
+  findMember,
+  findSubAccount,
+  resetData,
+  subAccounts,
+  transferFunds,
+  type AccountKind,
+} from "./data.js";
 import { getTenantLabels } from "./tenants.js";
 
 declare module "express-session" {
@@ -187,6 +198,54 @@ app.get("/members/:id", requireAuth, async (req, res) => {
   });
 });
 
+app.get("/members/:id/transfer", requireAuth, (req, res) => {
+  const { id } = req.params;
+  const member = findMember(id);
+  if (!member) {
+    res.redirect(`/search?memberId=${encodeURIComponent(id)}`);
+    return;
+  }
+  res.render("transferFunds", { username: req.session.username, member, error: undefined, fromAccount: "Checking", toAccount: "Savings", amount: "" });
+});
+
+app.post("/members/:id/transfer", requireAuth, (req, res) => {
+  const { id } = req.params;
+  const member = findMember(id);
+  if (!member) {
+    res.redirect(`/search?memberId=${encodeURIComponent(id)}`);
+    return;
+  }
+
+  const fromAccount = String(req.body.fromAccount ?? "Checking") as AccountKind;
+  const toAccount = String(req.body.toAccount ?? "Savings") as AccountKind;
+  const rawAmount = String(req.body.amount ?? "").trim();
+  const amount = Number(rawAmount);
+
+  const result = transferFunds(id, fromAccount, toAccount, amount);
+  if (!result.ok) {
+    res.render("transferFunds", {
+      username: req.session.username,
+      member,
+      error: result.error === "insufficient_funds" ? labels.insufficientFundsText : labels.invalidTransferText,
+      fromAccount,
+      toAccount,
+      amount: rawAmount,
+    });
+    return;
+  }
+
+  res.redirect(`/members/${id}/transfer/confirm`);
+});
+
+app.get("/members/:id/transfer/confirm", requireAuth, (req, res) => {
+  const member = findMember(req.params.id);
+  if (!member) {
+    res.status(404).send("Transfer confirmation record not found.");
+    return;
+  }
+  res.render("transferConfirmation", { username: req.session.username, member });
+});
+
 app.get("/members/:id/sub-accounts/new", requireAuth, (req, res) => {
   const { id } = req.params;
   const member = findMember(id);
@@ -257,6 +316,43 @@ app.get("/members/:id/sub-accounts/:subId/confirm", requireAuth, (req, res) => {
     return;
   }
   res.render("confirmation", { username: req.session.username, subAccount });
+});
+
+app.get("/members/:id/sub-accounts/:subId/close", requireAuth, (req, res) => {
+  const member = findMember(req.params.id);
+  const subAccount = findSubAccount(req.params.subId);
+  if (!member || !subAccount || subAccount.memberId !== member.id) {
+    res.status(404).send("Sub-account not found.");
+    return;
+  }
+  res.render("closeSubAccount", { username: req.session.username, member, subAccount, error: undefined });
+});
+
+app.post("/members/:id/sub-accounts/:subId/close", requireAuth, (req, res) => {
+  const member = findMember(req.params.id);
+  const subAccount = findSubAccount(req.params.subId);
+  if (!member || !subAccount || subAccount.memberId !== member.id) {
+    res.status(404).send("Sub-account not found.");
+    return;
+  }
+
+  const result = closeSubAccount(subAccount.id);
+  if (!result.ok) {
+    res.render("closeSubAccount", { username: req.session.username, member, subAccount, error: labels.alreadyClosedText });
+    return;
+  }
+
+  res.redirect(`/members/${member.id}/sub-accounts/${subAccount.id}/closed`);
+});
+
+app.get("/members/:id/sub-accounts/:subId/closed", requireAuth, (req, res) => {
+  const member = findMember(req.params.id);
+  const subAccount = findSubAccount(req.params.subId);
+  if (!member || !subAccount || subAccount.memberId !== member.id) {
+    res.status(404).send("Sub-account not found.");
+    return;
+  }
+  res.render("subAccountClosed", { username: req.session.username, member, subAccount });
 });
 
 // Test-only: resets in-memory data so discovery/replay runs start from a known state.

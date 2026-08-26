@@ -164,6 +164,31 @@
         "runId": "replay-2026-08-26T17-33-29-649Z",
         "timestamp": "2026-08-26T17:33:31.290Z",
         "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-26T18-47-48-270Z",
+        "timestamp": "2026-08-26T18:47:50.723Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T19-14-51-605Z",
+        "timestamp": "2026-08-26T19:14:54.958Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T19-16-54-689Z",
+        "timestamp": "2026-08-26T19:16:57.526Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T19-17-26-309Z",
+        "timestamp": "2026-08-26T19:17:29.049Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T19-18-33-056Z",
+        "timestamp": "2026-08-26T19:18:35.497Z",
+        "status": "success"
       }
     ]
   },
@@ -303,6 +328,115 @@
       {
         "runId": "replay-2026-08-26T18-38-02-162Z",
         "timestamp": "2026-08-26T18:38:04.293Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T18-47-45-298Z",
+        "timestamp": "2026-08-26T18:47:47.459Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T18-50-00-562Z",
+        "timestamp": "2026-08-26T18:50:02.869Z",
+        "status": "success"
+      }
+    ]
+  },
+  "check-balance@ae35f3385f5baf31": {
+    "artifactId": "check-balance",
+    "version": "1.0.0",
+    "fingerprint": "ae35f3385f5baf31",
+    "approvalState": "approved",
+    "history": [
+      {
+        "runId": "replay-2026-08-26T18-56-18-588Z",
+        "timestamp": "2026-08-26T18:56:20.697Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T18-56-21-247Z",
+        "timestamp": "2026-08-26T18:56:22.937Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-26T18-56-32-565Z",
+        "timestamp": "2026-08-26T18:56:34.155Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T18-56-52-810Z",
+        "timestamp": "2026-08-26T18:56:54.333Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T19-18-16-280Z",
+        "timestamp": "2026-08-26T19:18:17.793Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T19-18-31-009Z",
+        "timestamp": "2026-08-26T19:18:32.320Z",
+        "status": "success"
+      }
+    ]
+  },
+  "transfer-funds@b11bf77c60abee36": {
+    "artifactId": "transfer-funds",
+    "version": "1.0.0",
+    "fingerprint": "b11bf77c60abee36",
+    "approvalState": "approved",
+    "history": [
+      {
+        "runId": "replay-2026-08-26T19-04-15-154Z",
+        "timestamp": "2026-08-26T19:04:17.911Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T19-04-18-504Z",
+        "timestamp": "2026-08-26T19:04:21.325Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-26T19-04-21-890Z",
+        "timestamp": "2026-08-26T19:04:24.769Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-26T19-18-18-738Z",
+        "timestamp": "2026-08-26T19:18:21.161Z",
+        "status": "success"
+      }
+    ]
+  },
+  "close-sub-account@761fa14d08d559b9": {
+    "artifactId": "close-sub-account",
+    "version": "1.0.0",
+    "fingerprint": "761fa14d08d559b9",
+    "approvalState": "approved",
+    "history": [
+      {
+        "runId": "replay-2026-08-26T19-15-31-441Z",
+        "timestamp": "2026-08-26T19:15:33.083Z",
+        "status": "failure"
+      },
+      {
+        "runId": "replay-2026-08-26T19-16-58-081Z",
+        "timestamp": "2026-08-26T19:17:00.827Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T19-17-07-785Z",
+        "timestamp": "2026-08-26T19:17:10.503Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-26T19-17-29-590Z",
+        "timestamp": "2026-08-26T19:17:32.367Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T19-18-36-296Z",
+        "timestamp": "2026-08-26T19:18:38.683Z",
         "status": "success"
       }
     ]

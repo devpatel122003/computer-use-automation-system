@@ -1,0 +1,1955 @@
+{
+  "status": "finished",
+  "goal": "Sign on as operator \"demo_operator\" with password \"[REDACTED]\", look up member 10002, close their existing sub-account, and reach the confirmation screen.",
+  "startUrl": "http://localhost:4000/login",
+  "steps": [
+    {
+      "stepIndex": 0,
+      "observation": {
+        "url": "http://localhost:4000/login",
+        "title": "",
+        "elements": [],
+        "screenshotPath": ""
+      },
+      "toolName": "navigate",
+      "toolInput": {
+        "url": "http://localhost:4000/login"
+      },
+      "action": {
+        "type": "navigate",
+        "url": "http://localhost:4000/login"
+      },
+      "actionResult": {
+        "ok": true,
+        "url": "http://localhost:4000/login"
+      }
+    },
+    {
+      "stepIndex": 1,
+      "observation": {
+        "url": "http://localhost:4000/login",
+        "title": "CU Core — Sign On",
+        "elements": [
+          {
+            "role": "textbox",
+            "name": "Operator ID",
+            "value": "",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Operator ID",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Operator ID",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#username",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "textbox",
+            "name": "Password",
+            "value": "",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Password",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Password",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#password",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": true
+          },
+          {
+            "role": "button",
+            "name": "Sign On",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "button",
+                "name": "Sign On",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign On",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > input:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Member Services Terminal",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member Services Terminal",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Operator ID",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Operator ID",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Password",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Password",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-26T19-15-03-319Z/screenshots/001-observe.png"
+      },
+      "rationale": "Enter operator ID for login",
+      "toolName": "type",
+      "toolInput": {
+        "role": "textbox",
+        "text": "demo_operator",
+        "name": "Operator ID",
+        "reasoning": "Enter operator ID for login"
+      },
+      "action": {
+        "type": "type",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": "Operator ID",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "Operator ID",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "#username",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ],
+        "text": "demo_operator"
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4000/login"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 2,
+      "observation": {
+        "url": "http://localhost:4000/login",
+        "title": "CU Core — Sign On",
+        "elements": [
+          {
+            "role": "textbox",
+            "name": "Operator ID",
+            "value": "demo_operator",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Operator ID",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Operator ID",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#username",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "textbox",
+            "name": "Password",
+            "value": "",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Password",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Password",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#password",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": true
+          },
+          {
+            "role": "button",
+            "name": "Sign On",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "button",
+                "name": "Sign On",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign On",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > input:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Member Services Terminal",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member Services Terminal",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Operator ID",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Operator ID",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Password",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Password",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-26T19-15-03-319Z/screenshots/002-observe.png"
+      },
+      "rationale": "Enter password for login",
+      "toolName": "type",
+      "toolInput": {
+        "name": "Password",
+        "reasoning": "Enter password for login",
+        "text": "[REDACTED]",
+        "role": "textbox"
+      },
+      "action": {
+        "type": "type",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": "Password",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "Password",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "#password",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ],
+        "text": "[REDACTED]"
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4000/login"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 3,
+      "observation": {
+        "url": "http://localhost:4000/login",
+        "title": "CU Core — Sign On",
+        "elements": [
+          {
+            "role": "textbox",
+            "name": "Operator ID",
+            "value": "demo_operator",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Operator ID",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Operator ID",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#username",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "textbox",
+            "name": "Password",
+            "value": "[REDACTED]",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Password",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Password",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#password",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": true
+          },
+          {
+            "role": "button",
+            "name": "Sign On",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "button",
+                "name": "Sign On",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign On",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > input:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Member Services Terminal",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member Services Terminal",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Operator ID",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Operator ID",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Password",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Password",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-26T19-15-03-319Z/screenshots/003-observe.png"
+      },
+      "rationale": "Click Sign On button to log in",
+      "toolName": "click",
+      "toolInput": {
+        "name": "Sign On",
+        "role": "button",
+        "reasoning": "Click Sign On button to log in"
+      },
+      "action": {
+        "type": "click",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "button",
+            "name": "Sign On",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "Sign On",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > input:nth-of-type(1)",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ]
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4000/search"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 4,
+      "observation": {
+        "url": "http://localhost:4000/search",
+        "title": "CU Core — Member Search",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Off",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Off",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Off",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2) > font:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "textbox",
+            "name": "Member ID",
+            "value": "",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Member ID",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Member ID",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#memberId",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "button",
+            "name": "Look Up Member",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "button",
+                "name": "Look Up Member",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Look Up Member",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(3) > input:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Create New Member",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Create New Member",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Create New Member",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Member Services Terminal",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member Services Terminal",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Member ID",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member ID",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-26T19-15-03-319Z/screenshots/004-observe.png"
+      },
+      "rationale": "Enter member ID 10002 to look up member",
+      "toolName": "type",
+      "toolInput": {
+        "role": "textbox",
+        "reasoning": "Enter member ID 10002 to look up member",
+        "text": "10002",
+        "name": "Member ID"
+      },
+      "action": {
+        "type": "type",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": "Member ID",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "Member ID",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "#memberId",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ],
+        "text": "10002"
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4000/search"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 5,
+      "observation": {
+        "url": "http://localhost:4000/search",
+        "title": "CU Core — Member Search",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Off",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Off",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Off",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2) > font:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "textbox",
+            "name": "Member ID",
+            "value": "10002",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Member ID",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Member ID",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#memberId",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "button",
+            "name": "Look Up Member",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "button",
+                "name": "Look Up Member",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Look Up Member",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(3) > input:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Create New Member",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Create New Member",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Create New Member",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Member Services Terminal",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member Services Terminal",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Member ID",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member ID",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-26T19-15-03-319Z/screenshots/005-observe.png"
+      },
+      "rationale": "Click Look Up Member button",
+      "toolName": "click",
+      "toolInput": {
+        "name": "Look Up Member",
+        "reasoning": "Click Look Up Member button",
+        "role": "button"
+      },
+      "action": {
+        "type": "click",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "button",
+            "name": "Look Up Member",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "Look Up Member",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(3) > input:nth-of-type(1)",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ]
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4000/members/10002"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 6,
+      "observation": {
+        "url": "http://localhost:4000/members/10002",
+        "title": "CU Core — Member Detail",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Off",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Off",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Off",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2) > font:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "« Back to Search",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "« Back to Search",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "« Back to Search",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Close",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Close",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Close",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(4) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(4) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Open New Sub-Account",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Open New Sub-Account",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Open New Sub-Account",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Transfer Funds",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Transfer Funds",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Transfer Funds",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > a:nth-of-type(2)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Member Services Terminal",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member Services Terminal",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Member ID",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member ID",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "10002",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "10002",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#memberIdValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Name",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Name",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Bob Martinez",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Bob Martinez",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#memberNameValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Checking Balance",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Checking Balance",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "$980.10",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "$980.10",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#checkingBalanceValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Savings Balance",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Savings Balance",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(4) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "$300.00",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "$300.00",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#savingsBalanceValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Sub-Accounts",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Sub-Accounts",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(4) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "SA-00001",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "SA-00001",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(4) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Savings",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Savings",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(4) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(2)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "$200.00",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "$200.00",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(4) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(3)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-26T19-15-03-319Z/screenshots/006-observe.png"
+      },
+      "rationale": "Click Close link to close the existing sub-account",
+      "toolName": "click",
+      "toolInput": {
+        "reasoning": "Click Close link to close the existing sub-account",
+        "name": "Close",
+        "role": "link"
+      },
+      "action": {
+        "type": "click",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "link",
+            "name": "Close",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "Close",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "body > table:nth-of-type(4) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(4) > a:nth-of-type(1)",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ]
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4000/members/10002/sub-accounts/SA-00001/close"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 7,
+      "observation": {
+        "url": "http://localhost:4000/members/10002/sub-accounts/SA-00001/close",
+        "title": "CU Core — Close",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Off",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Off",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Off",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2) > font:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "« Back to Member",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "« Back to Member",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "« Back to Member",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "button",
+            "name": "Confirm Close",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "button",
+                "name": "Confirm Close",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Confirm Close",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > input:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Member Services Terminal",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member Services Terminal",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-26T19-15-03-319Z/screenshots/007-observe.png"
+      },
+      "rationale": "Click Confirm Close button to finalize closing the sub-account and reach confirmation screen",
+      "toolName": "click",
+      "toolInput": {
+        "reasoning": "Click Confirm Close button to finalize closing the sub-account and reach confirmation screen",
+        "name": "Confirm Close",
+        "role": "button"
+      },
+      "action": {
+        "type": "click",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "button",
+            "name": "Confirm Close",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "Confirm Close",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > input:nth-of-type(1)",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ]
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4000/members/10002/sub-accounts/SA-00001/closed"
+      },
+      "risk": "risky"
+    },
+    {
+      "stepIndex": 8,
+      "observation": {
+        "url": "http://localhost:4000/members/10002/sub-accounts/SA-00001/closed",
+        "title": "CU Core — Confirmation",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Off",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Off",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Off",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2) > font:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "« Back to Member",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "« Back to Member",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "« Back to Member",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Member Services Terminal",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member Services Terminal",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Sub-account closed successfully.",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Sub-account closed successfully.",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#closedConfirmationBanner",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Sub-Account",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Sub-Account",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "SA-00001",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "SA-00001",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#closedSubAccountIdValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Member ID",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Member ID",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "10002",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "10002",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(2)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Account Type",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Account Type",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Savings",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Savings",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(2)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-26T19-15-03-319Z/screenshots/008-observe.png"
+      },
+      "rationale": "Successfully signed on as demo_operator, looked up member 10002, closed sub-account SA-00001, and reached the confirmation screen.",
+      "toolName": "finish",
+      "toolInput": {
+        "summary": "Successfully signed on as demo_operator, looked up member 10002, closed sub-account SA-00001, and reached the confirmation screen.",
+        "success": true
+      }
+    }
+  ],
+  "outputs": {},
+  "finalSummary": "Successfully signed on as demo_operator, looked up member 10002, closed sub-account SA-00001, and reached the confirmation screen."
+}

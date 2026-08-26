@@ -876,6 +876,32 @@ set `false` on the two deposit fields specifically. The corrected artifact was r
 the *original* discovery result already on disk -- zero additional Gemini calls -- proving
 the fix and the real recorded run are independent of each other.
 
+**Three more real capabilities, each from its own genuine discovery run against a real
+mock-bank feature -- not a shortcut around that pipeline.** `check-balance` (a purely
+read-only lookup -- no new mock-bank route needed at all, since the member page already
+shows both balances; every step is `safe`, so replay never prompts for confirmation),
+`transfer-funds` (moves money between a member's own checking/savings, with two distinct
+business outcomes -- `insufficient_funds` and `invalid_transfer` -- rather than one generic
+error, the same reasoning behind every other capability's own error taxonomy), and
+`close-sub-account` (closes an existing sub-account, with an `already_closed` outcome for a
+double-close attempt). Each went through the identical discipline as the first two: a real
+mock-bank feature, a genuine Gemini-driven discovery run that actually clicked/typed through
+the live UI, a recorded artifact, and verified replay across every outcome the artifact
+declares -- not just the happy path.
+
+**A real bug found the same way, in `close-sub-account` specifically: the recorded artifact
+could not be replayed a second time.** The member page originally hid the "Close" link
+entirely once a sub-account was already closed -- reasonable-looking UI logic that quietly
+broke the exact scenario it was supposed to help demonstrate. Replaying the recorded
+close-sub-account artifact against an already-closed account hard-failed at step-7 ("no
+locator resolved") instead of reaching the intended `already_closed` business outcome,
+because the link the recorded step targets was never rendered at all. Fixed by keeping the
+link reachable regardless of status (a real legacy banking UI often does exactly this -- the
+affordance stays, the *server* is what reports "already closed") rather than hiding it
+client-side. Confirmed against a real replay run afterward, not just reasoned about: the
+same artifact, replayed twice in a row, now correctly reports `success` the first time and
+`business_outcome: already_closed` the second.
+
 **mock-bank gained real (if simple) persistence.** Previously in-memory only, reset to seed
 data on every restart; now every mutation (`createMember`, `createSubAccount`, consuming the
 session-timeout arm) is written immediately to `apps/mock-bank/data/state.<tenantId>.json`,

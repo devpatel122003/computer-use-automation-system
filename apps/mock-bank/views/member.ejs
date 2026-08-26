@@ -37,20 +37,31 @@
   </table>
   <br/>
   <table cellpadding="4" cellspacing="0" border="1" width="100%">
-    <tr bgcolor="#003366"><td colspan="3"><font color="#ffffff"><b>Sub-Accounts</b></font></td></tr>
+    <tr bgcolor="#003366"><td colspan="4"><font color="#ffffff"><b>Sub-Accounts</b></font></td></tr>
     <% if (subAccounts.length === 0) { %>
-      <tr><td colspan="3"><i>No sub-accounts on file.</i></td></tr>
+      <tr><td colspan="4"><i>No sub-accounts on file.</i></td></tr>
     <% } else { %>
       <% subAccounts.forEach(function(sa) { %>
-        <tr><td><%= sa.id %></td><td><%= sa.accountType %></td><td>$<%= sa.initialDeposit.toFixed(2) %></td></tr>
+        <tr>
+          <td><%= sa.id %></td>
+          <td><%= sa.accountType %></td>
+          <td>$<%= sa.initialDeposit.toFixed(2) %></td>
+          <td>
+            <% if (sa.closedAt) { %><i>Closed</i> &nbsp; <% } %>
+            <a href="/members/<%= member.id %>/sub-accounts/<%= sa.id %>/close"><%= labels.closeSubAccountLinkLabel %></a>
+          </td>
+        </tr>
       <% }); %>
     <% } %>
   </table>
   <br/>
   <% if (labels.bannerText) { %>
     <div><a href="/members/<%= member.id %>/sub-accounts/new"><%= labels.openNewSubAccountLabel %></a></div>
+    <div><a href="/members/<%= member.id %>/transfer"><%= labels.transferFundsLinkLabel %></a></div>
   <% } else { %>
     <a href="/members/<%= member.id %>/sub-accounts/new"><%= labels.openNewSubAccountLabel %></a>
+    &nbsp;|&nbsp;
+    <a href="/members/<%= member.id %>/transfer"><%= labels.transferFundsLinkLabel %></a>
   <% } %>
 <% } %>
 </body>

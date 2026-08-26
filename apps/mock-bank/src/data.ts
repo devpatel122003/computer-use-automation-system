@@ -8,6 +8,10 @@ export interface SubAccount {
   accountType: "Savings" | "Checking" | "CD";
   initialDeposit: number;
   openedAt: string;
+  /** Undefined/absent means still open. Closed sub-accounts stay on record (shown as
+   *  "Closed" on the member page) rather than being deleted -- a real bank keeps closed
+   *  accounts on file, it doesn't erase them. */
+  closedAt?: string;
 }
 
 export interface Member {
@@ -169,4 +173,44 @@ export function createMember(name: string, checkingBalance: number, savingsBalan
   members.set(id, record);
   persist();
   return record;
+}
+
+export type AccountKind = "Checking" | "Savings";
+
+export type TransferResult = { ok: true } | { ok: false; error: "insufficient_funds" | "invalid_transfer" };
+
+/** Moves funds between a member's OWN checking and savings balances -- not a transfer
+ *  between two different members, and not one of the member's named sub-accounts. Two
+ *  distinct failure reasons, not one generic one: "insufficient funds" is a genuinely
+ *  different business condition from "the request itself doesn't make sense" (a zero/
+ *  negative amount, or the same account on both sides), the same reasoning open-sub-account
+ *  and create-member already apply to their own validation errors. */
+export function transferFunds(memberId: string, from: AccountKind, to: AccountKind, amount: number): TransferResult {
+  const member = members.get(memberId);
+  if (!member) return { ok: false, error: "invalid_transfer" };
+  if (from === to || !(amount > 0)) return { ok: false, error: "invalid_transfer" };
+
+  const fromBalance = from === "Checking" ? member.checkingBalance : member.savingsBalance;
+  if (fromBalance < amount) return { ok: false, error: "insufficient_funds" };
+
+  if (from === "Checking") member.checkingBalance -= amount;
+  else member.savingsBalance -= amount;
+  if (to === "Checking") member.checkingBalance += amount;
+  else member.savingsBalance += amount;
+
+  persist();
+  return { ok: true };
+}
+
+/** The route calling this already 404s if the sub-account doesn't exist at all, so
+ *  "already_closed" is the one realistically reachable business outcome here -- closing the
+ *  same sub-account twice, a genuinely real thing an operator (or a replayed artifact run
+ *  twice) can attempt. */
+export function closeSubAccount(subId: string): { ok: true } | { ok: false; error: "already_closed" } {
+  const sa = subAccounts.get(subId);
+  if (!sa) return { ok: false, error: "already_closed" }; // treated the same: nothing left to close
+  if (sa.closedAt) return { ok: false, error: "already_closed" };
+  sa.closedAt = new Date(2026, 0, 1).toISOString();
+  persist();
+  return { ok: true };
 }

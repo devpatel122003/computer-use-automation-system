@@ -1,0 +1,36 @@
+<html>
+<head><title><%= labels.brandName %> &mdash; Confirmation</title></head>
+<body bgcolor="#d6d3ce">
+<table width="100%" cellpadding="4" cellspacing="0" border="0">
+  <tr bgcolor="#003366">
+    <td><font color="#ffffff" face="Arial" size="4"><b>Member Services Terminal</b></font></td>
+    <td align="right"><font color="#ffffff" face="Arial" size="2">Signed on as <%= username %> &nbsp; | &nbsp; <a href="/logout"><font color="#ffffff">Sign Off</font></a></font></td>
+  </tr>
+</table>
+<% if (labels.bannerText) { %>
+  <table width="100%" cellpadding="6" cellspacing="0" border="0">
+    <tr bgcolor="#e8edf5"><td><font face="Arial" size="2"><i><%= labels.bannerText %></i></font></td></tr>
+  </table>
+<% } %>
+<br/>
+<table bgcolor="#d6f5d6" cellpadding="8" cellspacing="0" border="1">
+  <tr><td>
+    <font color="#0a5d0a" size="3"><b><span id="transferConfirmationBanner"><%= labels.transferConfirmationBannerText %></span></b></font>
+  </td></tr>
+</table>
+<br/>
+<table cellpadding="8" cellspacing="0" border="1">
+  <tr>
+    <td>
+      <table cellpadding="3" cellspacing="0" border="0">
+        <tr><td><b>Member ID</b></td><td><%= member.id %></td></tr>
+        <tr><td><b>New Checking Balance</b></td><td><span id="checkingBalanceValue">$<%= member.checkingBalance.toFixed(2) %></span></td></tr>
+        <tr><td><b>New Savings Balance</b></td><td><span id="savingsBalanceValue">$<%= member.savingsBalance.toFixed(2) %></span></td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<br/>
+<a href="/members/<%= member.id %>">&laquo; Back to Member</a>
+</body>
+</html>

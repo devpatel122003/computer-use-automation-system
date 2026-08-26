@@ -76,6 +76,10 @@ be missing that member the day someone tested it.
 | `77777` (Dormant-Flag Member) | `requiresInterstitialConfirmation: true` — opening a sub-account renders a surprise "Additional Confirmation Required" page instead of going straight through | The genuinely-unanticipated case: nothing in the recorded artifact explains this page, so replay hard-fails and calls a human over to click "Confirm & Continue" on the live session |
 | `/legacy-widget-demo` | A button drawn entirely on an HTML `<canvas>`, with no real DOM element, role, or name behind it at all | The last-resort vision-grounded fallback: the model has to recognize there's nothing to click by name, and click by pixel coordinates instead |
 | `northgate-cu` tenant (`TENANT=northgate-cu PORT=4100`) | The exact same app, same routes, same business rules, different visible copy and an extra banner row | Cross-tenant reuse: one recorded artifact, adapted with a small override file, works against a second, differently-branded "bank" without being re-recorded |
+| `/members/new` + `POST /members` | Enroll a brand new member (name + optional starting balances, defaulting to $0) | A second, independent capability (`create-member`) with its own `validation_error` outcome, and the real bug it surfaced: deposit fields that were marked "required" when the app itself treats a blank one as $0 |
+| `/members/:id` (balances already shown) | No new route at all | `check-balance`: proof that a capability doesn't always need new app surface, just a discovery run that reaches and extracts what's already there |
+| `/members/:id/transfer` | Move funds between a member's own checking/savings | `transfer-funds`, with two distinct business outcomes: `insufficient_funds` and `invalid_transfer` (bad amount, or the same account twice) |
+| `/members/:id/sub-accounts/:subId/close` | Close an existing sub-account; the link stays visible even once closed | `close-sub-account`'s `already_closed` outcome, and the real bug fixed to make it reachable at all — see this doc's Part 2 "Edge cases" and REPORT.md for the full story |
 
 ### "What happens if...?"
 
@@ -253,6 +257,14 @@ contract exists for.
 - **The `/__test__/reset` route has no auth check at all.** Fine for a local fixture that's
   never meant to be deployed for real; called out explicitly in README.md as a documented
   local-demo affordance, not something a real banking app would ever expose.
+- **The member page originally hid the "Close" link once a sub-account was already closed**
+  — reasonable-looking, and wrong: it meant the recorded `close-sub-account` artifact could
+  never be replayed a *second* time against the same account, since the link its own step
+  targets simply wasn't rendered. Hard-failed instead of reaching the intended
+  `already_closed` business outcome. Fixed by keeping the link reachable regardless of
+  status; the server, not the client-side link, is what should report "already closed." A
+  real bank's legacy UI plausibly behaves the same way — the affordance stays, the backend
+  is the source of truth.
 
 ## Related docs
 

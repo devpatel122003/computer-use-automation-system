@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-26T19-04-18-504Z",
+  "outcome": "insufficient_funds",
+  "description": "The source account's balance is lower than the requested transfer amount -- a legitimate business outcome, not a system error.",
+  "stepId": "step-11",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-26T19-04-18-504Z/screenshots/001-outcome-insufficient_funds.png"
+}

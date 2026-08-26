@@ -35,6 +35,16 @@ export interface TenantLabels {
   initialSavingsLabel: string;
   newMemberValidationErrorText: string;
   newMemberConfirmationBannerText: string;
+  transferFundsLinkLabel: string;
+  transferSubmitLabel: string;
+  transferAmountLabel: string;
+  invalidTransferText: string;
+  insufficientFundsText: string;
+  transferConfirmationBannerText: string;
+  closeSubAccountLinkLabel: string;
+  closeSubAccountSubmitLabel: string;
+  alreadyClosedText: string;
+  subAccountClosedBannerText: string;
 }
 
 const TENANTS: Record<string, TenantLabels> = {
@@ -63,6 +73,16 @@ const TENANTS: Record<string, TenantLabels> = {
     initialSavingsLabel: "Initial Savings Deposit ($)",
     newMemberValidationErrorText: "Full name is required, and initial deposits must be valid, non-negative amounts.",
     newMemberConfirmationBannerText: "New member created successfully.",
+    transferFundsLinkLabel: "Transfer Funds",
+    transferSubmitLabel: "Submit Transfer",
+    transferAmountLabel: "Amount ($)",
+    invalidTransferText: "Transfer amount must be a valid, positive number, and the source and destination accounts must be different.",
+    insufficientFundsText: "Insufficient funds in the source account to complete this transfer.",
+    transferConfirmationBannerText: "Funds transferred successfully.",
+    closeSubAccountLinkLabel: "Close",
+    closeSubAccountSubmitLabel: "Confirm Close",
+    alreadyClosedText: "This sub-account is already closed.",
+    subAccountClosedBannerText: "Sub-account closed successfully.",
   },
   // A second tenant running the identical underlying app -- rebranded copy AND an extra
   // promo banner row (shifts every position-based DOM path), but the same routes, the
@@ -94,6 +114,16 @@ const TENANTS: Record<string, TenantLabels> = {
     initialSavingsLabel: "Opening Savings Deposit ($)",
     newMemberValidationErrorText: "Member name is required, and opening deposits must be valid, non-negative amounts.",
     newMemberConfirmationBannerText: "New member enrolled successfully.",
+    transferFundsLinkLabel: "Move Money",
+    transferSubmitLabel: "Confirm Transfer",
+    transferAmountLabel: "Transfer Amount ($)",
+    invalidTransferText: "Enter a valid, positive transfer amount, and choose two different accounts.",
+    insufficientFundsText: "The source account does not have enough available funds for this transfer.",
+    transferConfirmationBannerText: "Transfer completed successfully.",
+    closeSubAccountLinkLabel: "Close Account",
+    closeSubAccountSubmitLabel: "Confirm Closure",
+    alreadyClosedText: "This account has already been closed.",
+    subAccountClosedBannerText: "Account closed successfully.",
   },
 };
 

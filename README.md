@@ -31,10 +31,12 @@ guardrail design in one place.
 ## What's in here
 
 - `apps/mock-bank/` — the target application: a small, deliberately legacy-styled
-  (server-rendered, table layout, no test IDs) banking back-office app with a
-  member-search → member-detail → open-sub-account → create-member flow, plus seeded
-  scenarios for not-found / permission-denied / validation-error / session-timeout /
-  slow-load. Real (if simple) persistence: every mutation is written to
+  (server-rendered, table layout, no test IDs) banking back-office app supporting five real
+  flows: member-search → member-detail, open-sub-account, create-member, check-balance
+  (read-only), transfer-funds (between a member's own checking/savings), and
+  close-sub-account -- plus seeded scenarios for not-found / permission-denied /
+  validation-error / insufficient-funds / already-closed / session-timeout / slow-load.
+  Real (if simple) persistence: every mutation is written to
   `apps/mock-bank/data/state.<tenantId>.json` immediately, and a restart resumes from that
   file instead of always reseeding -- a created member or sub-account survives a real
   process restart. `POST /__test__/reset` is the deliberate escape hatch back to seed data
@@ -92,12 +94,16 @@ guardrail design in one place.
 - `src/evidence/` — the structured JSONL run logger, plus `audit-report.ts` (not a Section 8
   stretch goal — a non-numbered addition that reformats the same redacted evidence every run
   already writes into a compliance/audit report for a bank's audit function).
-- `src/cli/` — the entry points (`run-agent`, `run-agent-create-member`, `replay`, `approve`,
-  `escalation-resume-demo`, `escalation-resume-replay-demo`, `compliance-report`,
-  `canary-check`) and both capabilities' domain config (param mappings, checkpoints, known
-  outcomes) — `open-sub-account` (act on an existing member) and `create-member` (enroll a
-  brand new one), two independently recorded artifacts proving the system generalizes past
-  the first capability.
+- `src/cli/` — the entry points (`run-agent`, `run-agent-create-member`,
+  `run-agent-check-balance`, `run-agent-transfer-funds`, `run-agent-close-sub-account`,
+  `replay`, `approve`, `escalation-resume-demo`, `escalation-resume-replay-demo`,
+  `compliance-report`, `canary-check`) and every capability's domain config (param mappings,
+  checkpoints, known outcomes) — `open-sub-account` (act on an existing member),
+  `create-member` (enroll a brand new one), `check-balance` (a read-only lookup, no new
+  mock-bank route needed at all), `transfer-funds` (move money between a member's own
+  checking/savings), and `close-sub-account` (close an existing one). Five independently
+  recorded artifacts proving the system generalizes past the first capability, each from its
+  own genuine discovery run against a real, working mock-bank feature.
 - `apps/mock-bank/src/tenants.ts` + `config/tenant-overrides/` — a second tenant ("Northgate
   Credit Union") served from the *same* mock-bank app/routes/views with different copy and
   DOM structure, and the override file that adapts the base artifact to it.
@@ -569,9 +575,57 @@ npx tsx src/cli/replay.ts --artifact evidence/artifacts/create-member.artifact.j
   --allow-risky true
 ```
 
+**10c. A third capability, entirely read-only.** No new mock-bank route at all -- the member
+page already shows both balances; the discovery run just has to reach it and extract them:
+
+```bash
+npm run run-agent-check-balance
+```
+
+Records `evidence/artifacts/check-balance.artifact.json` -- every step is `safe` (all GET),
+so replay never prompts for confirmation at all, unlike the other two:
+
+```bash
+npx tsx src/cli/replay.ts --artifact evidence/artifacts/check-balance.artifact.json \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10001"}'
+```
+
+**10d. A fourth capability, moving a member's own money between their two balances.** A new
+mock-bank route (`/members/:id/transfer`), and two distinct business outcomes --
+`insufficient_funds` and `invalid_transfer` (bad amount, or the same account on both sides):
+
+```bash
+npm run run-agent-transfer-funds
+npx tsx src/cli/replay.ts --artifact evidence/artifacts/transfer-funds.artifact.json \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10001","fromAccount":"Checking","toAccount":"Savings","amount":"100"}' \
+  --allow-risky true
+```
+
+**10e. A fifth capability, closing an existing sub-account -- and a real bug this one
+surfaced.** The member page originally hid the "Close" link once an account was already
+closed, which meant *replaying the same recorded artifact twice* couldn't even reach the
+form the second time -- a hard failure ("no locator resolved"), not the intended
+`already_closed` business outcome. Fixed by keeping the link reachable regardless of status
+(a real bank's legacy UI often does exactly this) and letting the *server* report
+"already closed," not the link's absence. Needs a member with an existing sub-account first:
+
+```bash
+npm run mock-bank    # if not already running
+npx tsx src/cli/replay.ts --artifact evidence/artifacts/open-sub-account.artifact.json \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10002","accountType":"Savings","initialDeposit":"200"}' \
+  --allow-risky true
+
+npm run run-agent-close-sub-account
+npx tsx src/cli/replay.ts --artifact evidence/artifacts/close-sub-account.artifact.json \
+  --params '{"username":"demo_operator","password":"demo_password","memberId":"10002"}' \
+  --allow-risky true
+```
+Replay the exact same command a second time to see the real `already_closed` business
+outcome instead of a crash.
+
 **11. Conversational front end.** The other half of "the agent-facing product decides what
 to do": natural language, mapped to a capability + typed args by one Gemini call, then
-invoked through the same capability API as step 9. With two real capabilities now
+invoked through the same capability API as step 9. With three real capabilities now
 discoverable, this is also where a request actually gets to choose -- "look up member
 10001" and "create a new member named ..." resolve to different capabilities, decided by
 the model, not hardcoded.

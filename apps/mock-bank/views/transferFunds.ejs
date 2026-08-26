@@ -1,0 +1,68 @@
+<html>
+<head><title><%= labels.brandName %> &mdash; <%= labels.transferFundsLinkLabel %></title></head>
+<body bgcolor="#d6d3ce">
+<table width="100%" cellpadding="4" cellspacing="0" border="0">
+  <tr bgcolor="#003366">
+    <td><font color="#ffffff" face="Arial" size="4"><b>Member Services Terminal</b></font></td>
+    <td align="right"><font color="#ffffff" face="Arial" size="2">Signed on as <%= username %> &nbsp; | &nbsp; <a href="/logout"><font color="#ffffff">Sign Off</font></a></font></td>
+  </tr>
+</table>
+<% if (labels.bannerText) { %>
+  <table width="100%" cellpadding="6" cellspacing="0" border="0">
+    <tr bgcolor="#e8edf5"><td><font face="Arial" size="2"><i><%= labels.bannerText %></i></font></td></tr>
+  </table>
+<% } %>
+<br/>
+<table cellpadding="2" cellspacing="0" border="0">
+  <tr><td><a href="/members/<%= member.id %>">&laquo; Back to Member</a></td></tr>
+</table>
+<br/>
+<table cellpadding="8" cellspacing="0" border="1">
+  <tr>
+    <td>
+      <font face="Arial" size="3"><b><%= labels.transferFundsLinkLabel %> for Member <%= member.id %></b></font>
+      <br/><br/>
+      <font face="Arial" size="2">
+        Checking: $<%= member.checkingBalance.toFixed(2) %> &nbsp;|&nbsp; Savings: $<%= member.savingsBalance.toFixed(2) %>
+      </font>
+      <br/><br/>
+      <% if (typeof error !== "undefined" && error) { %>
+        <table bgcolor="#f8d0d0" width="100%"><tr><td>
+          <font color="#7a0000"><b><%= error %></b></font>
+        </td></tr></table>
+        <br/>
+      <% } %>
+      <form method="POST" action="/members/<%= member.id %>/transfer">
+        <table cellpadding="4" cellspacing="0" border="0">
+          <tr>
+            <td><label for="fromAccount">From Account</label></td>
+            <td>
+              <select id="fromAccount" name="fromAccount">
+                <option value="Checking" <%= fromAccount === 'Checking' ? 'selected' : '' %>>Checking</option>
+                <option value="Savings" <%= fromAccount === 'Savings' ? 'selected' : '' %>>Savings</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td><label for="toAccount">To Account</label></td>
+            <td>
+              <select id="toAccount" name="toAccount">
+                <option value="Checking" <%= toAccount === 'Checking' ? 'selected' : '' %>>Checking</option>
+                <option value="Savings" <%= toAccount === 'Savings' ? 'selected' : '' %>>Savings</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td><label for="amount"><%= labels.transferAmountLabel %></label></td>
+            <td><input type="text" id="amount" name="amount" value="<%= amount %>" /></td>
+          </tr>
+          <tr>
+            <td colspan="2" align="right"><input type="submit" value="<%= labels.transferSubmitLabel %>" /></td>
+          </tr>
+        </table>
+      </form>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
