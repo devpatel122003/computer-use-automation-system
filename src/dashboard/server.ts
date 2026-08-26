@@ -95,7 +95,11 @@ function buildCapabilityViews(): CapabilityView[] {
 
 const app = express();
 app.disable("x-powered-by");
-app.use(helmet());
+// hsts: false -- this server is plain HTTP on localhost only, never TLS; helmet's default
+// Strict-Transport-Security header is a promise it can't keep. A real bug, reproduced live
+// in Safari/WebKit against src/chat-ui/server.ts (same default): the browser believed the
+// header and upgraded later same-origin requests to https, which then failed outright.
+app.use(helmet({ hsts: false }));
 app.use(requestLog("dashboard"));
 
 app.get("/health", (_req, res) => {

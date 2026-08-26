@@ -43,6 +43,22 @@ export interface CapabilityInvocationPlan {
  */
 export type PlanResult = { kind: "invoke"; plan: CapabilityInvocationPlan } | { kind: "clarify"; message: string };
 
+/**
+ * One prior exchange, carried into the NEXT `planInvocation` call so slot-filling actually
+ * works across turns -- a real bug found live: without this, "I want to create a new member
+ * account" (no name) correctly got a clarifying "what's the name?" reply, but the very next
+ * message ("my full name is Devin Kumar Patel") was planned with NO memory of that exchange
+ * at all, since each call only ever sent the single current utterance. Gemini saw an isolated
+ * "my full name is ..." sentence, which doesn't clearly ask for anything, and just repeated
+ * the capability list. `role: "model"` mirrors what was actually said back (the clarifying
+ * question, or the deterministic result summary for an invoked turn) -- not the internal
+ * function-call plumbing -- since that's all a follow-up needs to make sense of the thread.
+ */
+export interface ConversationTurn {
+  role: "user" | "model";
+  text: string;
+}
+
 const GEMINI_TYPE: Record<"string" | "number" | "boolean", Type> = {
   string: Type.STRING,
   number: Type.NUMBER,
@@ -105,6 +121,16 @@ real field value. If a required argument is genuinely missing, either don't call
 at all, or call the best-matching one and leave that argument out entirely -- the invocation
 will fail validation explicitly and safely, rather than silently proceeding on a made-up value.
 
+A field asking for a real-world name or identifier (a person's full name, an account label,
+etc.) must be an actual value the request states -- never a paraphrase of the request's own
+wording about the action itself. For example, "I have to create one new member account"
+never states anyone's name: "one new member account" describes the action being requested,
+not a person, and must NOT be extracted as the fullName argument. If you cannot point to the
+specific words in the request that ARE the value (e.g. a name that follows "named", "my name
+is", "for", or is otherwise clearly introduced as data rather than as part of the request's
+own phrasing), the field is missing -- leave it out rather than approximating it from nearby
+words.
+
 If the message is a greeting, small talk, a question about what you can do, or otherwise
 doesn't clearly map to one of the available capabilities, do NOT call any function -- just
 reply in plain text (briefly, one or two sentences, mentioning what you can actually help
@@ -127,7 +153,8 @@ export async function planInvocation(
   genai: GoogleGenAI,
   models: string[],
   capabilities: DiscoveredCapability[],
-  utterance: string
+  utterance: string,
+  history: ConversationTurn[] = []
 ): Promise<PlanResult> {
   if (capabilities.length === 0) {
     throw new Error("No capabilities available to plan against -- discover at least one before invoking.");
@@ -142,7 +169,7 @@ export async function planInvocation(
   const response = await withModelFallback(models, (model) =>
     genai.models.generateContent({
       model,
-      contents: [{ role: "user", parts: [{ text: utterance }] }],
+      contents: [...history.map((t) => ({ role: t.role, parts: [{ text: t.text }] })), { role: "user", parts: [{ text: utterance }] }],
       config: {
         systemInstruction: SYSTEM_PROMPT,
         tools: [{ functionDeclarations: buildToolDeclarations(capabilities) }],

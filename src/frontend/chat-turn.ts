@@ -1,5 +1,5 @@
 import type { GoogleGenAI } from "@google/genai";
-import { planInvocation, type CapabilityInvocationPlan, type DiscoveredCapability } from "./planner.js";
+import { planInvocation, type CapabilityInvocationPlan, type ConversationTurn, type DiscoveredCapability } from "./planner.js";
 import { redact } from "../guardrails/redaction.js";
 import { redactionOptionsFor, summarize, type InvokeResponse } from "./chat-shared.js";
 
@@ -20,6 +20,13 @@ export interface ChatTurnOptions {
    * doesn't pass this, so its behavior is unchanged.
    */
   fillParams?: Record<string, string>;
+  /**
+   * Prior exchanges in this same conversation, oldest first -- see `ConversationTurn`'s own
+   * doc comment in planner.ts for the real multi-turn slot-filling bug this closes. The CLI
+   * (one-shot `--message`) has no conversation to carry, so it never passes this; the chat
+   * UI keeps it in a server-side session across turns.
+   */
+  history?: ConversationTurn[];
 }
 
 /**
@@ -100,13 +107,27 @@ async function fetchCapabilities(apiBase: string, authHeaders: Record<string, st
 }
 
 export async function planChatTurn(
-  options: Pick<ChatTurnOptions, "genai" | "models" | "apiBase" | "apiKey" | "message">
+  options: Pick<ChatTurnOptions, "genai" | "models" | "apiBase" | "apiKey" | "message" | "history" | "fillParams">
 ): Promise<PlanChatTurnResult> {
-  const { genai, models, apiBase, apiKey, message } = options;
+  const { genai, models, apiBase, apiKey, message, history, fillParams } = options;
   const authHeaders = { Authorization: `Bearer ${apiKey}` };
 
   const capabilities = await fetchCapabilities(apiBase, authHeaders);
-  const planResult = await planInvocation(genai, models, capabilities, message);
+
+  // A param the caller will supply itself via fillParams (the chat UI's own operator
+  // username/password) must never be presented to the model as something it needs to
+  // collect from the customer at all -- not just excluded from what's shown back, as
+  // `sensitive` params already are. A real bug caught live: `username` isn't marked
+  // `sensitive` (only `password` is), so without this the model correctly refused to invent
+  // a value for it, but that meant it just kept asking the customer for an "operator
+  // username" -- a value they have no reason to know and will never be asked to actually
+  // use -- blocking the entire request instead of proceeding. Filtering it out of the
+  // schema entirely (not just the `required` list) means the model never even considers it.
+  const fillKeys = new Set(Object.keys(fillParams ?? {}));
+  const capabilitiesForPlanning =
+    fillKeys.size === 0 ? capabilities : capabilities.map((c) => ({ ...c, inputParams: c.inputParams.filter((p) => !fillKeys.has(p.name)) }));
+
+  const planResult = await planInvocation(genai, models, capabilitiesForPlanning, message, history);
 
   if (planResult.kind === "clarify") {
     return {

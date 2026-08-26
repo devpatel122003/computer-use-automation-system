@@ -146,10 +146,27 @@ See `REPORT.md` §5 for the full design and a real captured example of both outc
 
 ## Rate limiting & transport hardening
 
-- `helmet()` is applied to all three Express services (mock-bank's `contentSecurityPolicy` is
+- `helmet()` is applied to all four Express services (mock-bank's `contentSecurityPolicy` is
   explicitly disabled — see the comment in `apps/mock-bank/src/server.ts` for why: the
   vision-fallback negative-control fixture needs an inline `<canvas>` script, and mock-bank
   itself isn't the system being hardened, see below).
+- **`hsts: false` on all four**, a deliberate override of helmet's own default — and a real
+  bug found live, not a preemptive guess. Every one of these servers is plain HTTP on
+  localhost only; none is ever served over TLS in any context this repo runs in (checked:
+  `docker-compose.yml` has no TLS termination either). Helmet's default
+  `Strict-Transport-Security` header promises exactly the opposite — "always use HTTPS for
+  this origin" — and Safari/WebKit believed it: reproduced with Playwright's WebKit engine
+  against `src/chat-ui/server.ts`, the *next* same-origin requests for `style.css`/`chat.js`
+  after the header landed were silently upgraded to `https://localhost:4800/...` and failed
+  outright (no TLS listener to answer), while the page's own initial navigation — already in
+  flight before the header was received — loaded fine. That's exactly "no CSS, everything
+  else looks fine," reported live by a real user in a real Safari session. Worth noting for
+  anyone hitting this themselves: once a browser receives this header for a host, it caches
+  the policy (helmet's default `max-age` is one year) independent of anything the server
+  sends afterward — removing the header here stops it happening to any *new* client from now
+  on, but a browser that already cached the old header for `localhost:4800` needs that one
+  entry cleared once (e.g. Safari → Settings → Privacy → Manage Website Data → remove
+  "localhost", or Clear History) before it'll load correctly again.
 - `POST /capabilities/:id/invoke` has its own rate limit (20 requests/minute per the default
   `express-rate-limit` key), independent of read traffic to `/capabilities`, since invocation
   can trigger a real action against the target system.

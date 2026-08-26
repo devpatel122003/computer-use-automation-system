@@ -66,6 +66,21 @@ describe("buildToolDeclarations", () => {
   });
 });
 
+/** Captures every `generateContent` call's `contents` so a test can assert what conversation
+ *  history actually reached the model, not just what came back. */
+function capturingGenai(name: string, args: Record<string, unknown>): { genai: GoogleGenAI; calls: unknown[] } {
+  const calls: unknown[] = [];
+  const genai = {
+    models: {
+      generateContent: async (req: { contents: unknown }) => {
+        calls.push(req.contents);
+        return { candidates: [{ content: { parts: [{ functionCall: { name, args, id: "call-1" } }] } }] };
+      },
+    },
+  } as unknown as GoogleGenAI;
+  return { genai, calls };
+}
+
 describe("planInvocation", () => {
   it("maps a scripted function call back to the capability id and extracts params/reasoning/tenantId", async () => {
     const genai = scriptedGenai("invoke__open_sub_account", {
@@ -129,6 +144,28 @@ describe("planInvocation", () => {
       const genai = scriptedTextOnlyGenai("Hi there! How can I help?");
       const result = await planInvocation(genai, ["gemini-3.7-flash"], capabilities, "hi");
       expect(result.kind).not.toBe("invoke");
+    });
+  });
+
+  describe("history (regression: multi-turn slot-filling silently lost context without this)", () => {
+    it("with no history, sends only the current utterance as the sole content", async () => {
+      const { genai, calls } = capturingGenai("invoke__open_sub_account", { reasoning: "r", memberId: "10001", initialDeposit: "100" });
+      await planInvocation(genai, ["gemini-3.7-flash"], capabilities, "open an account for member 10001");
+      expect(calls[0]).toEqual([{ role: "user", parts: [{ text: "open an account for member 10001" }] }]);
+    });
+
+    it("prepends prior turns (oldest first) before the current utterance, in Gemini's role/parts shape", async () => {
+      const { genai, calls } = capturingGenai("invoke__open_sub_account", { reasoning: "r", memberId: "10001", initialDeposit: "100" });
+      await planInvocation(genai, ["gemini-3.7-flash"], capabilities, "with $100", [
+        { role: "user", text: "I want to open an account for member 10001" },
+        { role: "model", text: "How much would you like to deposit?" },
+      ]);
+
+      expect(calls[0]).toEqual([
+        { role: "user", parts: [{ text: "I want to open an account for member 10001" }] },
+        { role: "model", parts: [{ text: "How much would you like to deposit?" }] },
+        { role: "user", parts: [{ text: "with $100" }] },
+      ]);
     });
   });
 });

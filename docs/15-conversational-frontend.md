@@ -95,6 +95,11 @@ deliberate design decision, not an oversight.
 | The member replies "yes"/"confirm"/"go ahead" to a pending confirmation | The capability is invoked now, for real, with the exact data that was summarized. |
 | The member replies "no"/"cancel"/"nevermind" to a pending confirmation | Nothing is invoked; the pending plan is discarded. |
 | The member replies with something that's neither a clear yes nor a clear no (e.g. changes the subject) | The old pending plan is discarded rather than left dangling for a later, unrelated "yes" to accidentally confirm; the new message is planned fresh. |
+| The bot asks a clarifying question (e.g. "what's the full name?") and the member answers with just that, in a separate message | Answered correctly, using the conversation's own history — see "Real conversation memory" below. A real bug, now fixed: each turn used to be planned with zero memory of the previous one, so an isolated "my full name is ..." reply matched nothing and the bot just repeated its capability list. |
+| The member's own wording paraphrases the request itself ("I have to create one new member account") with no actual name anywhere in it | The model is now told explicitly not to extract action-describing words as if they were the entity's data — a real bug, now fixed: this exact phrasing once created a member literally named "one new member account." |
+| A required field (like an operator username) is something the chat UI itself will supply, not the customer | The model never even sees that field as part of the capability's schema — a real bug, now fixed: it used to correctly refuse to invent a value, but that meant it kept asking the customer for an "operator username" they'd never know, blocking the whole request. |
+| A confirmation message needs to show which capability is about to run | Plain quoting (`"create-member"`), not markdown `**bold**` — a real bug, now fixed: the chat page renders bot text as plain text on purpose, so asterisks showed up literally instead of rendering bold. |
+| Opening the chat page in Safari specifically | Style and script now load correctly — a real bug, now fixed: helmet's default `Strict-Transport-Security` header, sent even over plain `http://localhost`, was being honored by Safari/WebKit, which then upgraded the *next* requests for `style.css`/`chat.js` to `https://localhost:4800/...` and failed outright (nothing answers TLS there). See `SECURITY.md`'s "Rate limiting & transport hardening" for the fix and — importantly — why a browser that already cached the old header for this host needs one manual site-data clear before it loads correctly again, even after this fix. |
 
 ---
 
@@ -300,20 +305,73 @@ reading `apps/mock-bank/data/state.mock-bank.json` directly afterward; a second 
 "no" instead left the member count and `nextMemberSeq` completely unchanged; and a plain
 balance check invoked immediately with no confirmation step at all.
 
+### Real conversation memory (and two more real bugs the first real multi-turn test found)
+
+Every real chat is a back-and-forth, not one perfectly-specified sentence — the bot asks a
+clarifying question, the member answers just that question in their next message, and the
+bot needs to remember what was actually asked. This didn't work at all until now: each
+`planInvocation` call sent Gemini exactly one isolated sentence, the current message, with no
+memory of anything said before it.
+
+**The core fix: `ConversationTurn[]` history, threaded all the way through.**
+`planInvocation(genai, models, capabilities, utterance, history)` now prepends `history`
+(oldest first) to the single-turn `contents` array it always sent, in Gemini's own
+`{ role, parts }` shape (`role` is `"user"` or `"model"` — Gemini's multi-turn contract, not
+this repo's invention). `history` entries are deliberately *what was actually said back* — the
+clarifying question, or the deterministic result summary — never the internal
+function-call/response plumbing; that's all a human follow-up needs to make sense of the
+thread. `planChatTurn()` accepts the same `history` and passes it straight through.
+`src/chat-ui/server.ts` is the one caller that keeps it: a `history` array lives in the same
+`express-session` the pending-plan confirmation already uses, appended to (and trimmed to the
+most recent `MAX_HISTORY_TURNS = 20` entries, so a long-running chat's token cost doesn't grow
+without bound) after every single reply, regardless of which branch produced it.
+`src/cli/agent-chat.ts` is one-shot and has no conversation to carry, so it never passes this
+— `runChatTurn()`'s behavior for the CLI is unchanged.
+
+Verified against real Gemini, replaying the exact conversation that failed before the fix:
+"I want to create a new member account" (correctly asks for a name) → "my full name is Devin
+Kumar Patel" now resolves and confirms correctly (it used to get answered as if it were an
+unrelated, unmatched message, since the model had no idea a name had just been requested).
+
+**A second real bug the same live test surfaced, unrelated to memory itself: the model
+blocked an entire multi-turn `open-sub-account` request asking a customer for an "operator
+username."** `username` is required by the capability's own schema but isn't marked
+`sensitive` (only `password` is — see "How" above for why `sensitive` alone isn't a complete
+signal). Once slot-filling worked well enough to reach every *other* field across several
+turns, the model correctly refused to invent a `username` value for the one field left — but
+that's exactly the field `fillParams` was always going to override anyway, so refusing to
+proceed without it just stalled a request that had everything it actually needed. Fixed at
+the schema level, not just the confirmation-display level the earlier `username: ` blank-value
+bug was fixed at: `planChatTurn()` now filters any param name present in `fillParams` out of
+the capability list *before* it ever reaches `planInvocation`/`buildToolDeclarations` — the
+model never sees that parameter exists at all, so it can neither invent a value for it nor
+block waiting for one. Verified live: the same multi-turn `open-sub-account` conversation
+(member ID in one message, account type + deposit in the next) now reaches a clean
+confirmation and a real, persisted sub-account with no username prompt anywhere in the
+transcript.
+
+**A third, purely cosmetic real bug, caught in the same round of live testing: a confirmation
+read `"...run **create-member**..."` literally, asterisks and all.** `chat.js` renders every
+bot message via `el.textContent`, deliberately (bot text can trace back to a customer's own
+words or a model's own guess at a value, so it's never treated as HTML) — which also means it
+was never going to render markdown `**bold**` either. Fixed by using plain quoting
+(`"create-member"`) instead, matching the CLI's own console-output style.
+
 ### Where
 
 - `src/frontend/planner.ts` — `planInvocation`, `buildToolDeclarations`, `toFunctionName`,
-  the `CapabilityInvocationPlan` type.
+  the `CapabilityInvocationPlan` type, and `ConversationTurn` (the multi-turn history shape).
 - `src/frontend/chat-turn.ts` — `runChatTurn()`, the one shared discover→plan→invoke
-  sequence, including the `fillParams` credential-override mechanism; also `planChatTurn()`
-  and `invokePlannedTurn()`, the two halves it's built from, used directly by the chat UI's
-  confirm-before-executing flow.
+  sequence, including the `fillParams` credential-override mechanism (now also filtering
+  `fillParams`-covered fields out of what the model's schema even exposes); also
+  `planChatTurn()` and `invokePlannedTurn()`, the two halves it's built from, used directly by
+  the chat UI's confirm-before-executing flow, and `planChatTurn()`'s own `history` parameter.
 - `src/frontend/chat-shared.ts` — `InvokeResponse`, `redactionOptionsFor()`, `summarize()`,
   shared by the CLI and the web UI (re-exported from `agent-chat.ts` for backward
   compatibility with its own tests).
 - `src/chat-ui/server.ts` + `src/chat-ui/public/` — the web UI: the `/chat` endpoint (now with
-  the `express-session`-backed `pendingPlan` confirmation flow) and the static
-  page/styles/client script.
+  the `express-session`-backed `pendingPlan` confirmation flow AND a `history` array of
+  `ConversationTurn`s, capped at `MAX_HISTORY_TURNS`) and the static page/styles/client script.
 - `src/cli/agent-chat.ts` — the CLI: argument parsing and console output around
   `runChatTurn()`.
 - `src/replay/replay-engine.ts` — `validateParams`, tightened to treat empty string as

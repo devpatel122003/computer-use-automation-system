@@ -10,6 +10,22 @@ function scriptedGenai(name: string, args: Record<string, unknown>): GoogleGenAI
   } as unknown as GoogleGenAI;
 }
 
+/** Same as scriptedGenai, but also captures the tool declarations actually sent to the
+ *  model -- needed to assert a fillParams-covered field (e.g. "username") never even
+ *  appears in the schema the model sees. */
+function capturingScriptedGenai(name: string, args: Record<string, unknown>): { genai: GoogleGenAI; requests: any[] } {
+  const requests: any[] = [];
+  const genai = {
+    models: {
+      generateContent: async (req: any) => {
+        requests.push(req);
+        return { candidates: [{ content: { parts: [{ functionCall: { name, args, id: "call-1" } }] } }] };
+      },
+    },
+  } as unknown as GoogleGenAI;
+  return { genai, requests };
+}
+
 /** AUTO mode's real "didn't call anything" shape: a text part, no functionCall part. */
 function scriptedTextOnlyGenai(text: string): GoogleGenAI {
   return {
@@ -234,5 +250,36 @@ describe("planChatTurn / invokePlannedTurn (the split runChatTurn is built from)
     expect(turn.kind).toBe("invoked");
     if (turn.kind !== "invoked") throw new Error("expected invoked");
     expect(turn.summary).toBe("Done. confirmationNumber = SA-00003.");
+  });
+
+  describe("fillParams-covered fields never reach the model's own schema (regression: the model blocked an entire request asking a customer for an 'operator username')", () => {
+    it("passing fillParams hides those param names from the tool declaration the model actually sees", async () => {
+      stubFetch({ status: "success", outputs: {} });
+      const { genai, requests } = capturingScriptedGenai("invoke__open_sub_account", { reasoning: "r", memberId: "10001", initialDeposit: "100" });
+
+      await planChatTurn({
+        genai,
+        models: ["m"],
+        apiBase: "http://localhost:4700",
+        apiKey: "k",
+        message: "x",
+        fillParams: { username: "demo_operator", password: "demo_password" },
+      });
+
+      const props = requests[0].config.tools[0].functionDeclarations[0].parameters.properties;
+      expect(Object.keys(props)).not.toContain("username");
+      expect(Object.keys(props)).not.toContain("password"); // already excluded anyway (sensitive)
+      expect(Object.keys(props)).toContain("memberId"); // untouched -- not a fillParams key
+    });
+
+    it("without fillParams, the field is still exposed (unchanged behavior for the CLI, which has no fillParams)", async () => {
+      stubFetch({ status: "success", outputs: {} });
+      const { genai, requests } = capturingScriptedGenai("invoke__open_sub_account", { reasoning: "r", memberId: "10001", initialDeposit: "100" });
+
+      await planChatTurn({ genai, models: ["m"], apiBase: "http://localhost:4700", apiKey: "k", message: "x" });
+
+      const props = requests[0].config.tools[0].functionDeclarations[0].parameters.properties;
+      expect(Object.keys(props)).toContain("username");
+    });
   });
 });

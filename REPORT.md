@@ -971,6 +971,67 @@ by reading `apps/mock-bank/data/state.mock-bank.json` directly afterward), "no" 
 member count and `nextMemberSeq` completely unchanged, and a plain balance check invoking
 immediately with no confirmation step.
 
+**Real conversation memory across turns, plus three more real bugs a genuine multi-turn live
+test found.** Every single-shot fix above was still tested one message at a time; the first
+real back-and-forth conversation ("I want to create a new member account" → bot asks for a
+name → "my full name is Devin Kumar Patel") broke immediately, because each `planInvocation`
+call only ever sent Gemini the current utterance -- zero memory of the exchange that came
+before it. Fixed by adding `ConversationTurn[]` history, threaded through
+`planInvocation(..., history)` → `planChatTurn(..., history)` → a `history` array kept in the
+chat UI's own `express-session` (the same session already holding the pending-plan
+confirmation), appended to after every reply and capped at `MAX_HISTORY_TURNS = 20` so a long
+session's token cost can't grow unbounded. History entries are what was actually said back --
+the clarifying question or the result summary -- not the function-call/response plumbing,
+since that's all a human follow-up needs. `agent-chat.ts` (one-shot, no conversation to carry)
+is unaffected. Verified against real Gemini by replaying the exact conversation that failed.
+
+That same live multi-turn test immediately surfaced two more real bugs standalone tests never
+would have: (1) once slot-filling worked well enough to reach every other field of an
+`open-sub-account` request across several turns, the model correctly refused to invent a value
+for the one field left, `username` -- but that field isn't `sensitive` (only `password` is)
+and was always going to be overwritten by `fillParams` anyway, so refusing to proceed without
+it just stalled a request asking a customer for an operator credential they'd never know.
+Fixed at the schema level, not just the display level the earlier blank-`username`
+confirmation bug was fixed at: `planChatTurn()` now filters any `fillParams`-covered param
+name out of the capability list *before* it reaches `buildToolDeclarations` -- the model never
+sees the field exists, so it can neither invent nor block on it. Verified live: the same
+multi-turn `open-sub-account` conversation now reaches a clean confirmation and a real,
+persisted sub-account, confirmed by reading `state.mock-bank.json` directly, with no username
+prompt anywhere in the transcript. (2) A confirmation read `"...run **create-member**..."`
+literally, asterisks and all -- `chat.js` renders bot text via `el.textContent` on purpose
+(bot text can trace back to a customer's own words or a model's own guess, so it's never
+treated as HTML), which was never going to render markdown bold either. Fixed with plain
+quoting instead, matching the CLI's own console-output style.
+
+A fourth real bug, from the same round of live testing but unrelated to memory: "I have to
+create one new member account" has no name anywhere in it, yet the model extracted "one new
+member account" itself as the `fullName` argument and created a member with that literal
+name -- the same class of bug as the earlier "hi" incident, just a subtler phrasing. Fixed by
+adding an explicit rule (with this exact example) to the system prompt: a name/identifier
+field must be a value the request actually states, never a paraphrase of the request's own
+action wording; if the model can't point to the specific words that ARE the value, the field
+is missing, not approximately present.
+
+**A fifth real bug, reported live by an actual Safari user: "css is lost" -- reproduced,
+diagnosed, and fixed with Playwright's WebKit engine, not guessed at.** Helmet's default
+`Strict-Transport-Security` header was being sent by all four Express services even though
+every one of them is plain HTTP on localhost only, never TLS, in any context this repo runs
+in. Safari/WebKit honored it anyway: a WebKit reproduction against `src/chat-ui/server.ts`
+showed the page's own initial navigation loading fine (already in flight before the header
+landed) while the *next* same-origin requests for `style.css` and `chat.js` were silently
+upgraded to `https://localhost:4800/...` and failed outright, since nothing answers TLS on
+that port -- exactly "no CSS, everything else looks fine." Fixed with `hsts: false` on all
+four `helmet()` calls (`src/chat-ui/server.ts`, `src/api/server.ts`, `src/dashboard/server.ts`,
+`apps/mock-bank/src/server.ts` -- see `SECURITY.md` "Rate limiting & transport hardening" for
+the full reasoning). One important wrinkle this bug's own mechanics create: because HSTS is
+cached client-side once received (helmet's default `max-age` is one year), a browser that
+already loaded this page before the fix keeps upgrading to https regardless of what the
+server sends afterward -- removing the header prevents this for any new client from here on,
+but an already-affected browser needs one manual site-data clear (confirmed against a
+freshly-launched, never-before-used WebKit profile: still failed, because macOS's HSTS store
+turned out to be keyed by hostname at the OS network-stack level, not per browser-profile --
+this is what actually took the longest to nail down, not the header fix itself).
+
 **No longer cut, added in the production-hardening pass:** this endpoint now requires a real
 API key on every route except `/health` (`src/http/api-key-auth.ts`, timing-safe, fails
 closed and loud at startup if unconfigured), plus a rate limit specifically on `/invoke`

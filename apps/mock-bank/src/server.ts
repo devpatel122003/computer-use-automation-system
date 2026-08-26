@@ -43,7 +43,11 @@ app.set("views", path.join(__dirname, "..", "views"));
 // SECURITY.md). It's off specifically because legacyWidgetDemo.ejs's inline <canvas> script
 // (the vision-fallback negative-control fixture, README step 13) would otherwise be blocked
 // by helmet's default script-src.
-app.use(helmet({ contentSecurityPolicy: false }));
+// hsts: false -- this server is plain HTTP on localhost only, never TLS; helmet's default
+// Strict-Transport-Security header is a promise it can't keep. A real bug, reproduced live
+// in Safari/WebKit against src/chat-ui/server.ts (same default): the browser believed the
+// header and upgraded later same-origin requests to https, which then failed outright.
+app.use(helmet({ contentSecurityPolicy: false, hsts: false }));
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });

@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import session from "express-session";
 import { GoogleGenAI } from "@google/genai";
 import { planChatTurn, invokePlannedTurn, type PlanChatTurnResult } from "../frontend/chat-turn.js";
+import type { ConversationTurn } from "../frontend/planner.js";
 import { resolveModelList } from "../agent/model-retry.js";
 import { requestLog } from "../http/request-log.js";
 
@@ -59,12 +60,29 @@ const OPERATOR_PASSWORD = process.env.CHAT_UI_OPERATOR_PASSWORD ?? "demo_passwor
 declare module "express-session" {
   interface SessionData {
     pendingPlan?: Extract<PlanChatTurnResult, { kind: "planned" }>;
+    /** Prior exchanges in this browser session, oldest first -- see `ConversationTurn`'s
+     *  doc comment in planner.ts for the real bug (multi-turn slot-filling silently losing
+     *  context) this exists to fix. Capped below so a long-running chat can't grow this
+     *  (and therefore every future model call's token cost) without bound. */
+    history?: ConversationTurn[];
   }
 }
 
+// 10 exchanges (20 turns) is plenty of context for this demo's short slot-filling
+// back-and-forths without letting a long session's token cost grow unbounded.
+const MAX_HISTORY_TURNS = 20;
+
 const app = express();
 app.disable("x-powered-by");
-app.use(helmet());
+// hsts: false -- a real bug, reproduced with Playwright's WebKit (Safari's engine): helmet's
+// default Strict-Transport-Security header is a promise this server can never keep (it's
+// plain HTTP on localhost, never TLS, in every context this repo runs in), and Safari
+// believed it anyway -- upgrading the NEXT requests for style.css/chat.js on this origin to
+// https://localhost:4800/..., which fails outright since nothing is listening for TLS there.
+// The initial page load looked fine (it was already in flight before the header landed);
+// only the same-origin sub-resource fetches right after it broke, which is exactly "no CSS,
+// everything else looks fine" as reported live.
+app.use(helmet({ hsts: false }));
 app.use(express.json());
 app.use(
   session({
@@ -101,7 +119,12 @@ function describePendingPlan(planned: Extract<PlanChatTurnResult, { kind: "plann
     .join(", ");
   const tenantNote = planned.plan.tenantId ? ` for tenant "${planned.plan.tenantId}"` : "";
   return (
-    `Before I go ahead: I'm about to run **${planned.plan.capabilityId}**${tenantNote}` +
+    // Plain quoting, not markdown "**bold**" -- the chat page renders bot text with
+    // `textContent` (chat.js), deliberately, since a bot reply can carry text that
+    // ultimately traces back to a customer's own message or the model's own guess at a
+    // field value; asterisks meant as bold just showed up literally in the bubble (a real
+    // bug caught live).
+    `Before I go ahead: I'm about to run "${planned.plan.capabilityId}"${tenantNote}` +
     (paramList ? ` with ${paramList}.` : ".") +
     ` Reply "yes" to confirm or "no" to cancel.`
   );
@@ -127,11 +150,25 @@ app.post("/chat", chatLimiter, async (req, res) => {
     return;
   }
 
+  // Records this exchange in the session's conversation history (trimmed to the most
+  // recent MAX_HISTORY_TURNS) and sends the JSON reply -- every response path below goes
+  // through this so a follow-up message always has the context of what was actually said,
+  // not just the isolated sentence it contains. `replyText` is deliberately whatever's
+  // shown to the human, not the raw structured result -- that's what a real follow-up
+  // ("about the account I just made...") would actually be referring back to.
+  function respond(replyText: string, body: Record<string, unknown>) {
+    const history = req.session.history ?? [];
+    history.push({ role: "user", text: message }, { role: "model", text: replyText });
+    req.session.history = history.slice(-MAX_HISTORY_TURNS);
+    res.json({ reply: replyText, ...body });
+  }
+
   try {
     const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const apiBase = process.env.CAPABILITY_API_BASE ?? "http://localhost:4700";
     const apiKey = process.env.CAPABILITY_API_KEY;
     const fillParams = { username: OPERATOR_USERNAME, password: OPERATOR_PASSWORD };
+    const history = req.session.history ?? [];
 
     // A pending risky plan from a PREVIOUS turn takes priority over re-planning this
     // message from scratch: this message's only job right now is to confirm, cancel, or
@@ -141,12 +178,13 @@ app.post("/chat", chatLimiter, async (req, res) => {
       if (AFFIRMATIVE_RE.test(message)) {
         req.session.pendingPlan = undefined;
         const turn = await invokePlannedTurn({ apiBase, apiKey, fillParams }, pending);
-        res.json(invokedTurnResponse(turn));
+        const { reply, ...body } = invokedTurnResponse(turn);
+        respond(reply, body);
         return;
       }
       if (NEGATIVE_RE.test(message)) {
         req.session.pendingPlan = undefined;
-        res.json({ reply: "Okay, I won't go ahead with that. Let me know if there's something else I can help with." });
+        respond("Okay, I won't go ahead with that. Let me know if there's something else I can help with.", {});
         return;
       }
       // Neither a clear yes nor a clear no -- treat it as a new request and replace the
@@ -154,14 +192,14 @@ app.post("/chat", chatLimiter, async (req, res) => {
       req.session.pendingPlan = undefined;
     }
 
-    const planned = await planChatTurn({ genai, models: MODELS, apiBase, apiKey, message });
+    const planned = await planChatTurn({ genai, models: MODELS, apiBase, apiKey, message, history, fillParams });
 
     if (planned.kind === "clarified") {
       // No capability matched clearly enough to act on -- nothing was invoked. See
       // planner.ts's PlanResult for the real incident (a bare "hi" creating a member) this
       // closes; the model's own reply goes straight back, since there's no structured
       // result to template a deterministic one from.
-      res.json({ reply: planned.message });
+      respond(planned.message, {});
       return;
     }
 
@@ -171,14 +209,15 @@ app.post("/chat", chatLimiter, async (req, res) => {
       // plan (with its REAL, unredacted params -- needed to actually invoke it once
       // confirmed) in the session instead of invoking it now.
       req.session.pendingPlan = planned;
-      res.json({ reply: describePendingPlan(planned, new Set(Object.keys(fillParams))) });
+      respond(describePendingPlan(planned, new Set(Object.keys(fillParams))), {});
       return;
     }
 
     // Read-only capabilities (e.g. check-balance) have nothing to confirm -- there's no
     // action to reconsider before it happens.
     const turn = await invokePlannedTurn({ apiBase, apiKey, fillParams }, planned);
-    res.json(invokedTurnResponse(turn));
+    const { reply, ...body } = invokedTurnResponse(turn);
+    respond(reply, body);
   } catch (err) {
     const messageText = err instanceof Error ? err.message : String(err);
     // "fetch failed" (Node's undici) is exactly what a refused connection looks like -- this

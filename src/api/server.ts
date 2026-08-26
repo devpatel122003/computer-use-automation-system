@@ -39,7 +39,12 @@ const REGISTRY_PATH = "evidence/artifacts/registry.json";
 
 const app = express();
 app.disable("x-powered-by");
-app.use(helmet());
+// hsts: false -- this server is plain HTTP on localhost only, never TLS, in every context
+// this repo runs in; helmet's default Strict-Transport-Security header is a promise it can't
+// keep. A real bug, reproduced live in Safari/WebKit against src/chat-ui/server.ts (which
+// serves the same header by default): the browser believed the header and upgraded later
+// same-origin requests to https, which then failed outright with no TLS listener to answer.
+app.use(helmet({ hsts: false }));
 app.use(express.json());
 app.use(requestLog("capability-api"));
 
