@@ -1,0 +1,143 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { runChatTurn } from "./chat-turn.js";
+import type { GoogleGenAI } from "@google/genai";
+
+function scriptedGenai(name: string, args: Record<string, unknown>): GoogleGenAI {
+  return {
+    models: {
+      generateContent: async () => ({ candidates: [{ content: { parts: [{ functionCall: { name, args, id: "call-1" } }] } }] }),
+    },
+  } as unknown as GoogleGenAI;
+}
+
+const CATALOG = [
+  {
+    id: "open-sub-account",
+    description: "Opens a new sub-account for a member.",
+    inputParams: [
+      { name: "username", type: "string", required: true, sensitive: false },
+      { name: "password", type: "string", required: true, sensitive: true },
+      { name: "memberId", type: "string", required: true, sensitive: false },
+      { name: "initialDeposit", type: "string", required: true, sensitive: false },
+    ],
+  },
+];
+
+/** Stubs global fetch: first call is GET /capabilities, second is POST /invoke. */
+function stubFetch(invokeResponse: unknown, invokeStatus = 200) {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    calls.push({ url, init });
+    if (String(url).endsWith("/capabilities")) {
+      return new Response(JSON.stringify(CATALOG), { status: 200 });
+    }
+    return new Response(JSON.stringify(invokeResponse), { status: invokeStatus });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return calls;
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("runChatTurn", () => {
+  it("discovers, plans, and invokes, returning a deterministic summary", async () => {
+    const calls = stubFetch({ status: "success", outputs: { confirmationNumber: "SA-00001" } });
+    const genai = scriptedGenai("invoke__open_sub_account", {
+      reasoning: "Open a savings account for member 10001.",
+      memberId: "10001",
+      initialDeposit: "100",
+    });
+
+    const turn = await runChatTurn({
+      genai,
+      models: ["gemini-3.7-flash"],
+      apiBase: "http://localhost:4700",
+      apiKey: "test-key",
+      message: "open a savings account for member 10001 with $100",
+    });
+
+    expect(turn.plan.capabilityId).toBe("open-sub-account");
+    expect(turn.httpStatus).toBe(200);
+    expect(turn.summary).toBe("Done. confirmationNumber = SA-00001.");
+    expect(calls[0].url).toContain("/capabilities");
+    expect(calls[1].url).toContain("/open-sub-account/invoke");
+  });
+
+  it("sends an Authorization header with the given apiKey on both calls", async () => {
+    const calls = stubFetch({ status: "success", outputs: {} });
+    const genai = scriptedGenai("invoke__open_sub_account", { reasoning: "r", memberId: "10001", initialDeposit: "100" });
+
+    await runChatTurn({ genai, models: ["m"], apiBase: "http://localhost:4700", apiKey: "secret-key", message: "x" });
+
+    for (const call of calls) {
+      expect((call.init?.headers as Record<string, string>)?.Authorization).toBe("Bearer secret-key");
+    }
+  });
+
+  it("fillParams override plan.params in the actual invoke call, but never leak into the returned redactedParams", async () => {
+    const calls = stubFetch({ status: "success", outputs: {} });
+    const genai = scriptedGenai("invoke__open_sub_account", { reasoning: "r", memberId: "10001", initialDeposit: "100" });
+
+    const turn = await runChatTurn({
+      genai,
+      models: ["m"],
+      apiBase: "http://localhost:4700",
+      apiKey: "k",
+      message: "open a savings account for member 10001 with $100",
+      fillParams: { username: "demo_operator", password: "demo_password" },
+    });
+
+    // The credential the customer never stated must actually reach the invoke call...
+    const invokeBody = JSON.parse(String(calls[1].init?.body)) as { params: Record<string, string> };
+    expect(invokeBody.params.username).toBe("demo_operator");
+    expect(invokeBody.params.password).toBe("demo_password");
+
+    // ...but must never appear in what's handed back to a caller (the chat UI, the CLI),
+    // since the customer never supplied it and has no reason to see it, redacted or not.
+    expect(turn.redactedParams.username).toBeUndefined();
+    expect(turn.redactedParams.password).toBeUndefined();
+  });
+
+  it("redacts a sensitive value the model DID legitimately extract from the utterance", async () => {
+    stubFetch({ status: "success", outputs: {} });
+    const genai = scriptedGenai("invoke__open_sub_account", {
+      reasoning: "r",
+      username: "demo_operator",
+      password: "demo_password",
+      memberId: "10001",
+      initialDeposit: "100",
+    });
+
+    const turn = await runChatTurn({
+      genai,
+      models: ["m"],
+      apiBase: "http://localhost:4700",
+      apiKey: "k",
+      message: "sign on as demo_operator with password demo_password and open an account for member 10001 with $100",
+    });
+
+    expect(turn.redactedMessage).not.toContain("demo_password");
+    expect(turn.redactedParams.password).not.toBe("demo_password");
+  });
+
+  it("throws a clear error when the capability catalog can't be fetched", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 500 })));
+    const genai = scriptedGenai("anything", {});
+
+    await expect(
+      runChatTurn({ genai, models: ["m"], apiBase: "http://localhost:4700", apiKey: "k", message: "x" })
+    ).rejects.toThrow(/GET \/capabilities failed/);
+  });
+
+  it("propagates a business_outcome result and summary, distinct from success or failure", async () => {
+    stubFetch({ status: "business_outcome", outcome: "member_not_found", description: "No such member." });
+    const genai = scriptedGenai("invoke__open_sub_account", { reasoning: "r", memberId: "40404", initialDeposit: "100" });
+
+    const turn = await runChatTurn({ genai, models: ["m"], apiBase: "http://localhost:4700", apiKey: "k", message: "look up member 40404" });
+
+    expect(turn.result.status).toBe("business_outcome");
+    expect(turn.summary).toContain("member_not_found");
+  });
+});

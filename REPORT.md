@@ -121,7 +121,7 @@ matching (including origin-parsing edge cases), the confidence/registry math, th
 artifact-building, schema cross-field validation, the replay engine's recovery/retry/
 escalation-resume state machine, and the discovery loop's own control flow (escalate/resume,
 dead-end detection, risky-action confirmation) — has a real unit test suite (`npm test`,
-Vitest, 234 tests across 28 files as of this pass) built against small fakes (a stub
+Vitest, 240 tests across 29 files as of this pass) built against small fakes (a stub
 `Surface`, a scripted fake model *output*, a real `GuardrailsPolicy` against a temp config
 where the class's private state made a plain fake impractical), not mocks of the browser or
 of what the model would actually decide. What's
@@ -833,6 +833,29 @@ value's own text before the first `console.log`, real evidence in hand (`grep`-v
 password never appears in cleartext in this CLI's own stdout, only in npm's own pre-execution
 argv echo, which is a shell-level exposure common to every `--password`/`--params` flag in
 this repo, not something this fix could reach).
+
+**The same front end, as a real member-facing UI, not just a CLI.** `src/chat-ui/` is a small
+Express server plus a plain HTML/CSS/JS page (no build step) that turns the CLI's one-shot
+`--message` flag into an actual chat window, with voice input/output layered on entirely
+client-side via the browser's own Web Speech API — no audio ever leaves the page, no new
+backend service exists to support it, and the mic control hides itself outright on a browser
+that doesn't implement `SpeechRecognition`. The CLI and the web UI share one implementation
+of "discover → plan → invoke" (`src/frontend/chat-turn.ts`, extracted from `agent-chat.ts`
+for exactly this reason) rather than two. The one thing genuinely new here: a *customer*
+should never have to state a back-office credential in chat text, so `chat-turn.ts` takes an
+optional `fillParams` map that's merged in **after** planning and always wins over anything
+the model itself proposed; the chat UI passes its own configured service-account operator
+credential through it. Verified for real, not just asserted: a message that (with only one
+capability available to match against) forced the model into a wrong-ish capability mapping
+also caused it to fabricate a plausible-looking `username` value — the evidence log for that
+exact run shows the real operator username was what actually signed on, confirming the
+override wins even when the model's own guess looks legitimate, not just when it's obviously
+a placeholder. A second real bug surfaced the same way: the model sometimes echoed a dollar
+amount as `"$100"` rather than `"100"`, which the target app's own numeric parsing silently
+read as `NaN` and misreported as "below the $25 minimum" — a false negative, not a true
+validation failure. Fixed in the planner's own system prompt (strip currency symbols before
+supplying a numeric-shaped value) and confirmed against a second real Gemini call, not just
+reasoned about.
 
 **No longer cut, added in the production-hardening pass:** this endpoint now requires a real
 API key on every route except `/health` (`src/http/api-key-auth.ts`, timing-safe, fails

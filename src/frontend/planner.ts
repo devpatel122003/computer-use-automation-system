@@ -83,7 +83,10 @@ If a required argument is genuinely missing from the request, still choose the b
 capability and leave that argument out of your call entirely -- the invocation will fail
 validation explicitly and safely, rather than silently proceeding on a made-up value. This
 matters most for credential fields: never supply a username or password unless the request
-states one verbatim; a missing credential should block the call, not get papered over.`;
+states one verbatim; a missing credential should block the call, not get papered over.
+When a request states a dollar amount, supply only the plain numeric value with no currency
+symbol, comma, or unit (e.g. "100" for "$100" or "one hundred dollars") -- the field this
+becomes is validated as a plain number downstream, and a literal "$100" is not one.`;
 
 /**
  * One model call, one function call back -- same `functionCallingConfig.mode = ANY`

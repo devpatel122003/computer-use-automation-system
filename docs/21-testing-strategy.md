@@ -49,7 +49,7 @@ npm test
    Duration  650ms (transform 1.10s, setup 0ms, import 1.94s, tests 236ms, environment 3ms)
 ```
 
-234 tests across 28 files, done in well under a second, with no browser window opening and no
+240 tests across 29 files, done in well under a second, with no browser window opening and no
 network call going out anywhere — because none of it needs a real page or a real model to
 prove itself.
 
@@ -97,7 +97,7 @@ less than it looks like it proves.
 
 ### What
 
-As of this pass: **234 tests across 28 files**, all in `src/**/*.test.ts`, run via `npm test`
+As of this pass: **240 tests across 29 files**, all in `src/**/*.test.ts`, run via `npm test`
 (Vitest). The full list of test files:
 
 ```

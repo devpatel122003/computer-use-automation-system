@@ -68,6 +68,13 @@ Mentioning a tenant by name — e.g. "...open this at Northgate Credit Union" �
 into the request's `tenantId` too, reusing the exact cross-tenant machinery
 [`14-capability-api.md`](14-capability-api.md) already documents.
 
+The same receptionist also stands at a real front desk, not just a terminal:
+`npm run chat-ui` opens a real chat page at `http://localhost:4800` where a member can type
+*or speak* the request (voice is the browser's own built-in speech recognition/synthesis —
+nothing new to run, nothing audio-shaped ever sent anywhere). Notably, this front desk
+**never asks the member for a password at all** — see Part 2's "How" for why that's a
+deliberate design decision, not an oversight.
+
 ### "What happens if...?"
 
 | Situation | What happens |
@@ -79,6 +86,9 @@ into the request's `tenantId` too, reusing the exact cross-tenant machinery
 | The action would be risky and the artifact isn't approved yet | Declined automatically over HTTP — same outcome `agent-invoke-demo` sees for the same reason, since it's the same API underneath. |
 | The request mentions a specific credit union by name | That name is picked up as a `tenantId` and that tenant's branded variant is invoked instead of the base capability. |
 | Two different phrasings ask for the same thing ("open a savings account for 10001 with $100" vs. "10001 wants to start a savings account, $100 to open") | Both should resolve to the same capability and (ideally) the same arguments — the execution and the final report are identical either way, because they never depend on the wording, only on the structured plan that comes out of it. |
+| The member types "$100" instead of "100" | Handled at the prompt level now — a real bug found by actually running this: the target app's own numeric parsing read a literal `"$100"` as `NaN` and misreported it as below the minimum deposit. Fixed by telling the model explicitly to strip currency symbols. |
+| The member's browser doesn't support voice input (most don't fully implement it) | The mic button simply isn't shown at all — no broken control, no silent failure, typing still works exactly the same. |
+| The chat page itself somehow got asked for operator credentials | It wouldn't matter — the chat UI's server injects its own configured service-account credential after planning, which always overrides anything a customer's message (or the model's own guess) supplied. |
 
 ---
 
@@ -177,12 +187,58 @@ pre-execution argv echo at the shell level, a shell-level exposure common to eve
 `--password`/`--params` flag in this repo, which this fix cannot reach because it happens
 before this process even starts.
 
+### A real chat + voice UI, sharing one implementation with the CLI
+
+`src/chat-ui/server.ts` is a small Express server plus a plain HTML/CSS/JS page (no build
+step, no framework) at `http://localhost:4800`. It does not reimplement anything: both it
+and `src/cli/agent-chat.ts` call the same `runChatTurn()` (`src/frontend/chat-turn.ts`,
+extracted from the CLI for exactly this reason — one discover→plan→invoke implementation,
+not two that could quietly drift apart). Voice is entirely client-side
+(`src/chat-ui/public/chat.js`): `SpeechRecognition` for speech-to-text,
+`speechSynthesis` for text-to-speech, both feature-detected, with the mic control removed
+from the page entirely (not just disabled) on a browser that doesn't implement it.
+
+**The one genuinely new problem this surface introduces: a customer should never be able to
+supply — or need to know — a back-office credential.** `runChatTurn()` accepts an optional
+`fillParams: Record<string, string>`, merged into the invoke call *after* planning and
+**always winning** over anything the model itself proposed. The chat UI passes its own
+configured service-account operator credential
+(`CHAT_UI_OPERATOR_USERNAME`/`CHAT_UI_OPERATOR_PASSWORD`) through it; the CLI doesn't use
+this at all, since an internal caller running the CLI is already the authenticated party. The
+injected value is also never included in what's returned to *any* caller (`redactedParams`
+is built from the plan *before* the merge), so even an internal debugging view can't
+accidentally surface it.
+
+This was verified for real, not just reasoned about, against a genuinely adversarial case:
+with only one capability in this demo's catalog, a message that didn't cleanly match it
+forced the model into a wrong-ish capability mapping — and, in the process, the model
+fabricated a plausible-looking `username` value (`"test_user"`) for the one credential-shaped
+field that isn't marked `sensitive`. The real evidence log for that exact run
+(`evidence/runs/replay-2026-08-26T17-09-25-499Z/log.jsonl`) shows the operator that actually
+signed on was the real configured one, not the fabricated one — confirming `fillParams`
+overrides even a confident-looking guess, not only an obvious placeholder.
+
+A second real bug surfaced the same way, unrelated to credentials: a request phrased with a
+dollar sign ("...with $100") sometimes came back through the model as the literal string
+`"$100"`. The target app's own `Number("$100")` parses to `NaN`, which its validation path
+silently misreports as "below the $25 minimum" — a false negative, not a genuine validation
+failure. Fixed in `planner.ts`'s own system prompt (supply the plain numeric value, no
+currency symbol) and confirmed by re-running the exact same request against a live Gemini
+call afterward, not just inspecting the prompt change.
+
 ### Where
 
 - `src/frontend/planner.ts` — `planInvocation`, `buildToolDeclarations`, `toFunctionName`,
   the `CapabilityInvocationPlan` type.
-- `src/cli/agent-chat.ts` — the CLI: discovery, redaction wiring (`redactionOptionsFor`),
-  invocation, `summarize()`.
+- `src/frontend/chat-turn.ts` — `runChatTurn()`, the one shared discover→plan→invoke
+  sequence, including the `fillParams` credential-override mechanism.
+- `src/frontend/chat-shared.ts` — `InvokeResponse`, `redactionOptionsFor()`, `summarize()`,
+  shared by the CLI and the web UI (re-exported from `agent-chat.ts` for backward
+  compatibility with its own tests).
+- `src/chat-ui/server.ts` + `src/chat-ui/public/` — the web UI: the `/chat` endpoint and the
+  static page/styles/client script.
+- `src/cli/agent-chat.ts` — the CLI: argument parsing and console output around
+  `runChatTurn()`.
 - `src/replay/replay-engine.ts` — `validateParams`, tightened to treat empty string as
   missing for every caller.
 - `src/guardrails/redaction.ts` — `redact()`, shared by this front end, the capability API,
@@ -241,6 +297,15 @@ Done. confirmationNumber = ....
 - **The shell itself echoes a `--message`/`--params` flag containing a credential** — a
   known, disclosed limitation at the OS/npm level, outside what any in-process redaction fix
   can reach.
+- **The chat UI's own `GEMINI_API_KEY`/`CAPABILITY_API_KEY` are missing** — `/chat` returns a
+  clear 500 before attempting any network call, rather than a confusing downstream failure.
+- **A customer's message states a credential-looking value** — never used; `fillParams`
+  always overrides it before the invoke call, verified against real evidence, not just the
+  code path (see "A real chat + voice UI" above).
+- **No per-customer identity or session** — deliberately not built for this demo (same "one
+  caller class per surface, not a full identity system" posture `19-security-and-authentication.md`
+  already discloses for the capability API and dashboard); a real deployment would need to
+  know *which* member is chatting rather than asking them to state their own member ID.
 
 ## Related docs
 

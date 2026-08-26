@@ -1,7 +1,6 @@
 import "dotenv/config";
 import { GoogleGenAI } from "@google/genai";
-import { planInvocation, type DiscoveredCapability } from "../frontend/planner.js";
-import { redact } from "../guardrails/redaction.js";
+import { runChatTurn } from "../frontend/chat-turn.js";
 import { parseArgs } from "./args.js";
 import { resolveModelList } from "../agent/model-retry.js";
 
@@ -15,55 +14,18 @@ import { resolveModelList } from "../agent/model-retry.js";
  * deterministic" split the whole system is built around -- an extra LLM call to restate a
  * result that's already fully structured would just be latency, cost, and a new
  * hallucination surface for zero benefit.
+ *
+ * The actual discover -> plan -> invoke sequence lives in `src/frontend/chat-turn.ts` now,
+ * shared with the customer-facing chat UI (`src/chat-ui/server.ts`) -- this file is just
+ * the CLI's own argument parsing and console output around that one shared implementation.
  */
+
+// Re-exported for backward compatibility: this file's own tests (agent-chat.test.ts)
+// import these from here, and other internal callers may too. The real definitions live in
+// ../frontend/chat-shared.ts now, alongside runChatTurn's other shared pieces.
+export { redactionOptionsFor, summarize, type InvokeResponse } from "../frontend/chat-shared.js";
 
 const MODELS = resolveModelList();
-
-export interface InvokeResponse {
-  status: "success" | "business_outcome" | "failure";
-  outputs?: Record<string, string>;
-  outcome?: string;
-  description?: string;
-  stepId?: string;
-  expected?: string;
-  observed?: string;
-  evidenceRef?: string;
-  error?: string;
-}
-
-/**
- * Which param names/values must never reach stdout in the clear, for a given plan. Kept as
- * its own pure function (rather than inline in main()) specifically so the redaction
- * decision is unit-testable without a live Gemini call.
- */
-export function redactionOptionsFor(
-  capabilities: DiscoveredCapability[],
-  plan: { capabilityId: string; params: Record<string, string> }
-): { sensitiveKeys: Set<string>; sensitiveValues: Set<string> } {
-  const chosenCapability = capabilities.find((c) => c.id === plan.capabilityId);
-  const sensitiveKeys = new Set((chosenCapability?.inputParams ?? []).filter((p) => p.sensitive).map((p) => p.name));
-  const sensitiveValues = new Set(
-    Object.entries(plan.params)
-      .filter(([k]) => sensitiveKeys.has(k))
-      .map(([, v]) => v)
-  );
-  return { sensitiveKeys, sensitiveValues };
-}
-
-export function summarize(response: InvokeResponse, httpStatus: number): string {
-  if (httpStatus >= 400 && response.error) {
-    return `Couldn't even start: ${response.error}`;
-  }
-  if (response.status === "success") {
-    const outputs = response.outputs ?? {};
-    const outputText = Object.entries(outputs).map(([k, v]) => `${k} = ${v}`).join(", ");
-    return `Done.${outputText ? ` ${outputText}.` : ""}`;
-  }
-  if (response.status === "business_outcome") {
-    return `Completed, but the answer is "${response.outcome}": ${response.description}`;
-  }
-  return `Didn't complete. At step ${response.stepId}, expected ${response.expected} but observed ${response.observed}.`;
-}
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
@@ -86,40 +48,24 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const authHeaders = { Authorization: `Bearer ${process.env.CAPABILITY_API_KEY}` };
 
   console.log(`Discovering capabilities: GET ${apiBase}/capabilities`);
-  const listRes = await fetch(`${apiBase}/capabilities`, { headers: authHeaders });
-  if (!listRes.ok) throw new Error(`GET /capabilities failed: HTTP ${listRes.status}`);
-  const catalog = (await listRes.json()) as Array<{ id: string; description: string; inputParams: DiscoveredCapability["inputParams"] }>;
-  const capabilities: DiscoveredCapability[] = catalog.map((c) => ({ id: c.id, description: c.description, inputParams: c.inputParams }));
-
   const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const plan = await planInvocation(genai, MODELS, capabilities, message);
+  const turn = await runChatTurn({ genai, models: MODELS, apiBase, apiKey: process.env.CAPABILITY_API_KEY, message, allowRisky });
 
   // Redact before printing anything, not after: the raw utterance itself can carry a
   // credential in plain English (e.g. "using password demo_password..."), the same real
-  // leak the discovery agent's own goal string had (see REPORT.md "Safety") -- so the
-  // sensitive param names/values have to be known and registered *before* the first
-  // console.log, not just before sending the params over the wire.
-  const redactOpts = redactionOptionsFor(capabilities, plan);
-
-  console.log(`\nRequest: "${redact(message, redactOpts)}"`);
+  // leak the discovery agent's own goal string had (see REPORT.md "Safety") -- runChatTurn
+  // already computed the redacted versions before this file ever sees them.
+  console.log(`\nRequest: "${turn.redactedMessage}"`);
   console.log(
-    `Plan: invoke "${plan.capabilityId}"${plan.tenantId ? ` for tenant "${plan.tenantId}"` : ""} with ${JSON.stringify(redact(plan.params, redactOpts))}`
+    `Plan: invoke "${turn.plan.capabilityId}"${turn.plan.tenantId ? ` for tenant "${turn.plan.tenantId}"` : ""} with ${JSON.stringify(turn.redactedParams)}`
   );
-  console.log(`Reasoning: ${redact(plan.reasoning, redactOpts)}`);
+  console.log(`Reasoning: ${turn.redactedReasoning}`);
 
-  const invokeRes = await fetch(`${apiBase}/capabilities/${plan.capabilityId}/invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders },
-    body: JSON.stringify({ params: plan.params, allowRisky, tenantId: plan.tenantId }),
-  });
-  const result = (await invokeRes.json()) as InvokeResponse;
-
-  console.log(`\nHTTP ${invokeRes.status}`);
-  console.log(JSON.stringify(result, null, 2));
-  console.log(`\n${summarize(result, invokeRes.status)}`);
+  console.log(`\nHTTP ${turn.httpStatus}`);
+  console.log(JSON.stringify(turn.result, null, 2));
+  console.log(`\n${turn.summary}`);
 }
 
 main().catch((err) => {

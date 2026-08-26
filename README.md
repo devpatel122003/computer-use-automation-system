@@ -67,7 +67,12 @@ guardrail design in one place.
 - `src/frontend/` + `src/cli/agent-chat.ts` — the other half of "the agent-facing product
   decides what to do; this system is how it reliably and safely does it": a natural-language
   request mapped by one Gemini function-call decision to a capability + typed args, then
-  invoked through the exact same capability API above.
+  invoked through the exact same capability API above. `chat-turn.ts` is the one shared
+  discover→plan→invoke implementation both the CLI and `src/chat-ui/` (a real web page,
+  step 11b) call into.
+- `src/chat-ui/` — a real member-facing chat (+ voice, client-side via the browser's Web
+  Speech API) UI on top of `chat-turn.ts`, holding its own service-account operator
+  credential server-side so a customer's chat text is never what actually authenticates.
 - `src/guardrails/` — the allowlist policy, risk classification, and redaction utilities.
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
   drive the same live browser session, capture what they did, hand control back); shared by
@@ -549,6 +554,27 @@ and the final report stay fully deterministic -- no second LLM call phrases the 
 a request that mentions a tenant by name (e.g. "...at Northgate Credit Union") to see
 `tenantId` get picked up too.
 
+**11b. The same front end, as a real chat (+ voice) UI, not just a CLI.** A member-facing
+web page instead of a one-shot command -- same `runChatTurn()` underneath (shared with step
+11's CLI, not a second implementation):
+
+```bash
+npm run capability-api    # if not already running
+npm run chat-ui
+```
+
+Open `http://localhost:4800`. Type (or, in Chrome/Edge, click the mic and speak) a request
+like *"Open a savings account for member 10001 with $100"* -- no credentials needed in the
+chat: `src/chat-ui/server.ts` injects its own configured service-account operator
+credential (`CHAT_UI_OPERATOR_USERNAME`/`PASSWORD`, defaulting to the same demo credential
+used everywhere else in this repo) *after* planning and *before* invoking, so a customer's
+chat text is never what actually authenticates against the target system -- the same reason
+`planner.ts` excludes sensitive params from the model's function-calling contract in the
+first place, closed all the way to the front door. Voice is entirely client-side (the
+browser's own Web Speech API for speech-to-text and text-to-speech) -- no audio is ever sent
+anywhere, no new backend service exists to support it, and the mic button hides itself
+entirely on a browser that doesn't support it rather than failing silently.
+
 **12. Assisted fallback (bounded LLM recovery).** Opt-in only -- `replay`'s own promise
 ("never calls a model") holds unless you pass this:
 
@@ -687,7 +713,7 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (234 tests across 28 files, no network/browser
+`npm test` runs a real Vitest unit suite (240 tests across 29 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route

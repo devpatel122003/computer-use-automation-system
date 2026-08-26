@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Member Assistant</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="chat-app">
+    <header>
+      <h1>Member Assistant</h1>
+      <p class="subtitle">Type or talk — ask to open an account, look up a member, and more.</p>
+    </header>
+
+    <main id="messages" class="messages" aria-live="polite"></main>
+
+    <form id="composer" class="composer">
+      <button type="button" id="mic-btn" class="icon-btn" title="Speak your request" aria-label="Speak your request">🎙️</button>
+      <input
+        id="input"
+        type="text"
+        placeholder="e.g. Open a savings account for member 10001 with $100"
+        autocomplete="off"
+      />
+      <button type="submit" class="send-btn">Send</button>
+    </form>
+
+    <div class="footer-row">
+      <label class="speak-toggle"><input type="checkbox" id="speak-toggle" /> Read replies aloud</label>
+      <span id="mic-status" class="mic-status" hidden>Listening…</span>
+    </div>
+  </div>
+
+  <script src="/chat.js"></script>
+</body>
+</html>

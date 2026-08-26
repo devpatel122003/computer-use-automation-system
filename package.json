@@ -20,6 +20,7 @@
     "capability-api": "tsx src/api/server.ts",
     "agent-invoke-demo": "tsx src/cli/agent-invoke-demo.ts",
     "agent-chat": "tsx src/cli/agent-chat.ts",
+    "chat-ui": "tsx src/chat-ui/server.ts",
     "vision-fallback-demo": "tsx src/cli/vision-fallback-demo.ts",
     "compliance-report": "tsx src/cli/compliance-report.ts",
     "canary-check": "tsx src/cli/canary-check.ts",
