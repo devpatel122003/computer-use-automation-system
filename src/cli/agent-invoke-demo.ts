@@ -17,6 +17,32 @@ interface CatalogEntry {
   inputParams: Array<{ name: string; required: boolean; type: string }>;
 }
 
+/**
+ * Explains a 422 "no confirmation given" decline in terms that actually match why it
+ * happened. Found for real while re-running this demo against a freshly recorded artifact:
+ * once a few replays (including an expected negative-control failure) had run, the artifact
+ * was already `approved` but its confidence had dropped back to "low", and this script's
+ * old hardcoded message ("this capability isn't approved yet") was simply wrong in that
+ * case -- confusing to say out loud in a live demo where the audience just watched `npm run
+ * approve` succeed a few steps earlier. `draft` and "approved but not enough of a track
+ * record / drift-capped" are both real, distinct reasons the confidence circuit breaker
+ * (execution-policy.ts) can decline the exact same way; this picks the one that matches.
+ */
+export function explainDeclinedRisky(approvalState: string): string {
+  if (approvalState === "approved") {
+    return (
+      'This capability is already "approved," but the API still declined the risky step -- its ' +
+      "confidence hasn't built up enough of a track record yet for unattended risky steps (or UI-drift " +
+      "has capped it). Run `npm run drift-report` or check the dashboard for detail, then re-run this " +
+      "once more clean replay history has accumulated."
+    );
+  }
+  return (
+    'This capability isn\'t "approved" yet, so the API declined the risky step exactly ' +
+    "like the CLI would -- run `npm run approve -- --artifact <path>` first, then re-run this."
+  );
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const apiBase = args["api-base"] ?? "http://localhost:4700";
@@ -59,10 +85,7 @@ async function main(): Promise<void> {
   console.log(JSON.stringify(result, null, 2));
 
   if (invokeRes.status === 422 && result.observed?.includes("no confirmation given")) {
-    console.log(
-      `\nThis capability isn't "approved" yet, so the API declined the risky step exactly ` +
-        `like the CLI would -- run \`npm run approve -- --artifact <path>\` first, then re-run this.`
-    );
+    console.log(`\n${explainDeclinedRisky(target.approvalState)}`);
   }
 }
 
