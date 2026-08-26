@@ -558,10 +558,18 @@ a request that mentions a tenant by name (e.g. "...at Northgate Credit Union") t
 web page instead of a one-shot command -- same `runChatTurn()` underneath (shared with step
 11's CLI, not a second implementation):
 
+Needs **two** other services already running first -- the chat UI calls the capability API,
+which drives mock-bank -- not just itself:
+
 ```bash
-npm run capability-api    # if not already running
+npm run mock-bank         # if not already running (step 1)
+npm run capability-api    # if not already running (step 9)
 npm run chat-ui
 ```
+
+If you skip either of the first two, the chat UI itself starts fine (it has nothing to
+connect to yet), but every message fails with "Couldn't reach the capability API" -- that
+error names exactly this cause.
 
 Open `http://localhost:4800`. Type (or, in Chrome/Edge, click the mic and speak) a request
 like *"Open a savings account for member 10001 with $100"* -- no credentials needed in the

@@ -97,7 +97,15 @@ app.post("/chat", chatLimiter, async (req, res) => {
     });
   } catch (err) {
     const messageText = err instanceof Error ? err.message : String(err);
-    res.status(502).json({ error: `Couldn't reach the capability API: ${messageText}` });
+    // "fetch failed" (Node's undici) is exactly what a refused connection looks like -- this
+    // server has no other reason to see it, since runChatTurn's own errors (bad capability
+    // catalog response, etc.) already carry a more specific message. Almost always means the
+    // capability API (and, transitively, mock-bank) isn't actually running yet -- the single
+    // most common way to see this endpoint "not work" is starting only the chat UI on its own.
+    const hint = /fetch failed/i.test(messageText)
+      ? ` -- is it running? (npm run mock-bank, then npm run capability-api, then this)`
+      : "";
+    res.status(502).json({ error: `Couldn't reach the capability API at ${process.env.CAPABILITY_API_BASE ?? "http://localhost:4700"}: ${messageText}${hint}` });
   }
 });
 
