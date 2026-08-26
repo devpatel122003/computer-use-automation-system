@@ -3,7 +3,7 @@
   "name": "Create Member",
   "description": "Signs on and enrolls a brand new member with an initial checking and savings balance, then confirms the result.",
   "version": "1.0.0",
-  "createdAt": "2026-08-26T17:43:41.934Z",
+  "createdAt": "2026-08-26T17:52:42.288Z",
   "target": {
     "appId": "mock-bank",
     "surfaceType": "web",
@@ -34,16 +34,16 @@
     {
       "name": "initialChecking",
       "type": "string",
-      "required": true,
+      "required": false,
       "sensitive": false,
-      "description": "Opening checking account balance in dollars."
+      "description": "Opening checking account balance in dollars. Defaults to $0 if omitted -- the target app itself treats a blank deposit field as zero, not an error."
     },
     {
       "name": "initialSavings",
       "type": "string",
-      "required": true,
+      "required": false,
       "sensitive": false,
-      "description": "Opening savings account balance in dollars."
+      "description": "Opening savings account balance in dollars. Defaults to $0 if omitted -- the target app itself treats a blank deposit field as zero, not an error."
     }
   ],
   "outputSchema": [

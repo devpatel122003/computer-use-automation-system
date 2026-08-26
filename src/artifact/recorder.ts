@@ -23,6 +23,13 @@ export interface ParamMapping {
   type: "string" | "number" | "boolean";
   sensitive?: boolean;
   description?: string;
+  /** Defaults to true. Set false when the target app itself treats a blank value as a real
+   *  default (e.g. mock-bank's initial-deposit fields silently become $0 if left blank) --
+   *  found for real via the create-member capability: marking a field "required" that the
+   *  app doesn't actually require forces the conversational front end's model to either get
+   *  its call rejected for omitting it, or invent a value to satisfy the schema, when the
+   *  honest answer is "this field has a real default, so it's fine to leave out." */
+  required?: boolean;
 }
 
 export interface RecorderOptions {
@@ -96,7 +103,7 @@ export function buildArtifact(discovery: DiscoveryResult, options: RecorderOptio
       inputParams.push({
         name: mapping.paramName,
         type: mapping.type,
-        required: true,
+        required: mapping.required ?? true,
         sensitive: mapping.sensitive ?? false,
         description: mapping.description,
       });

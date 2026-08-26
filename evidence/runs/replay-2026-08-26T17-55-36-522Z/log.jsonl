@@ -1,0 +1,2 @@
+{"ts":"2026-08-26T17:55:36.528Z","step":0,"phase":"start","summary":"Capability API invoked Create Member v1.0.0","detail":{"fingerprint":"0fa6e4926c16b778","approvalState":"approved","driftAdjustedConfidenceLabel":"low","allowRiskyRequested":true,"allowRiskyEffective":false,"params":{"fullName":"","username":"demo_operator","password":"[REDACTED]"}}}
+{"ts":"2026-08-26T17:55:36.664Z","step":0,"phase":"error","summary":"Capability API invocation error: Missing required input params: fullName"}

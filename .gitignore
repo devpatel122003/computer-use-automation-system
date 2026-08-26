@@ -5,4 +5,9 @@ dist/
 .env
 .env.local
 .claude/
+
+# mock-bank's persisted runtime state (apps/mock-bank/src/data.ts) -- generated data, not
+# source; each tenant gets its own state.<tenantId>.json here. Delete this folder (or hit
+# POST /__test__/reset) to return to seed data.
+apps/mock-bank/data/
 Assignment A — Computer-Use Automation System.pdf

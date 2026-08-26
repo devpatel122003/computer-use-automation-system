@@ -857,6 +857,36 @@ validation failure. Fixed in the planner's own system prompt (strip currency sym
 supplying a numeric-shaped value) and confirmed against a second real Gemini call, not just
 reasoned about.
 
+**A second real capability, proving the system generalizes past the first one.**
+`evidence/artifacts/create-member.artifact.json` -- enrolling a brand new member, not acting
+on an existing one -- was recorded with its own genuine discovery run
+(`npm run run-agent-create-member`), its own typed contract, and its own `validation_error`
+known outcome, and is now discoverable and invocable through the same capability API and
+chat front end alongside `open-sub-account`. Building it surfaced a real, generalizable bug
+in the recorder itself, not specific to this one capability: `buildArtifact()`
+(`src/artifact/recorder.ts`) hardcoded every mapped param as `required: true`, but the
+target app's own initial-deposit fields silently default to $0 when left blank -- they were
+never actually required. That mismatch meant a request that genuinely omitted a deposit
+amount got rejected outright, while a request that only partially specified fields could
+push the model into inventing a value to satisfy the artifact's own (wrong) contract, since
+the JSON-schema `required` list left it no honest way to comply otherwise. Fixed by adding an
+optional `required` override to `ParamMapping`, defaulting to `true` for backward
+compatibility (every existing mapping, including `open-sub-account`'s, is unaffected), and
+set `false` on the two deposit fields specifically. The corrected artifact was rebuilt from
+the *original* discovery result already on disk -- zero additional Gemini calls -- proving
+the fix and the real recorded run are independent of each other.
+
+**mock-bank gained real (if simple) persistence.** Previously in-memory only, reset to seed
+data on every restart; now every mutation (`createMember`, `createSubAccount`, consuming the
+session-timeout arm) is written immediately to `apps/mock-bank/data/state.<tenantId>.json`,
+and startup resumes from that file if one exists. One file per tenant, not one shared file --
+mock-bank and the northgate-cu variant are two independent processes that must not corrupt
+each other's data when both run at once, which the cross-tenant reuse demo already does.
+`POST /__test__/reset` remains the deliberate escape hatch back to a known state, now also
+rewriting the persisted file, not just in-memory state. Verified by actually killing and
+restarting the process, not just reasoning about the code: a member created before the
+restart was still there after it.
+
 **No longer cut, added in the production-hardening pass:** this endpoint now requires a real
 API key on every route except `/health` (`src/http/api-key-auth.ts`, timing-safe, fails
 closed and loud at startup if unconfigured), plus a rate limit specifically on `/invoke`

@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 export interface SubAccount {
   id: string;
   memberId: string;
@@ -34,37 +38,108 @@ const seedMembers: Member[] = [
   { id: "77777", name: "Dormant-Flag Member", checkingBalance: 75.0, savingsBalance: 40.0, requiresInterstitialConfirmation: true },
 ];
 
-// Populated by resetData() below, called once at module load -- a single source of truth
-// for "fresh state" instead of duplicating slightly-different init logic here and there.
-// The initial assignment previously stored direct references into `seedMembers` (only
-// resetData()'s clone was deep), so any in-place mutation of a served Member object before
-// the first reset would have permanently corrupted the seed data for the process lifetime.
+/**
+ * Real, file-based persistence -- previously this was pure in-memory state, reset to seed
+ * data on every process restart, which is fine for a single demo session but means anything
+ * created (a new member, a new sub-account) vanishes the moment mock-bank restarts. This
+ * app now behaves like it has a real (if trivially simple) database: every mutation is
+ * written to `apps/mock-bank/data/state.<tenantId>.json` immediately, and startup resumes
+ * from that file if one exists, instead of always reseeding.
+ *
+ * One file per tenant (keyed by the same TENANT env var `tenants.ts` already reads), not
+ * one shared file -- mock-bank (:4000) and the northgate-cu variant (:4100) are two
+ * independent processes from the same code and must not silently corrupt each other's data
+ * when both run at once, exactly as they do for the cross-tenant reuse demo.
+ *
+ * `resetData()` (used by `POST /__test__/reset`) is the deliberate escape hatch: it
+ * explicitly reseeds *and* re-persists, so a demo can still return to a known state on
+ * request -- persistence means "survives a restart," not "can never be reset."
+ */
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = path.join(__dirname, "..", "data");
+const TENANT_ID = process.env.TENANT ?? "mock-bank";
+const STATE_FILE = path.join(DATA_DIR, `state.${TENANT_ID}.json`);
+
+interface PersistedState {
+  members: Member[];
+  subAccounts: SubAccount[];
+  nextSubAccountSeq: number;
+  nextMemberSeq: number;
+  sessionTimeoutArmed: boolean;
+}
+
+function seedState(): PersistedState {
+  return {
+    members: seedMembers.map((m) => structuredClone(m)),
+    subAccounts: [],
+    nextSubAccountSeq: 1,
+    nextMemberSeq: 20001,
+    sessionTimeoutArmed: true,
+  };
+}
+
+function persist(): void {
+  const state: PersistedState = {
+    members: Array.from(members.values()),
+    subAccounts: Array.from(subAccounts.values()),
+    nextSubAccountSeq,
+    nextMemberSeq,
+    sessionTimeoutArmed,
+  };
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+}
+
+function loadOrSeed(): PersistedState {
+  if (fs.existsSync(STATE_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(STATE_FILE, "utf-8")) as PersistedState;
+    } catch (err) {
+      // A corrupt/partially-written file is a real possibility (e.g. the process was
+      // killed mid-write) -- fall back to seed data rather than crash the whole app on
+      // startup over it.
+      console.error(`mock-bank: ${STATE_FILE} was unreadable (${err}); starting from seed data instead.`);
+    }
+  }
+  return seedState();
+}
+
+function applyState(state: PersistedState): void {
+  members = new Map(state.members.map((m) => [m.id, m]));
+  subAccounts = new Map(state.subAccounts.map((s) => [s.id, s]));
+  nextSubAccountSeq = state.nextSubAccountSeq;
+  nextMemberSeq = state.nextMemberSeq;
+  sessionTimeoutArmed = state.sessionTimeoutArmed;
+}
+
 export let members: Map<string, Member>;
 export let subAccounts: Map<string, SubAccount>;
-let nextSubAccountSeq = 1;
+let nextSubAccountSeq: number;
 // New members created via /members/new get IDs starting well above the seeded range
 // (10001-99999) so a freshly created member can never collide with a seeded one.
-let nextMemberSeq = 20001;
+let nextMemberSeq: number;
 
 // Simulates a session expiring exactly once mid-flow (a real, transient condition), rather
 // than a permanently-broken member -- consumed on first trigger, reset via resetData().
-export let sessionTimeoutArmed = true;
+export let sessionTimeoutArmed: boolean;
 
 export function consumeSessionTimeoutArm(): boolean {
   if (!sessionTimeoutArmed) return false;
   sessionTimeoutArmed = false;
+  persist();
   return true;
 }
 
 export function resetData(): void {
-  members = new Map(seedMembers.map((m) => [m.id, structuredClone(m)]));
-  subAccounts = new Map();
-  nextSubAccountSeq = 1;
-  nextMemberSeq = 20001;
-  sessionTimeoutArmed = true;
+  applyState(seedState());
+  persist();
 }
 
-resetData();
+// Resume from disk if this tenant has real persisted state; otherwise seed fresh and write
+// it out immediately, so the file exists from the first run rather than only after the
+// first mutation.
+applyState(loadOrSeed());
+if (!fs.existsSync(STATE_FILE)) persist();
 
 export function findMember(id: string): Member | undefined {
   return members.get(id.trim());
@@ -80,6 +155,7 @@ export function createSubAccount(memberId: string, accountType: SubAccount["acco
     openedAt: new Date(2026, 0, 1).toISOString(),
   };
   subAccounts.set(id, record);
+  persist();
   return record;
 }
 
@@ -91,5 +167,6 @@ export function createMember(name: string, checkingBalance: number, savingsBalan
   const id = String(nextMemberSeq++);
   const record: Member = { id, name, checkingBalance, savingsBalance };
   members.set(id, record);
+  persist();
   return record;
 }

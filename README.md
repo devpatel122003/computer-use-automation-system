@@ -32,8 +32,14 @@ guardrail design in one place.
 
 - `apps/mock-bank/` — the target application: a small, deliberately legacy-styled
   (server-rendered, table layout, no test IDs) banking back-office app with a
-  member-search → member-detail → open-sub-account flow, plus seeded scenarios for
-  not-found / permission-denied / validation-error / session-timeout / slow-load.
+  member-search → member-detail → open-sub-account → create-member flow, plus seeded
+  scenarios for not-found / permission-denied / validation-error / session-timeout /
+  slow-load. Real (if simple) persistence: every mutation is written to
+  `apps/mock-bank/data/state.<tenantId>.json` immediately, and a restart resumes from that
+  file instead of always reseeding -- a created member or sub-account survives a real
+  process restart. `POST /__test__/reset` is the deliberate escape hatch back to seed data
+  (also deletes-and-rewrites that file); delete `apps/mock-bank/data/` yourself for the same
+  effect. Gitignored -- it's generated state, not source.
 - `src/surface/` — the `Surface` abstraction (observe/act) and its Playwright implementation.
 - `src/agent/` — the discovery loop: observe → Gemini function-call decision → act; also
   `model-retry.ts`, the shared 429/503 backoff-and-retry used by every real Gemini call in

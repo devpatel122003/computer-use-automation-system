@@ -36,14 +36,16 @@ export const CREATE_MEMBER_PARAM_MAPPINGS: ParamMapping[] = [
     name: "Initial Checking Deposit ($)",
     paramName: "initialChecking",
     type: "string",
-    description: "Opening checking account balance in dollars.",
+    required: false,
+    description: "Opening checking account balance in dollars. Defaults to $0 if omitted -- the target app itself treats a blank deposit field as zero, not an error.",
   },
   {
     role: "textbox",
     name: "Initial Savings Deposit ($)",
     paramName: "initialSavings",
     type: "string",
-    description: "Opening savings account balance in dollars.",
+    required: false,
+    description: "Opening savings account balance in dollars. Defaults to $0 if omitted -- the target app itself treats a blank deposit field as zero, not an error.",
   },
 ];
 

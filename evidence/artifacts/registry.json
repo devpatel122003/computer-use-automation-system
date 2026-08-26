@@ -256,6 +256,44 @@
         "runId": "replay-2026-08-26T17-45-42-671Z",
         "timestamp": "2026-08-26T17:45:44.826Z",
         "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T17-49-19-235Z",
+        "timestamp": "2026-08-26T17:49:21.227Z",
+        "status": "success"
+      }
+    ]
+  },
+  "create-member@0fa6e4926c16b778": {
+    "artifactId": "create-member",
+    "version": "1.0.0",
+    "fingerprint": "0fa6e4926c16b778",
+    "approvalState": "approved",
+    "history": [
+      {
+        "runId": "replay-2026-08-26T17-54-55-866Z",
+        "timestamp": "2026-08-26T17:54:58.836Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T17-55-37-580Z",
+        "timestamp": "2026-08-26T17:55:38.977Z",
+        "status": "failure"
+      },
+      {
+        "runId": "replay-2026-08-26T17-56-01-241Z",
+        "timestamp": "2026-08-26T17:56:03.665Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T17-56-04-506Z",
+        "timestamp": "2026-08-26T17:56:06.852Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T17-56-20-607Z",
+        "timestamp": "2026-08-26T17:56:22.559Z",
+        "status": "success"
       }
     ]
   }
