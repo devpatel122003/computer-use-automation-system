@@ -159,6 +159,11 @@
         "runId": "replay-2026-08-26T17-30-50-566Z",
         "timestamp": "2026-08-26T17:30:53.107Z",
         "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T17-33-29-649Z",
+        "timestamp": "2026-08-26T17:33:31.290Z",
+        "status": "business_outcome"
       }
     ]
   },
@@ -228,6 +233,29 @@
         "runId": "replay-2026-08-25T20-03-59-895Z",
         "timestamp": "2026-08-25T20:04:02.441Z",
         "status": "failure"
+      }
+    ]
+  },
+  "create-member@a0959ff37da249cd": {
+    "artifactId": "create-member",
+    "version": "1.0.0",
+    "fingerprint": "a0959ff37da249cd",
+    "approvalState": "approved",
+    "history": [
+      {
+        "runId": "replay-2026-08-26T17-44-19-373Z",
+        "timestamp": "2026-08-26T17:44:21.796Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-26T17-44-46-795Z",
+        "timestamp": "2026-08-26T17:44:49.138Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-26T17-45-42-671Z",
+        "timestamp": "2026-08-26T17:45:44.826Z",
+        "status": "success"
       }
     ]
   }

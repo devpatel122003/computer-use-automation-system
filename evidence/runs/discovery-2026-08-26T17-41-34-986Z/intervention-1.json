@@ -1,0 +1,11 @@
+{
+  "id": "discovery-2026-08-26T17-41-34-986Z-intervention-1",
+  "runId": "discovery-2026-08-26T17-41-34-986Z",
+  "runType": "discovery",
+  "capability": "create-member",
+  "step": 10,
+  "reason": "There is no submit button or form action element present on the Create New Member page to complete the enrollment.",
+  "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-26T17-41-34-986Z/screenshots/intervention-1.png",
+  "url": "http://localhost:4000/members/new",
+  "createdAt": "2026-08-26T17:41:46.094Z"
+}

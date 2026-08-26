@@ -42,6 +42,9 @@ const seedMembers: Member[] = [
 export let members: Map<string, Member>;
 export let subAccounts: Map<string, SubAccount>;
 let nextSubAccountSeq = 1;
+// New members created via /members/new get IDs starting well above the seeded range
+// (10001-99999) so a freshly created member can never collide with a seeded one.
+let nextMemberSeq = 20001;
 
 // Simulates a session expiring exactly once mid-flow (a real, transient condition), rather
 // than a permanently-broken member -- consumed on first trigger, reset via resetData().
@@ -57,6 +60,7 @@ export function resetData(): void {
   members = new Map(seedMembers.map((m) => [m.id, structuredClone(m)]));
   subAccounts = new Map();
   nextSubAccountSeq = 1;
+  nextMemberSeq = 20001;
   sessionTimeoutArmed = true;
 }
 
@@ -81,4 +85,11 @@ export function createSubAccount(memberId: string, accountType: SubAccount["acco
 
 export function findSubAccount(id: string): SubAccount | undefined {
   return subAccounts.get(id);
+}
+
+export function createMember(name: string, checkingBalance: number, savingsBalance: number): Member {
+  const id = String(nextMemberSeq++);
+  const record: Member = { id, name, checkingBalance, savingsBalance };
+  members.set(id, record);
+  return record;
 }

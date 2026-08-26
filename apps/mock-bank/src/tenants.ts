@@ -28,6 +28,13 @@ export interface TenantLabels {
   accessDeniedText: string;
   minDepositErrorText: string;
   confirmationBannerText: string;
+  createNewMemberLinkLabel: string;
+  createMemberSubmitLabel: string;
+  fullNameLabel: string;
+  initialCheckingLabel: string;
+  initialSavingsLabel: string;
+  newMemberValidationErrorText: string;
+  newMemberConfirmationBannerText: string;
 }
 
 const TENANTS: Record<string, TenantLabels> = {
@@ -49,6 +56,13 @@ const TENANTS: Record<string, TenantLabels> = {
     accessDeniedText: "Access denied.",
     minDepositErrorText: "Initial deposit must be at least $25.00.",
     confirmationBannerText: "Sub-account opened successfully.",
+    createNewMemberLinkLabel: "Create New Member",
+    createMemberSubmitLabel: "Create Member",
+    fullNameLabel: "Full Name",
+    initialCheckingLabel: "Initial Checking Deposit ($)",
+    initialSavingsLabel: "Initial Savings Deposit ($)",
+    newMemberValidationErrorText: "Full name is required, and initial deposits must be valid, non-negative amounts.",
+    newMemberConfirmationBannerText: "New member created successfully.",
   },
   // A second tenant running the identical underlying app -- rebranded copy AND an extra
   // promo banner row (shifts every position-based DOM path), but the same routes, the
@@ -73,6 +87,13 @@ const TENANTS: Record<string, TenantLabels> = {
     accessDeniedText: "Not authorized to view this member.",
     minDepositErrorText: "Minimum opening deposit is $25.00.",
     confirmationBannerText: "Account opened successfully.",
+    createNewMemberLinkLabel: "Enroll New Member",
+    createMemberSubmitLabel: "Enroll Member",
+    fullNameLabel: "Member Full Name",
+    initialCheckingLabel: "Opening Checking Deposit ($)",
+    initialSavingsLabel: "Opening Savings Deposit ($)",
+    newMemberValidationErrorText: "Member name is required, and opening deposits must be valid, non-negative amounts.",
+    newMemberConfirmationBannerText: "New member enrolled successfully.",
   },
 };
 

@@ -1,0 +1,54 @@
+<html>
+<head><title><%= labels.brandName %> &mdash; <%= labels.createNewMemberLinkLabel %></title></head>
+<body bgcolor="#d6d3ce">
+<table width="100%" cellpadding="4" cellspacing="0" border="0">
+  <tr bgcolor="#003366">
+    <td><font color="#ffffff" face="Arial" size="4"><b>Member Services Terminal</b></font></td>
+    <td align="right"><font color="#ffffff" face="Arial" size="2">Signed on as <%= username %> &nbsp; | &nbsp; <a href="/logout"><font color="#ffffff">Sign Off</font></a></font></td>
+  </tr>
+</table>
+<% if (labels.bannerText) { %>
+  <table width="100%" cellpadding="6" cellspacing="0" border="0">
+    <tr bgcolor="#e8edf5"><td><font face="Arial" size="2"><i><%= labels.bannerText %></i></font></td></tr>
+  </table>
+<% } %>
+<br/>
+<table cellpadding="2" cellspacing="0" border="0">
+  <tr><td><a href="/search">&laquo; Back to Search</a></td></tr>
+</table>
+<br/>
+<table cellpadding="8" cellspacing="0" border="1">
+  <tr>
+    <td>
+      <font face="Arial" size="3"><b><%= labels.createNewMemberLinkLabel %></b></font>
+      <br/><br/>
+      <% if (typeof error !== "undefined" && error) { %>
+        <table bgcolor="#f8d0d0" width="100%"><tr><td>
+          <font color="#7a0000"><b><%= error %></b></font>
+        </td></tr></table>
+        <br/>
+      <% } %>
+      <form method="POST" action="/members">
+        <table cellpadding="4" cellspacing="0" border="0">
+          <tr>
+            <td><label for="name"><%= labels.fullNameLabel %></label></td>
+            <td><input type="text" id="name" name="name" value="<%= name %>" /></td>
+          </tr>
+          <tr>
+            <td><label for="initialChecking"><%= labels.initialCheckingLabel %></label></td>
+            <td><input type="text" id="initialChecking" name="initialChecking" value="<%= initialChecking %>" /></td>
+          </tr>
+          <tr>
+            <td><label for="initialSavings"><%= labels.initialSavingsLabel %></label></td>
+            <td><input type="text" id="initialSavings" name="initialSavings" value="<%= initialSavings %>" /></td>
+          </tr>
+          <tr>
+            <td colspan="2" align="right"><input type="submit" value="<%= labels.createMemberSubmitLabel %>" /></td>
+          </tr>
+        </table>
+      </form>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

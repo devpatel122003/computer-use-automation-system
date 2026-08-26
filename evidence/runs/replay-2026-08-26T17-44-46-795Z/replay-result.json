@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-26T17-44-46-795Z",
+  "outcome": "validation_error",
+  "description": "The submitted name was blank, or an initial deposit amount wasn't a valid non-negative number.",
+  "stepId": "step-9",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-26T17-44-46-795Z/screenshots/001-outcome-validation_error.png"
+}

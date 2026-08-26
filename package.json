@@ -11,6 +11,7 @@
     "mock-bank": "tsx apps/mock-bank/src/server.ts",
     "mock-bank:northgate": "TENANT=northgate-cu PORT=4100 tsx apps/mock-bank/src/server.ts",
     "run-agent": "tsx src/cli/run-agent.ts",
+    "run-agent-create-member": "tsx src/cli/run-agent-create-member.ts",
     "escalation-resume-demo": "tsx src/cli/escalation-resume-demo.ts",
     "escalation-resume-replay-demo": "tsx src/cli/escalation-resume-replay-demo.ts",
     "replay": "tsx src/cli/replay.ts",

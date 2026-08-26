@@ -3,7 +3,7 @@ import session from "express-session";
 import helmet from "helmet";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { consumeSessionTimeoutArm, createSubAccount, findMember, findSubAccount, resetData, subAccounts } from "./data.js";
+import { consumeSessionTimeoutArm, createMember, createSubAccount, findMember, findSubAccount, resetData, subAccounts } from "./data.js";
 import { getTenantLabels } from "./tenants.js";
 
 declare module "express-session" {
@@ -111,6 +111,43 @@ app.get("/search", requireAuth, async (req, res) => {
     return;
   }
   res.redirect(`/members/${member.id}`);
+});
+
+// Registered before /members/:id so "new" is never mistaken for a member id.
+app.get("/members/new", requireAuth, (req, res) => {
+  res.render("newMember", { username: req.session.username, error: undefined, name: "", initialChecking: "", initialSavings: "" });
+});
+
+app.post("/members", requireAuth, (req, res) => {
+  const name = String(req.body.name ?? "").trim();
+  const rawChecking = String(req.body.initialChecking ?? "").trim();
+  const rawSavings = String(req.body.initialSavings ?? "").trim();
+  const checkingBalance = rawChecking === "" ? 0 : Number(rawChecking);
+  const savingsBalance = rawSavings === "" ? 0 : Number(rawSavings);
+
+  const invalid = !name || Number.isNaN(checkingBalance) || Number.isNaN(savingsBalance) || checkingBalance < 0 || savingsBalance < 0;
+  if (invalid) {
+    res.render("newMember", {
+      username: req.session.username,
+      error: labels.newMemberValidationErrorText,
+      name,
+      initialChecking: rawChecking,
+      initialSavings: rawSavings,
+    });
+    return;
+  }
+
+  const member = createMember(name, checkingBalance, savingsBalance);
+  res.redirect(`/members/new/confirm/${member.id}`);
+});
+
+app.get("/members/new/confirm/:id", requireAuth, (req, res) => {
+  const member = findMember(req.params.id);
+  if (!member) {
+    res.status(404).send("New-member confirmation record not found.");
+    return;
+  }
+  res.render("newMemberConfirmation", { username: req.session.username, member });
 });
 
 app.get("/members/:id", requireAuth, async (req, res) => {

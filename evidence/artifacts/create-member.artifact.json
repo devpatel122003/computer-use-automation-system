@@ -1,0 +1,416 @@
+{
+  "id": "create-member",
+  "name": "Create Member",
+  "description": "Signs on and enrolls a brand new member with an initial checking and savings balance, then confirms the result.",
+  "version": "1.0.0",
+  "createdAt": "2026-08-26T17:43:41.934Z",
+  "target": {
+    "appId": "mock-bank",
+    "surfaceType": "web",
+    "baseUrlPattern": "http://localhost:4000"
+  },
+  "inputParams": [
+    {
+      "name": "username",
+      "type": "string",
+      "required": true,
+      "sensitive": false,
+      "description": "Operator ID used to sign on to the terminal."
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "required": true,
+      "sensitive": true,
+      "description": "Operator password used to sign on to the terminal."
+    },
+    {
+      "name": "fullName",
+      "type": "string",
+      "required": true,
+      "sensitive": false,
+      "description": "Full name of the new member to enroll."
+    },
+    {
+      "name": "initialChecking",
+      "type": "string",
+      "required": true,
+      "sensitive": false,
+      "description": "Opening checking account balance in dollars."
+    },
+    {
+      "name": "initialSavings",
+      "type": "string",
+      "required": true,
+      "sensitive": false,
+      "description": "Opening savings account balance in dollars."
+    }
+  ],
+  "outputSchema": [
+    {
+      "name": "newMemberId",
+      "type": "string",
+      "sourceStepId": "step-10",
+      "description": "Extracted from text \"20001\""
+    }
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "actionType": "navigate",
+      "description": "Navigate to /login",
+      "url": "/login",
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-2",
+      "actionType": "type",
+      "description": "Type into textbox \"Operator ID\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "textbox",
+          "name": "Operator ID",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Operator ID",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "#username",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "input": {
+        "paramRef": "username"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-3",
+      "actionType": "type",
+      "description": "Type into textbox \"Password\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "textbox",
+          "name": "Password",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Password",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "#password",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "input": {
+        "paramRef": "password"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-4",
+      "actionType": "click",
+      "description": "Click button \"Sign On\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "button",
+          "name": "Sign On",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Sign On",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > input:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 1
+      },
+      "checkpoint": {
+        "kind": "url",
+        "expr": "/search",
+        "description": "Reached the search page after signing on."
+      }
+    },
+    {
+      "id": "step-5",
+      "actionType": "click",
+      "description": "Click link \"Create New Member\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "link",
+          "name": "Create New Member",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Create New Member",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(2) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > a:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 1
+      },
+      "checkpoint": {
+        "kind": "url",
+        "expr": "/members/new",
+        "description": "Reached the new-member enrollment form."
+      }
+    },
+    {
+      "id": "step-6",
+      "actionType": "type",
+      "description": "Type into textbox \"Full Name\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "textbox",
+          "name": "Full Name",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Full Name",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "#name",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "input": {
+        "paramRef": "fullName"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-7",
+      "actionType": "type",
+      "description": "Type into textbox \"Initial Checking Deposit ($)\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "textbox",
+          "name": "Initial Checking Deposit ($)",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Initial Checking Deposit ($)",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "#initialChecking",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "input": {
+        "paramRef": "initialChecking"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-8",
+      "actionType": "type",
+      "description": "Type into textbox \"Initial Savings Deposit ($)\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "textbox",
+          "name": "Initial Savings Deposit ($)",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Initial Savings Deposit ($)",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "#initialSavings",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "input": {
+        "paramRef": "initialSavings"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-9",
+      "actionType": "click",
+      "description": "Click button \"Create Member\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "button",
+          "name": "Create Member",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Create Member",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(3) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(4) > td:nth-of-type(1) > input:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "risk": "risky",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 1
+      },
+      "checkpoint": {
+        "kind": "url",
+        "expr": "/members/new/confirm/*",
+        "description": "Reached the new-member confirmation page."
+      }
+    },
+    {
+      "id": "step-10",
+      "actionType": "extract",
+      "description": "Extract value from text \"20001\"",
+      "locator": [
+        {
+          "strategy": "text",
+          "name": "20001",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "#newMemberIdValue",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "outputName": "newMemberId",
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    }
+  ],
+  "successCheckpoint": {
+    "kind": "text_match",
+    "expr": "New member created successfully",
+    "description": "The new-member confirmation banner is visible."
+  },
+  "knownOutcomes": [
+    {
+      "name": "validation_error",
+      "category": "business_outcome",
+      "detector": {
+        "kind": "text_match",
+        "expr": "Full name is required",
+        "description": "New-member form rejected the submission."
+      },
+      "description": "The submitted name was blank, or an initial deposit amount wasn't a valid non-negative number."
+    }
+  ]
+}

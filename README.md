@@ -86,9 +86,12 @@ guardrail design in one place.
 - `src/evidence/` — the structured JSONL run logger, plus `audit-report.ts` (not a Section 8
   stretch goal — a non-numbered addition that reformats the same redacted evidence every run
   already writes into a compliance/audit report for a bank's audit function).
-- `src/cli/` — the entry points (`run-agent`, `replay`, `approve`, `escalation-resume-demo`,
-  `escalation-resume-replay-demo`, `compliance-report`, `canary-check`) and the
-  `open-sub-account` capability's domain config (param mappings, checkpoints, known outcomes).
+- `src/cli/` — the entry points (`run-agent`, `run-agent-create-member`, `replay`, `approve`,
+  `escalation-resume-demo`, `escalation-resume-replay-demo`, `compliance-report`,
+  `canary-check`) and both capabilities' domain config (param mappings, checkpoints, known
+  outcomes) — `open-sub-account` (act on an existing member) and `create-member` (enroll a
+  brand new one), two independently recorded artifacts proving the system generalizes past
+  the first capability.
 - `apps/mock-bank/src/tenants.ts` + `config/tenant-overrides/` — a second tenant ("Northgate
   Credit Union") served from the *same* mock-bank app/routes/views with different copy and
   DOM structure, and the override file that adapts the base artifact to it.
@@ -540,9 +543,32 @@ you'll see `--allow-risky was requested but ignored: this artifact is approved, 
 UI-drift has capped its confidence...` and a normal confirmation prompt, distinguished in
 the console output from the separate "not enough of a track record yet" case.
 
+**10b. A second, independent capability -- enrolling a brand new member, not acting on an
+existing one.** Everything above this line is one capability's full lifecycle. This proves
+the system generalizes to a second real one, recorded with its own genuine discovery run:
+
+```bash
+npm run mock-bank    # if not already running
+npm run run-agent-create-member
+```
+
+Records `evidence/artifacts/create-member.artifact.json` -- its own typed contract
+(`fullName`, `initialChecking`, `initialSavings`), its own `validation_error` known outcome,
+its own draft→approved lifecycle. Replay it exactly like step 3-4b, just with this
+artifact and these params:
+
+```bash
+npx tsx src/cli/replay.ts --artifact evidence/artifacts/create-member.artifact.json \
+  --params '{"username":"demo_operator","password":"demo_password","fullName":"Priya Nair","initialChecking":"1000","initialSavings":"250"}' \
+  --allow-risky true
+```
+
 **11. Conversational front end.** The other half of "the agent-facing product decides what
 to do": natural language, mapped to a capability + typed args by one Gemini call, then
-invoked through the same capability API as step 9.
+invoked through the same capability API as step 9. With two real capabilities now
+discoverable, this is also where a request actually gets to choose -- "look up member
+10001" and "create a new member named ..." resolve to different capabilities, decided by
+the model, not hardcoded.
 
 ```bash
 npm run capability-api    # if not already running
