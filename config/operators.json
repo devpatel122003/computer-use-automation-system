@@ -1,0 +1,12 @@
+[
+  {
+    "id": "local-operator",
+    "apiKeyEnvVar": "CAPABILITY_API_KEY",
+    "dashboardUsername": "operator",
+    "dashboardPasswordEnvVar": "DASHBOARD_PASSWORD"
+  },
+  {
+    "id": "chat-ui-service",
+    "apiKeyEnvVar": "CHAT_UI_SERVICE_API_KEY"
+  }
+]

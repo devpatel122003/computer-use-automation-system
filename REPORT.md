@@ -1032,6 +1032,89 @@ freshly-launched, never-before-used WebKit profile: still failed, because macOS'
 turned out to be keyed by hostname at the OS network-stack level, not per browser-profile --
 this is what actually took the longest to nail down, not the header fix itself).
 
+**Four "go deeper" features, each closing a gap this report itself had already named as a
+next step, built in risk-ascending order with the same real-run discipline as everything
+above.**
+
+*Self-healing locator proposals.* Closes the loop between UI drift detection and
+cross-tenant reuse: `npm run propose-override` (`src/replay/self-heal.ts`) reads the same
+drift report `drift-report` already prints, and for every non-`extract` step with real
+drift, writes a draft `TenantOverride` scaffold with the right `stepId`/`strategy` already
+filled in and an explicit `TODO:` placeholder for the corrected `name` -- never a guessed
+value, since drift data only ever records which locator *strategy* won, never what the
+correct current accessible name actually is. Always written as a `.proposed.json` sibling,
+never the real filename `approve`/`replay --tenant-override` would pick up. Verified against
+this repo's own real, accumulated evidence: run against the exact historical drift case
+`docs/12-ui-drift-detection.md` already documents (tenant `northgate-cu-url-only-negative-
+control`), it reproduces the same three flagged steps and writes a schema-valid scaffold.
+
+*Trend-based canary alerting.* `computeStabilitySignal` only ever looks at an artifact's
+last-N replay outcomes of *any kind* -- a human debugging manually, the capability API, and
+`canary-check` itself all land in the same shared history, indistinguishably. A new,
+dedicated append-only log (`src/artifact/canary-history.ts`, default
+`evidence/canary-history.jsonl`) tracks `canary-check`'s *own* invocations specifically, and
+a new exit code (`3`, chosen because `2` was already reserved for an uncaught error --
+checked against the existing code, not assumed) fires when three or more of *this scheduled
+check's own* runs in a row have been unhealthy. Verified live: three real `canary-check`
+invocations against a deliberately-invalid `accountType` produced `failure` each time and a
+genuine exit code `3` on the third (confirmed via `$?` directly, not through a pipe, per
+this doc's own standing warning about that mistake); a fourth run with valid params reset
+the streak to `0`. The verification run's fabricated failures were caught polluting the
+*real* `evidence/artifacts/registry.json` (since `--registry` wasn't overridden) and
+reverted before moving on -- worth naming plainly rather than leaving a demo-visible
+artifact of a test run behind.
+
+*Real per-operator identity.* Replaces `CAPABILITY_API_KEY`/`DASHBOARD_PASSWORD`'s single-
+shared-secret model with a small named-operator registry (`config/operators.json` +
+`src/http/operator-registry.ts`): a presented credential now resolves to a specific
+operator id, which flows into the evidence log's `start` event and, from there, into the
+compliance audit report's new "Operator:" line -- closing the exact gap that report's own
+generated text, and `SECURITY.md`, already disclosed ("does not currently record *which
+human*..."). `requireBasicAuth` now actually checks the presented username against the
+registry instead of discarding it, which meant deliberately rewriting (not just extending)
+the two `api-key-auth.test.ts` cases that asserted "regardless of username" -- an
+intentional behavior change, called out rather than silently landed. Backward compatible by
+construction: a `local-operator` entry points at the exact same two env vars every existing
+`.env` already had, so a solo setup needs zero changes. The chat UI's own outbound call can
+now be attributed to a distinct `chat-ui-service` identity via `CHAT_UI_SERVICE_API_KEY`
+(falling back to `CAPABILITY_API_KEY` -- i.e. `local-operator` -- when unset). Verified live
+against the real running services both ways: with the env var unset, a chat-UI-triggered
+run's evidence log read `"operatorId":"local-operator"`; with it set (in both the chat UI's
+and the capability API's own environment -- it's a shared secret between them, same as
+`CAPABILITY_API_KEY` already is), the same flow read `"operatorId":"chat-ui-service"`.
+
+*Multi-step chained capability requests.* The chat UI can now execute *"create a new member
+named Priya Nair, then open a savings account for them with $100"* as two real, dependent
+invocations -- not a model-driven multi-call (a single Gemini turn can't produce step 2's
+real `memberId` at plan time, since it doesn't exist until step 1 runs; asking the model to
+supply one anyway would reintroduce the exact "invent a plausible value" failure mode this
+project already fixed once), but a deterministic text split (`src/frontend/chain.ts`) that
+plans both clauses through the existing, completely unmodified `planChatTurn()` and, only on
+one combined human confirmation, invokes step 1 for real, fails fast on anything but a clean
+`success`, and splices the real output into step 2's params before invoking it too. The
+allowed output→input pairs (`src/frontend/chain-mappings.ts`) are hand-authored, not
+name-matched -- `create-member`'s output is `newMemberId`, every consumer's input is
+`memberId`, and there's no honest automatic mapping between those. Two real bugs surfaced
+against real Gemini while building this, neither hypothetical: (1) planning the second
+clause in complete isolation, with no concrete member reference at all, made the model
+correctly refuse to call any function rather than invent one -- breaking chain detection
+outright, since both clauses must plan cleanly. Fixed with a placeholder hint appended only
+to the second clause's planning call, anchoring `memberId` syntactically without ever being
+trusted as real data (it's unconditionally overwritten before step 2 is invoked, regardless
+of what the model does with it). (2) That same placeholder then leaked into the human-facing
+confirmation text -- the same class of bug as the earlier blank-`username` confirmation
+issue, just a non-empty placeholder instead of an empty string -- fixed by hiding
+`mapping.toField` from step 2's displayed params. Also added `src/chat-ui/server.test.ts`,
+the first test file this server has ever had, testing the exported `handleChat()` handler
+directly with a fake req/res (the same style `api-key-auth.test.ts` already uses for
+Express middleware) rather than adding a new test dependency -- the first case locks in the
+pre-existing single-capability confirm flow's exact behavior before any chain-specific test
+is added, so a regression in old behavior would fail loudly. Verified live end-to-end
+against the real running services: the literal sentence above produced a clean combined
+confirmation, "yes" created a real member *and* a real, correctly-linked sub-account for
+that exact new member id (confirmed by reading `state.mock-bank.json` directly, not the
+chat reply), and a separate run replying "no" created nothing.
+
 **No longer cut, added in the production-hardening pass:** this endpoint now requires a real
 API key on every route except `/health` (`src/http/api-key-auth.ts`, timing-safe, fails
 closed and loud at startup if unconfigured), plus a rate limit specifically on `/invoke`

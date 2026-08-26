@@ -1,6 +1,7 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Request, Response } from "express";
 import { extractBearerToken, requireApiKey, requireBasicAuth } from "./api-key-auth.js";
+import type { OperatorConfigEntry } from "./operator-registry.js";
 
 function fakeReq(headers: Record<string, string>): Request {
   return { header: (name: string) => headers[name.toLowerCase()] } as unknown as Request;
@@ -39,26 +40,13 @@ describe("extractBearerToken", () => {
 });
 
 describe("requireApiKey", () => {
-  const ENV_VAR = "TEST_API_KEY_VAR";
-  let originalValue: string | undefined;
-
-  beforeEach(() => {
-    originalValue = process.env[ENV_VAR];
-  });
-
-  afterEach(() => {
-    if (originalValue === undefined) delete process.env[ENV_VAR];
-    else process.env[ENV_VAR] = originalValue;
-  });
-
-  it("throws at setup time if the expected env var isn't configured -- fails closed, not silently open", () => {
-    delete process.env[ENV_VAR];
-    expect(() => requireApiKey(ENV_VAR)).toThrow(/is not set/);
+  it("throws at setup time if no operator has a usable API key -- fails closed, not silently open", () => {
+    expect(() => requireApiKey([{ id: "alice" }])).toThrow(/No operator/);
   });
 
   it("returns 401 when no credential is provided", () => {
-    process.env[ENV_VAR] = "correct-key";
-    const middleware = requireApiKey(ENV_VAR);
+    process.env.TEST_AKA_1 = "correct-key";
+    const middleware = requireApiKey([{ id: "alice", apiKeyEnvVar: "TEST_AKA_1" }]);
     const req = fakeReq({});
     const res = fakeRes();
     const next = vi.fn();
@@ -70,8 +58,8 @@ describe("requireApiKey", () => {
   });
 
   it("returns 401 when the wrong key is provided via Authorization", () => {
-    process.env[ENV_VAR] = "correct-key";
-    const middleware = requireApiKey(ENV_VAR);
+    process.env.TEST_AKA_2 = "correct-key";
+    const middleware = requireApiKey([{ id: "alice", apiKeyEnvVar: "TEST_AKA_2" }]);
     const req = fakeReq({ authorization: "Bearer wrong-key" });
     const res = fakeRes();
     const next = vi.fn();
@@ -82,9 +70,9 @@ describe("requireApiKey", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it("calls next() when the correct key is provided via Authorization: Bearer", () => {
-    process.env[ENV_VAR] = "correct-key";
-    const middleware = requireApiKey(ENV_VAR);
+  it("calls next() and sets req.operatorId when the correct key is provided via Authorization: Bearer", () => {
+    process.env.TEST_AKA_3 = "correct-key";
+    const middleware = requireApiKey([{ id: "alice", apiKeyEnvVar: "TEST_AKA_3" }]);
     const req = fakeReq({ authorization: "Bearer correct-key" });
     const res = fakeRes();
     const next = vi.fn();
@@ -93,11 +81,12 @@ describe("requireApiKey", () => {
 
     expect(next).toHaveBeenCalledOnce();
     expect(res.statusCode).toBeUndefined();
+    expect(req.operatorId).toBe("alice");
   });
 
   it("also accepts the key via the X-API-Key header", () => {
-    process.env[ENV_VAR] = "correct-key";
-    const middleware = requireApiKey(ENV_VAR);
+    process.env.TEST_AKA_4 = "correct-key";
+    const middleware = requireApiKey([{ id: "alice", apiKeyEnvVar: "TEST_AKA_4" }]);
     const req = fakeReq({ "x-api-key": "correct-key" });
     const res = fakeRes();
     const next = vi.fn();
@@ -108,8 +97,8 @@ describe("requireApiKey", () => {
   });
 
   it("rejects a key that differs only in length from the correct one, without throwing", () => {
-    process.env[ENV_VAR] = "correct-key";
-    const middleware = requireApiKey(ENV_VAR);
+    process.env.TEST_AKA_5 = "correct-key";
+    const middleware = requireApiKey([{ id: "alice", apiKeyEnvVar: "TEST_AKA_5" }]);
     const req = fakeReq({ authorization: "Bearer short" });
     const res = fakeRes();
     const next = vi.fn();
@@ -117,29 +106,35 @@ describe("requireApiKey", () => {
     expect(() => middleware(req, res, next)).not.toThrow();
     expect(res.statusCode).toBe(401);
   });
+
+  it("resolves each of several operators to their own distinct id", () => {
+    process.env.TEST_AKA_ALICE = "alice-key";
+    process.env.TEST_AKA_BOB = "bob-key";
+    const middleware = requireApiKey([
+      { id: "alice", apiKeyEnvVar: "TEST_AKA_ALICE" },
+      { id: "bob", apiKeyEnvVar: "TEST_AKA_BOB" },
+    ]);
+
+    const reqAlice = fakeReq({ authorization: "Bearer alice-key" });
+    middleware(reqAlice, fakeRes(), vi.fn());
+    expect(reqAlice.operatorId).toBe("alice");
+
+    const reqBob = fakeReq({ authorization: "Bearer bob-key" });
+    middleware(reqBob, fakeRes(), vi.fn());
+    expect(reqBob.operatorId).toBe("bob");
+  });
 });
 
 describe("requireBasicAuth", () => {
-  const ENV_VAR = "TEST_DASHBOARD_PASSWORD_VAR";
-  let originalValue: string | undefined;
+  const entries: OperatorConfigEntry[] = [{ id: "alice", dashboardUsername: "alice", dashboardPasswordEnvVar: "TEST_DASH_ALICE" }];
 
-  beforeEach(() => {
-    originalValue = process.env[ENV_VAR];
-  });
-
-  afterEach(() => {
-    if (originalValue === undefined) delete process.env[ENV_VAR];
-    else process.env[ENV_VAR] = originalValue;
-  });
-
-  it("throws at setup time if the expected env var isn't configured", () => {
-    delete process.env[ENV_VAR];
-    expect(() => requireBasicAuth(ENV_VAR)).toThrow(/is not set/);
+  it("throws at setup time if no operator has dashboard credentials configured", () => {
+    expect(() => requireBasicAuth([{ id: "alice" }])).toThrow(/No operator/);
   });
 
   it("returns 401 with a WWW-Authenticate header when no credential is provided -- browsers use this to prompt", () => {
-    process.env[ENV_VAR] = "correct-password";
-    const middleware = requireBasicAuth(ENV_VAR);
+    process.env.TEST_DASH_ALICE = "correct-password";
+    const middleware = requireBasicAuth(entries);
     const req = fakeReq({});
     const res = fakeRes();
     const next = vi.fn();
@@ -151,27 +146,66 @@ describe("requireBasicAuth", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it("returns 401 when the password is wrong, regardless of username", () => {
-    process.env[ENV_VAR] = "correct-password";
-    const middleware = requireBasicAuth(ENV_VAR);
-    const req = fakeReq({ authorization: basicAuthHeader("operator", "wrong-password") });
+  it("returns 401 when the username matches but the password is wrong", () => {
+    process.env.TEST_DASH_ALICE = "correct-password";
+    const middleware = requireBasicAuth(entries);
+    const req = fakeReq({ authorization: basicAuthHeader("alice", "wrong-password") });
     const res = fakeRes();
     const next = vi.fn();
 
     middleware(req, res, next);
 
     expect(res.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
   });
 
-  it("calls next() when the correct password is provided, regardless of username", () => {
-    process.env[ENV_VAR] = "correct-password";
-    const middleware = requireBasicAuth(ENV_VAR);
-    const req = fakeReq({ authorization: basicAuthHeader("anyone", "correct-password") });
+  it("returns 401 when the password is correct but the username doesn't match any configured operator", () => {
+    process.env.TEST_DASH_ALICE = "correct-password";
+    const middleware = requireBasicAuth(entries);
+    const req = fakeReq({ authorization: basicAuthHeader("nobody", "correct-password") });
+    const res = fakeRes();
+    const next = vi.fn();
+
+    middleware(req, res, next);
+
+    expect(res.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("calls next() and sets req.operatorId when both username and password match a configured operator", () => {
+    process.env.TEST_DASH_ALICE = "correct-password";
+    const middleware = requireBasicAuth(entries);
+    const req = fakeReq({ authorization: basicAuthHeader("alice", "correct-password") });
     const res = fakeRes();
     const next = vi.fn();
 
     middleware(req, res, next);
 
     expect(next).toHaveBeenCalledOnce();
+    expect(req.operatorId).toBe("alice");
+  });
+
+  it("resolves two operators with distinct username/password pairs independently, rejecting a cross-mix", () => {
+    process.env.TEST_DASH_ALICE_2 = "alice-pw";
+    process.env.TEST_DASH_BOB_2 = "bob-pw";
+    const middleware = requireBasicAuth([
+      { id: "alice", dashboardUsername: "alice", dashboardPasswordEnvVar: "TEST_DASH_ALICE_2" },
+      { id: "bob", dashboardUsername: "bob", dashboardPasswordEnvVar: "TEST_DASH_BOB_2" },
+    ]);
+
+    // alice's username with bob's password: rejected.
+    const mixed = fakeReq({ authorization: basicAuthHeader("alice", "bob-pw") });
+    const mixedRes = fakeRes();
+    middleware(mixed, mixedRes, vi.fn());
+    expect(mixedRes.statusCode).toBe(401);
+
+    // each operator's own correct pairing resolves their own id.
+    const reqAlice = fakeReq({ authorization: basicAuthHeader("alice", "alice-pw") });
+    middleware(reqAlice, fakeRes(), vi.fn());
+    expect(reqAlice.operatorId).toBe("alice");
+
+    const reqBob = fakeReq({ authorization: basicAuthHeader("bob", "bob-pw") });
+    middleware(reqBob, fakeRes(), vi.fn());
+    expect(reqBob.operatorId).toBe("bob");
   });
 });

@@ -58,6 +58,7 @@ even though the artifact's *lifetime* confidence score might still read as "gene
 | The artifact has never been replayed before | Reported as not healthy — "healthy" would overclaim confidence for something that's never actually been run, even though it hasn't technically failed either. |
 | The artifact isn't approved yet, or its drift-adjusted confidence has degraded | The canary's own replay still runs its risky step through the exact same confidence circuit breaker (see [`10-confidence-and-approval.md`](10-confidence-and-approval.md)) as any other caller — if that step gets declined because there's no one there to confirm it, that's an honest part of this run's own health signal, not a special case the canary is exempt from. |
 | An artifact has a great lifetime confidence score but just failed its last 3 runs in a row | The lifetime score alone would still call it "generally reliable" — stability is precisely the tool that catches this and reports something different. |
+| This scheduled health check itself has failed 3 (or more) times in a row, specifically | Reported as `REGRESSING`, a distinct signal from "flaky this window" — the canary's own recent invocations are tracked separately from any other caller's replay traffic against the same artifact, see "Trend over time" below. |
 
 ---
 
@@ -152,7 +153,8 @@ console.log(
     `${stability.recentFailureCount} failed -- ${stability.healthy ? "HEALTHY" : stability.isFlaky ? "FLAKY" : "UNHEALTHY"}` +
     `${stability.justDegraded ? " (just degraded -- this is new)" : ""}`
 );
-process.exitCode = stability.healthy ? 0 : 1;
+console.log(`Trend (${trend.totalChecks} canary check(s) recorded): ${trend.consecutiveUnhealthy} consecutive unhealthy check(s)${trend.isRegressing ? " -- REGRESSING" : ""}`);
+process.exitCode = trend.isRegressing ? 3 : stability.healthy ? 0 : 1;
 ```
 
 The rationale, stated directly in the source comment: "a canary that could bypass the trust
@@ -161,9 +163,51 @@ in production." A canary's entire value is telling the truth about the *real* sy
 including the parts of that health that come from the guardrails themselves declining to act
 unattended.
 
+### Trend over time, not just last-5-runs
+
+`computeStabilitySignal` above has a real, deliberate limitation: it reads the last N entries of
+the registry's `ReplayHistoryEntry[]`, which is *shared* history — every caller's replays (a
+human running `replay` by hand, the capability API, `canary-check` itself) land in the same
+list, indistinguishably. That's the right data source for "how healthy does this artifact look
+right now, from any traffic," but it can't answer a narrower, calendar-time question a real
+on-call rotation cares about: "has the *scheduled health check itself* been failing, run after
+run, over its own timeline" — three unrelated manual replays failing during active debugging
+looks identical to that same window as three consecutive *canary* failures, even though only one
+of those is a real, unattended production signal worth paging someone over.
+
+`src/artifact/canary-history.ts` is a small, dedicated, append-only log of `canary-check`'s own
+invocations specifically — one JSONL line per run, filtered by artifact id + content fingerprint,
+completely separate from the registry:
+
+```ts
+export interface CanaryCheckRecord {
+  timestamp: string;
+  artifactId: string;
+  fingerprint: string;
+  status: "success" | "business_outcome" | "failure";
+}
+export function computeCanaryTrend(history: CanaryCheckRecord[]): {
+  totalChecks: number;
+  consecutiveUnhealthy: number; // back-to-back non-clean checks, ending at the most recent one
+  isRegressing: boolean;        // consecutiveUnhealthy >= 3
+}
+```
+
+Every `canary-check` invocation appends its own real outcome to this log (default
+`evidence/canary-history.jsonl`, overridable via `--canary-history <path>`) right after
+recording into the shared registry, then computes the trend from its own history alone. A
+recovery (one clean check breaking a failure streak) resets `consecutiveUnhealthy` to `0`
+immediately — the trend reflects the *current* streak, not a lifetime tally. Verified for real,
+not just reasoned about: three consecutive real canary runs against a deliberately-invalid
+account type produced `failure` each time and a genuine exit code `3` on the third one, and a
+fourth run with valid params reset the streak to `0` and exited `1` (still not `HEALTHY` by the
+existing stability window, but no longer `REGRESSING`) — confirmed by checking `$?` directly,
+per this doc's own existing warning about piping swallowing the real exit code.
+
 ### Where
 
 - `src/artifact/stability.ts` — `computeStabilitySignal()`, pure logic over an existing history array
+- `src/artifact/canary-history.ts` — `appendCanaryRecord()`/`loadCanaryHistory()`/`computeCanaryTrend()`, the canary-specific trend-over-time log
 - `src/cli/canary-check.ts` — the real, schedulable health-check invocation
 - `src/artifact/registry.ts` — the shared `ReplayHistoryEntry[]` both confidence and stability read
 - `src/replay/execution-policy.ts` — the same circuit breaker gate the canary goes through, not a looser variant
@@ -212,9 +256,12 @@ honestly rather than filtering them out.
 - **Uses default demo params unless `--params` is passed**, so a given canary run is only
   representative of the specific capability and input values it was actually invoked with — it
   is not a synthetic multi-scenario fuzz test.
-- **Exit codes: `0` healthy, `1` unhealthy/flaky, `2` on an uncaught error** (e.g. the artifact
-  file itself is missing or invalid) — distinguishing "the system told us it's unhealthy" from
-  "the health check itself couldn't even run."
+- **Exit codes: `0` healthy, `1` unhealthy/flaky this window, `3` REGRESSING (this scheduled
+  check's own last several invocations have been unhealthy in a row — see "Trend over time"
+  above), `2` on an uncaught error** (e.g. the artifact file itself is missing or invalid) —
+  distinguishing "the system told us it's unhealthy," "this has been failing for a while
+  specifically as a scheduled check," and "the health check itself couldn't even run" as three
+  different signals, not one generic non-zero code.
 
 ## Related docs
 

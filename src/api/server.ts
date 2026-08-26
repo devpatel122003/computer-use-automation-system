@@ -54,7 +54,7 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.use(requireApiKey("CAPABILITY_API_KEY"));
+app.use(requireApiKey());
 
 // Invocation can trigger a real (guardrail-checked) action against the target system --
 // throttled independently of read traffic so a runaway/malicious caller can't exhaust the
@@ -135,6 +135,7 @@ app.post("/capabilities/:id/invoke", invokeLimiter, async (req, res) => {
     phase: "start",
     summary: `Capability API invoked ${artifact.name} v${artifact.version}`,
     detail: {
+      operatorId: req.operatorId,
       fingerprint: entry.fingerprint,
       tenantId,
       approvalState: entry.approvalState,

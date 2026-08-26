@@ -34,8 +34,10 @@ npm run dashboard
 # -> Capability dashboard listening on http://localhost:4600
 ```
 
-Opening `http://localhost:4600` in a browser pops up a native username/password prompt (any
-username, and the password from `DASHBOARD_PASSWORD` in `.env`) — that's real HTTP Basic
+Opening `http://localhost:4600` in a browser pops up a native username/password prompt --
+username `operator` and the password from `DASHBOARD_PASSWORD` in `.env` for the default
+solo-dev setup (see `config/operators.json`; the username now matters and is checked
+against a named-operator registry, not accepted as-is) -- that's real HTTP Basic
 authentication, not a placeholder login form. Once past it, here is what the page actually
 showed when this doc was written, read straight from this repo's own `evidence/` folder:
 
@@ -94,10 +96,13 @@ distinction explicitly.
 Three files, each with one job:
 
 - **`src/dashboard/server.ts`** — the Express app. Binds `DASHBOARD_PORT` (default `4600`),
-  applies `helmet()` and a structured request log, leaves `/health` open (for container/
-  orchestrator checks), and gates every other route behind `requireBasicAuth("DASHBOARD_PASSWORD")`
-  from `src/http/api-key-auth.ts`. The one real route, `GET /`, calls `buildCapabilityViews()`
-  and hands the result to `renderDashboard()`.
+  applies `helmet()` and a structured request log (which now also logs `operatorId`, once
+  auth resolves it), leaves `/health` open (for container/orchestrator checks), and gates
+  every other route behind `requireBasicAuth()` from `src/http/api-key-auth.ts` -- which
+  resolves the presented username/password against the named operators in
+  `config/operators.json` rather than accepting any username with the right password (see
+  [`19-security-and-authentication.md`](19-security-and-authentication.md)). The one real
+  route, `GET /`, calls `buildCapabilityViews()` and hands the result to `renderDashboard()`.
 - **`src/dashboard/metrics.ts`** — pure functions turning a run's log events into numbers:
   `computeRunMetrics(runId, events)` returns `{ runId, durationMs, llmCalls }`, where
   `durationMs` is `lastEvent.ts - firstEvent.ts` (every run log is append-only and already
@@ -158,6 +163,7 @@ never desync it.
 - `src/artifact/catalog.ts` — `loadCapabilityCatalog`, `loadTenantVariants`
 - `src/replay/drift.ts` / `src/replay/drift-loader.ts` — `summarizeDrift`, `extractStepMatches`, `driftAdjustedLabel`, `loadMatchingRunLogs`
 - `src/http/api-key-auth.ts` — `requireBasicAuth` (shared with nothing else; the Capability API uses `requireApiKey` instead)
+- `config/operators.json` / `src/http/operator-registry.ts` — the named-operator list `requireBasicAuth`/`requireApiKey` both resolve credentials against
 - `evidence/artifacts/` and `evidence/runs/` — the only things this page ever reads
 
 ### Worked technical example
@@ -178,8 +184,12 @@ Replay vs. discovery     4.8x faster   6.9 model call(s) avoided, every invocati
 
 ### Edge cases & failure modes
 
-- **`DASHBOARD_PASSWORD` unset** — `requireBasicAuth` throws at process startup rather than
-  serving the route unauthenticated; the process never comes up.
+- **No configured operator has dashboard credentials at all** (e.g. `DASHBOARD_PASSWORD`
+  unset, for the default `local-operator` entry) — `requireBasicAuth` throws at process
+  startup rather than serving the route unauthenticated; the process never comes up.
+- **A username that matches no configured operator** — rejected even with an otherwise
+  correct password for a different operator; see
+  [`19-security-and-authentication.md`](19-security-and-authentication.md).
 - **No artifacts under `evidence/artifacts/`** — `renderDashboard([])` renders
   `"No capability artifacts found under evidence/artifacts."` instead of an empty or broken page.
 - **A discovery run's log is a single `phase: "error"` line** (a real example in this repo's

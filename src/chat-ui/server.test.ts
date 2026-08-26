@@ -1,0 +1,243 @@
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { Request, Response } from "express";
+
+/**
+ * Tests `handleChat` (the exported /chat route handler) directly with a fake req/res --
+ * the same style src/http/api-key-auth.test.ts already uses for Express middleware. No new
+ * test dependency (e.g. supertest) needed: underneath the HTTP framing, this is a
+ * deterministic session state machine over `req.body`/`req.session`, both trivially
+ * fakeable. `@google/genai` is mocked at the module level (via a mutable `router`, since
+ * different tests need different scripted model responses) so no real Gemini call is ever
+ * made; the capability API is a mocked `fetch`, same pattern as chat-turn.test.ts.
+ */
+
+type RouterResult = { name: string; args: Record<string, unknown> } | { text: string };
+let router: (utterance: string) => RouterResult = () => ({ text: "unused" });
+
+vi.mock("@google/genai", () => {
+  // planner.ts also imports Type/FunctionCallingConfigMode from this same module, only to
+  // build the outgoing request payload -- this mock's generateContent never inspects them
+  // (it only reads req.contents), so plain sentinel values are enough; no need for the
+  // real enums.
+  function GoogleGenAI(this: unknown) {
+    return {
+      models: {
+        generateContent: async (req: { contents: Array<{ parts: Array<{ text?: string }> }> }) => {
+          const utterance = req.contents[req.contents.length - 1]?.parts?.[0]?.text ?? "";
+          const result = router(utterance);
+          if ("text" in result) return { candidates: [{ content: { parts: [{ text: result.text }] } }] };
+          return { candidates: [{ content: { parts: [{ functionCall: { name: result.name, args: result.args, id: "call-1" } }] } }] };
+        },
+      },
+    };
+  }
+  return {
+    GoogleGenAI,
+    Type: { STRING: "STRING", NUMBER: "NUMBER", BOOLEAN: "BOOLEAN", OBJECT: "OBJECT" },
+    FunctionCallingConfigMode: { AUTO: "AUTO", ANY: "ANY", NONE: "NONE" },
+  };
+});
+
+let handleChat: typeof import("./server.js").handleChat;
+
+beforeAll(async () => {
+  process.env.GEMINI_API_KEY = "test-gemini-key";
+  process.env.CAPABILITY_API_KEY = "test-capability-key";
+  delete process.env.CHAT_UI_SERVICE_API_KEY;
+  const mod = await import("./server.js");
+  handleChat = mod.handleChat;
+});
+
+const CATALOG = [
+  { id: "create-member", description: "Enrolls a new member.", hasRiskyStep: true, inputParams: [{ name: "fullName", type: "string", required: true }] },
+  {
+    id: "open-sub-account",
+    description: "Opens a sub-account for a member.",
+    hasRiskyStep: true,
+    inputParams: [
+      { name: "memberId", type: "string", required: true },
+      { name: "accountType", type: "string", required: true },
+      { name: "initialDeposit", type: "string", required: true },
+    ],
+  },
+  { id: "check-balance", description: "Reads a member's balance.", hasRiskyStep: false, inputParams: [{ name: "memberId", type: "string", required: true }] },
+];
+
+function stubFetch(invokeResponses: Record<string, unknown> = {}) {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    calls.push({ url, init });
+    if (String(url).endsWith("/capabilities")) return new Response(JSON.stringify(CATALOG), { status: 200 });
+    const match = /\/capabilities\/([^/]+)\/invoke$/.exec(String(url));
+    const id = match?.[1] ?? "";
+    return new Response(JSON.stringify(invokeResponses[id] ?? { status: "success", outputs: {} }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return calls;
+}
+
+function fakeReq(message: string, session: Record<string, unknown> = {}): Request {
+  return { body: { message }, session } as unknown as Request;
+}
+
+function fakeRes(): Response & { statusCode?: number; body?: unknown } {
+  const res: Partial<Response> & { statusCode?: number; body?: unknown } = {};
+  res.status = vi.fn((code: number) => {
+    res.statusCode = code;
+    return res as Response;
+  }) as unknown as Response["status"];
+  res.json = vi.fn((body: unknown) => {
+    res.body = body;
+    return res as Response;
+  }) as unknown as Response["json"];
+  return res as Response & { statusCode?: number; body?: unknown };
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("handleChat -- regression lock: the existing single-capability confirm flow must be unaffected by chaining", () => {
+  it("a risky, non-chained request gets a confirmation, not an immediate invocation", async () => {
+    const calls = stubFetch();
+    router = () => ({ name: "invoke__create_member", args: { reasoning: "r", fullName: "Dave" } });
+
+    const session: Record<string, unknown> = {};
+    const res = fakeRes();
+    await handleChat(fakeReq("create a new member named Dave", session), res);
+
+    expect(res.body).toMatchObject({ reply: expect.stringContaining('"create-member"') });
+    expect(session.pendingPlan).toBeDefined();
+    expect(session.pendingChain).toBeUndefined();
+    // Only the discovery call happened -- no invoke yet.
+    expect(calls.filter((c) => c.url.includes("/invoke"))).toHaveLength(0);
+  });
+
+  it("confirming a pending single plan with 'yes' actually invokes it", async () => {
+    stubFetch({ "create-member": { status: "success", outputs: { newMemberId: "20001" } } });
+    router = () => ({ name: "invoke__create_member", args: { reasoning: "r", fullName: "Dave" } });
+
+    const session: Record<string, unknown> = {};
+    await handleChat(fakeReq("create a new member named Dave", session), fakeRes());
+
+    const confirmRes = fakeRes();
+    await handleChat(fakeReq("yes", session), confirmRes);
+
+    expect(confirmRes.body).toMatchObject({ reply: expect.stringContaining("newMemberId = 20001") });
+    expect(session.pendingPlan).toBeUndefined();
+  });
+
+  it("declining a pending single plan with 'no' invokes nothing", async () => {
+    const calls = stubFetch();
+    router = () => ({ name: "invoke__create_member", args: { reasoning: "r", fullName: "Dave" } });
+
+    const session: Record<string, unknown> = {};
+    await handleChat(fakeReq("create a new member named Dave", session), fakeRes());
+
+    const declineRes = fakeRes();
+    await handleChat(fakeReq("no", session), declineRes);
+
+    expect(session.pendingPlan).toBeUndefined();
+    expect(calls.filter((c) => c.url.includes("/invoke"))).toHaveLength(0);
+  });
+});
+
+describe("handleChat -- multi-step chained requests", () => {
+  function chainRouter(utterance: string): RouterResult {
+    return utterance.includes("Dave")
+      ? { name: "invoke__create_member", args: { reasoning: "r", fullName: "Dave" } }
+      // Real Gemini reliably fills memberId with the placeholder hint text (see chain.ts's
+      // MEMBER_ID_PLACEHOLDER_HINT) rather than omitting the field -- scripted here to
+      // match observed real behavior, not an idealized one.
+      : { name: "invoke__open_sub_account", args: { reasoning: "r", memberId: "CHAIN-STEP-1-MEMBER-ID", accountType: "Savings", initialDeposit: "100" } };
+  }
+
+  it("a chained message produces one combined confirmation and holds pendingChain, not pendingPlan -- and never shows the internal placeholder value", async () => {
+    stubFetch();
+    router = chainRouter;
+
+    const session: Record<string, unknown> = {};
+    const res = fakeRes();
+    await handleChat(fakeReq("create a new member named Dave, then open a savings account for them with $100", session), res);
+
+    expect(res.body).toMatchObject({
+      reply: expect.stringMatching(/"create-member".*"open-sub-account"/s),
+    });
+    expect(session.pendingChain).toBeDefined();
+    expect(session.pendingPlan).toBeUndefined();
+    // Regression: a real bug caught live -- the placeholder value used to anchor step 2's
+    // planning call (chain.ts) isn't a real value yet and must never be shown to the human
+    // as if it were one, the same "don't show a not-yet-real value" fix as the earlier
+    // blank-username confirmation bug.
+    expect((res.body as { reply: string }).reply).not.toContain("CHAIN-STEP-1-MEMBER-ID");
+  });
+
+  it("confirming with 'yes' invokes step 1, then splices its REAL output into step 2's params before invoking step 2", async () => {
+    const calls = stubFetch({
+      "create-member": { status: "success", outputs: { newMemberId: "20001" } },
+      "open-sub-account": { status: "success", outputs: { confirmationNumber: "SA-00099" } },
+    });
+    router = chainRouter;
+
+    const session: Record<string, unknown> = {};
+    await handleChat(fakeReq("create a new member named Dave, then open a savings account for them with $100", session), fakeRes());
+
+    const confirmRes = fakeRes();
+    await handleChat(fakeReq("yes", session), confirmRes);
+
+    expect(confirmRes.body).toMatchObject({
+      reply: expect.stringMatching(/newMemberId = 20001.*confirmationNumber = SA-00099/s),
+    });
+
+    const openInvoke = calls.find((c) => c.url.includes("/open-sub-account/invoke"));
+    const body = JSON.parse(String(openInvoke?.init?.body)) as { params: Record<string, string> };
+    expect(body.params.memberId).toBe("20001");
+    expect(session.pendingChain).toBeUndefined();
+  });
+
+  it("fails fast on a step-1 hard failure -- step 2's invoke endpoint is never called", async () => {
+    const calls = stubFetch({ "create-member": { status: "failure", stepId: "step-3", expected: "x", observed: "y" } });
+    router = chainRouter;
+
+    const session: Record<string, unknown> = {};
+    await handleChat(fakeReq("create a new member named Dave, then open a savings account for them with $100", session), fakeRes());
+
+    const confirmRes = fakeRes();
+    await handleChat(fakeReq("yes", session), confirmRes);
+
+    expect(confirmRes.body).toMatchObject({ reply: expect.stringContaining("didn't continue to the next step") });
+    expect(calls.filter((c) => c.url.includes("/open-sub-account/invoke"))).toHaveLength(0);
+  });
+
+  it("fails fast on a step-1 business_outcome (not just a hard failure) -- step 2's invoke endpoint is never called", async () => {
+    const calls = stubFetch({ "create-member": { status: "business_outcome", outcome: "validation_error", description: "bad input" } });
+    router = chainRouter;
+
+    const session: Record<string, unknown> = {};
+    await handleChat(fakeReq("create a new member named Dave, then open a savings account for them with $100", session), fakeRes());
+
+    const confirmRes = fakeRes();
+    await handleChat(fakeReq("yes", session), confirmRes);
+
+    expect(confirmRes.body).toMatchObject({ reply: expect.stringContaining("didn't continue to the next step") });
+    expect(calls.filter((c) => c.url.includes("/open-sub-account/invoke"))).toHaveLength(0);
+  });
+
+  it("declining a pending chain with 'no' invokes neither step, and a following ordinary message plans normally", async () => {
+    const calls = stubFetch();
+    router = chainRouter;
+
+    const session: Record<string, unknown> = {};
+    await handleChat(fakeReq("create a new member named Dave, then open a savings account for them with $100", session), fakeRes());
+
+    const declineRes = fakeRes();
+    await handleChat(fakeReq("no", session), declineRes);
+    expect(session.pendingChain).toBeUndefined();
+    expect(calls.filter((c) => c.url.includes("/invoke"))).toHaveLength(0);
+
+    router = () => ({ name: "invoke__create_member", args: { reasoning: "r", fullName: "Someone Else" } });
+    const nextRes = fakeRes();
+    await handleChat(fakeReq("create a new member named Someone Else", session), nextRes);
+    expect(session.pendingPlan).toBeDefined();
+  });
+});

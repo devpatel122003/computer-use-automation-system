@@ -106,7 +106,7 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.use(requireBasicAuth("DASHBOARD_PASSWORD"));
+app.use(requireBasicAuth());
 
 app.get("/", (_req, res) => {
   res.send(renderDashboard(buildCapabilityViews()));

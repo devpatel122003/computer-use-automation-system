@@ -56,6 +56,18 @@ describe("buildRunAuditEntry", () => {
     const entry = buildRunAuditEntry("replay-x", events, undefined, "evidence/runs/replay-x");
     expect(entry?.outcome).toMatch(/incomplete/);
   });
+
+  it("includes operatorId when the start event's detail carries one (a capability-API-triggered run)", () => {
+    const events = [evt("2026-01-01T00:00:00.000Z", "start", { operatorId: "local-operator", fingerprint: "fp1" })];
+    const entry = buildRunAuditEntry("replay-x", events, { status: "success" }, "evidence/runs/replay-x");
+    expect(entry?.operatorId).toBe("local-operator");
+  });
+
+  it("leaves operatorId undefined when absent (a discovery run or a local CLI invocation, neither of which authenticates)", () => {
+    const events = [evt("2026-01-01T00:00:00.000Z", "start", { fingerprint: "fp1" })];
+    const entry = buildRunAuditEntry("replay-x", events, { status: "success" }, "evidence/runs/replay-x");
+    expect(entry?.operatorId).toBeUndefined();
+  });
 });
 
 describe("renderAuditReportMarkdown", () => {
@@ -82,5 +94,17 @@ describe("renderAuditReportMarkdown", () => {
     const entries = [buildRunAuditEntry("discovery-a", [evt("2026-01-01T00:00:00.000Z", "start", { goal: "look up *member* [10001]" })], { status: "finished" }, "d/a")!];
     const report = renderAuditReportMarkdown(entries, "2026-01-01T00:00:00.000Z");
     expect(report).toContain("look up \\*member\\* \\[10001\\]");
+  });
+
+  it("prints an Operator line when present", () => {
+    const entries = [buildRunAuditEntry("replay-a", [evt("2026-01-01T00:00:00.000Z", "start", { operatorId: "alice" })], { status: "success" }, "d/a")!];
+    const report = renderAuditReportMarkdown(entries, "2026-01-01T00:00:00.000Z");
+    expect(report).toContain("- Operator: alice");
+  });
+
+  it("omits the Operator line when absent", () => {
+    const entries = [buildRunAuditEntry("replay-a", [evt("2026-01-01T00:00:00.000Z", "start", {})], { status: "success" }, "d/a")!];
+    const report = renderAuditReportMarkdown(entries, "2026-01-01T00:00:00.000Z");
+    expect(report).not.toContain("- Operator:");
   });
 });

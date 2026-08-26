@@ -177,8 +177,43 @@ raw report for anyone who wants to see it — just excluded from the decision th
 - `src/replay/drift.ts` — pure logic: `extractStepMatches`, `summarizeDrift`, `driftAdjustedLabel` (no filesystem access, so its unit tests don't need one)
 - `src/replay/drift-loader.ts` — the I/O layer on top: reads `evidence/runs/*/log.jsonl`, filters by fingerprint and declared tenant
 - `src/cli/drift-report.ts` — the CLI entry point
+- `src/replay/self-heal.ts` — turns a drift report into a draft override *proposal*; see below
+- `src/cli/propose-override.ts` — the CLI entry point for the above
 - `src/replay/execution-policy.ts` — where `driftAdjustedLabel`'s output becomes an actual gate (`effectiveAllowRisky`)
 - `src/dashboard/server.ts` — renders the same signal as a badge, plus a per-tenant cross-tenant comparison table
+
+### Self-healing proposals: closing the loop with cross-tenant reuse
+
+Drift detection tells a human *which* steps need attention; cross-tenant reuse
+([`11-cross-tenant-reuse.md`](11-cross-tenant-reuse.md)) already knows *how* to patch a
+locator. Until now, connecting the two was entirely manual — read the drift-report printout,
+figure out which `stepId`/`strategy` pairs need a `LocatorOverride`, hand-type the
+`TenantOverride` JSON. `src/replay/self-heal.ts` + `npm run propose-override` automate the
+first half of that (the *shape* of the fix) while being deliberately honest about not
+automating the second half (the *content*):
+
+```bash
+npm run propose-override -- --tenant-id northgate-cu-url-only-negative-control
+```
+
+A drift report only records which locator *strategy* won and how many times — never the
+actual accessible name/text that resolved. There is no honest way to fabricate a corrected
+`name` from that alone; doing so would mean guessing at live DOM content this system never
+observed. So `buildOverrideScaffold()` proposes exactly what it can support with real data —
+one `LocatorOverride` per drifting, overridable (`role`/`text` only, matching
+`LocatorOverrideSchema`'s own constraint — `css_structural`/`test_id` steps are skipped
+entirely, same reasoning as [`11-cross-tenant-reuse.md`](11-cross-tenant-reuse.md)'s own
+narrow-override philosophy) step — with `name` left as an explicit `TODO: ...` string naming
+the step and asking a human to fill it in after actually looking at the tenant's live page.
+
+Run against this repo's own real, checked-in evidence, this reproduces the exact three-step
+finding from Part 1's walkthrough (`step-2`/`step-3`/`step-5` — Operator ID, Password, Member
+ID) and writes the scaffold to `config/tenant-overrides/<tenantId>.proposed.json` —
+deliberately never the real `<tenantId>.json` filename `replay --tenant-override`/`approve`
+would pick up, so a proposal can never be silently treated as a reviewed, trustworthy
+override. The printed next step is explicit: fill in each `TODO`, save it under the real
+filename, then run `npm run approve -- --tenant-override <path>` — the same propose → human
+reviews → approve gate `approve.ts` already uses for artifact trust.
 
 ### A worked technical example
 

@@ -172,6 +172,13 @@ yours to generate, e.g. `node -e "console.log(require('crypto').randomBytes(24).
 Plain `npm run replay` and `npm run mock-bank` need neither -- replay never calls the model,
 and mock-bank is the target app, not one of the two secured surfaces.
 
+These two env vars are consumed indirectly via `config/operators.json`'s `local-operator`
+entry -- a real, named operator identity, not just a shared secret, that now shows up in
+this run's evidence log and (via `compliance-report`) an "Operator:" line. Nothing else to
+configure for a solo setup; see `SECURITY.md` "Authentication" to add a second named
+operator or attribute the chat UI's own outbound calls to a distinct `chat-ui-service`
+identity via `CHAT_UI_SERVICE_API_KEY`.
+
 ### Gemini quota fallback
 
 `src/agent/model-retry.ts`'s `withModelFallback` (used by discovery, the conversational
@@ -464,6 +471,25 @@ confirmation number observed at *recording* time, which by construction never ma
 See `REPORT.md` "Determinism & error handling" for both, and why the second one is a known
 false-positive category rather than a real drift signal.
 
+**7b. Self-healing locator proposals.** Closes the loop between the drift signal above and
+cross-tenant reuse (step 6): instead of a human re-deriving "which steps need an override"
+from the drift-report printout by hand, this generates the override's *shape* automatically
+-- which steps, which strategy -- while leaving the actual corrected `name` as an explicit
+`TODO`, since drift data only tells you which locator *strategy* won, never what the correct
+current accessible name/text actually is. Never writes a real, approvable
+`config/tenant-overrides/<tenantId>.json` directly -- always a `.proposed.json` sibling, so
+it can't be silently picked up by `replay --tenant-override`/`approve` without a human first
+reviewing and renaming it:
+
+```bash
+npm run propose-override -- --tenant-id northgate-cu-url-only-negative-control
+```
+
+Run against this repo's own checked-in evidence, this finds the exact same three drifting
+steps step 7's `drift-report` flags (Operator ID/Password/Member ID) and writes a scaffold
+to `config/tenant-overrides/northgate-cu-url-only-negative-control.proposed.json` with a
+`TODO:` placeholder `name` for each one -- real output, not a hypothetical.
+
 **8. Capability dashboard.** One page that renders everything above -- contract, approval/
 confidence, drift, and a discovery-vs-replay time/model-call comparison -- instead of four
 separate commands:
@@ -473,9 +499,11 @@ npm run dashboard
 # -> Capability dashboard listening on http://localhost:4600
 ```
 
-Open `http://localhost:4600` in a browser -- it'll prompt for a username (anything) and
-password (your `DASHBOARD_PASSWORD` from `.env`); that's real HTTP Basic auth, not a demo
-placeholder (see `SECURITY.md` "Authentication"). It reads straight from `evidence/artifacts/` and
+Open `http://localhost:4600` in a browser -- it'll prompt for a username and password:
+`operator` and your `DASHBOARD_PASSWORD` from `.env` for the default solo-dev setup (a
+presented username now resolves to a specific named entry in `config/operators.json`, not
+"anything" -- see `SECURITY.md` "Authentication"); that's real HTTP Basic auth, not a demo
+placeholder. It reads straight from `evidence/artifacts/` and
 `evidence/runs/` on every request (no writes, no state of its own), so it stays accurate
 while you run more discovery/replay/approve commands in other terminals and just refresh.
 Two things worth pointing at: a second confidence badge appears ("drift-capped to ...")
@@ -679,6 +707,15 @@ executing anything risky" for how this is implemented (`hasRiskyStep` on each ca
 `planChatTurn`/`invokePlannedTurn`, and a short-lived server-side session holding the pending
 plan across that one confirmation round-trip).
 
+You can also chain two steps in one message -- try *"create a new member named Priya Nair,
+then open a savings account for them with $100."* This detects the chain with a
+deterministic text split (no model call), plans both clauses, confirms both together in one
+message, and -- only on "yes" -- invokes step 1 for real, splices its actual output (the new
+member id) into step 2's params, and invokes step 2. Fails fast (never invokes step 2) if
+step 1 doesn't cleanly succeed. See `docs/15-conversational-frontend.md`'s "Chained
+requests" for the real bug this surfaced live (planning the second clause in complete
+isolation made Gemini correctly refuse to call any function at all) and how it was fixed.
+
 **12. Assisted fallback (bounded LLM recovery).** Opt-in only -- `replay`'s own promise
 ("never calls a model") holds unless you pass this:
 
@@ -733,6 +770,13 @@ That's a real read against this repo's own accumulated history, not a staged cle
 see `REPORT.md` "Multi-run stability" for why reporting the honest `FLAKY` result (and
 exiting 1, checked directly, not through a pipe) is the correct behavior for a tool whose
 entire job is telling the truth about health.
+
+Each invocation also appends its own outcome to a dedicated trend log
+(`evidence/canary-history.jsonl` by default, `--canary-history <path>` to override) and
+prints a `Trend:` line -- three consecutive unhealthy *canary* checks in a row (not just any
+replay traffic) exits `3` with a `REGRESSING` flag, distinct from a single flaky run. See
+`docs/17-multi-run-stability.md`'s "Trend over time" for why this needed its own log rather
+than reusing the registry's shared replay history.
 
 **15. Compliance/audit export.** Not a Section 8 stretch goal -- presentation on existing
 evidence, same category as the dashboard. Turns every run's already-redacted evidence into

@@ -20,6 +20,12 @@ export function requestLog(serviceName: string) {
           status: res.statusCode,
           durationMs: Math.round(durationMs * 100) / 100,
           timestamp: new Date().toISOString(),
+          // Set by requireApiKey/requireBasicAuth (src/http/api-key-auth.ts) before this
+          // callback fires, since that middleware runs earlier in the chain -- undefined
+          // (and so dropped by JSON.stringify) on unauthenticated routes like /health.
+          // Gives every authenticated request a per-line "who," attributed to a named
+          // operator identity, without touching dashboard/capability-API rendering code.
+          operatorId: req.operatorId,
         })
       );
     });

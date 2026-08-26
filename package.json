@@ -20,6 +20,7 @@
     "replay": "tsx src/cli/replay.ts",
     "approve": "tsx src/cli/approve.ts",
     "drift-report": "tsx src/cli/drift-report.ts",
+    "propose-override": "tsx src/cli/propose-override.ts",
     "dashboard": "tsx src/dashboard/server.ts",
     "capability-api": "tsx src/api/server.ts",
     "agent-invoke-demo": "tsx src/cli/agent-invoke-demo.ts",

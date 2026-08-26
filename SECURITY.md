@@ -44,32 +44,51 @@ one-size-fits-all identity layer:
 
 - **Capability API** (`src/api/server.ts`, `GET /capabilities` and
   `POST /capabilities/:id/invoke`) — called by code (an agent, a CLI), not a human clicking
-  around. Requires `Authorization: Bearer <CAPABILITY_API_KEY>` (or `X-API-Key`) on every
-  route except `/health`. `/invoke` can trigger a real, guardrail-checked action against the
-  target system, and `/capabilities` alone discloses confidence/approval state that's real
+  around. Requires `Authorization: Bearer <api-key>` (or `X-API-Key`) on every route except
+  `/health`. `/invoke` can trigger a real, guardrail-checked action against the target
+  system, and `/capabilities` alone discloses confidence/approval state that's real
   operational data — both legs need the same gate, not just the one that writes.
 - **Dashboard** (`src/dashboard/server.ts`) — opened directly in a browser by a human
-  operator. Uses HTTP Basic auth (`DASHBOARD_PASSWORD`) specifically because browsers prompt
-  for Basic credentials natively; a Bearer-token scheme would need a login form this
-  read-only ops page has no other reason to have.
-- Both share one comparison primitive (`src/http/api-key-auth.ts`): the candidate and the
-  expected secret are each SHA-256 hashed before `crypto.timingSafeEqual`, so neither a
-  length-based early return nor a byte-by-byte early exit leaks anything about the real
-  secret through response timing.
-- Both **fail closed and loud**: if `CAPABILITY_API_KEY` / `DASHBOARD_PASSWORD` isn't set,
-  the server throws at startup and refuses to listen at all, rather than silently serving
-  unauthenticated. An unset env var should never be indistinguishable from "auth
-  intentionally disabled."
+  operator. Uses HTTP Basic auth specifically because browsers prompt for Basic credentials
+  natively; a Bearer-token scheme would need a login form this read-only ops page has no
+  other reason to have.
+- **A presented credential now resolves to a specific NAMED operator, not a binary
+  valid/invalid.** `config/operators.json` (loaded by `src/http/operator-registry.ts`) is a
+  committed list of operator identities, each pointing at env var NAMES (never a secret
+  value itself) for its API key and/or dashboard username+password. `requireApiKey()`/
+  `requireBasicAuth()` (`src/http/api-key-auth.ts`) find which configured operator's
+  credential actually matched and attach that id to the request (`req.operatorId`), which
+  then flows into the evidence log's `start` event and the compliance audit report's
+  "Operator" line — closing the exact gap disclosed at the end of this section. A solo
+  dev's `.env` needs zero changes: the default `local-operator` entry points at the same
+  `CAPABILITY_API_KEY`/`DASHBOARD_PASSWORD` env vars that already existed. Adding a second,
+  real human operator is one new JSON entry + one new env var, no code change.
+- Both credential kinds share one comparison primitive (`src/http/api-key-auth.ts`): the
+  candidate and each configured operator's secret are SHA-256 hashed before
+  `crypto.timingSafeEqual`, so neither a length-based early return nor a byte-by-byte early
+  exit leaks anything about the real secret through response timing. **Disclosed, accepted
+  limitation:** Basic auth looks up the presented username by `===` *before* the timing-safe
+  password compare, so a nonexistent username fails faster than an existing one — a
+  theoretical username-enumeration timing signal, not hardened against, since it's no looser
+  a posture than the "not a full identity provider" stance below.
+- Both **fail closed and loud**: if no configured operator has a usable API key (or,
+  respectively, dashboard credentials), the server throws at startup and refuses to listen
+  at all, rather than silently serving unauthenticated. An unset env var should never be
+  indistinguishable from "auth intentionally disabled."
 - `/health` is intentionally the one unauthenticated route on every service (including
   mock-bank) — container orchestrators and uptime checks need it to work without a
   credential, and it discloses nothing beyond "the process is up."
-- Deliberately not built: per-user identity, roles, or an audit trail of *which human*
-  approved a risky action or an artifact (`npm run approve`, the `onRiskyStep` confirmation
-  prompt) — both record *that* a decision was made and *when*, not *who* made it. A single
-  shared secret per surface is the right amount of mechanism for "one caller class per
-  surface," but a real multi-operator deployment would need an identity provider on top of
-  this, not instead of it. The compliance/audit report (`npm run compliance-report`)
-  discloses this limitation in its own generated output, not just here.
+- Still deliberately not built: real per-user *roles* (every configured operator has the
+  same capabilities), and — the harder, larger, still-open gap — an audit trail of *which
+  human approved an individual risky action* (`npm run approve`, the `onRiskyStep`
+  confirmation prompt). Knowing *which named operator submitted a run* (now built, above) is
+  not the same as knowing who clicked "yes" on a specific confirmation prompt inside it — the
+  capability API in particular has no interactive confirmation path at all, so a risky step
+  there is auto-declined rather than attributably approved by anyone. A real multi-operator
+  deployment would still want a full identity provider (roles, session expiry, per-approver
+  audit) on top of this named-operator layer, not instead of it. The compliance/audit report
+  (`npm run compliance-report`) discloses both the "who submitted" data now available and
+  this remaining "who approved" gap in its own generated output, not just here.
 
 ## Guardrails: what's allowed to happen at all
 

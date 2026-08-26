@@ -100,6 +100,9 @@ deliberate design decision, not an oversight.
 | A required field (like an operator username) is something the chat UI itself will supply, not the customer | The model never even sees that field as part of the capability's schema — a real bug, now fixed: it used to correctly refuse to invent a value, but that meant it kept asking the customer for an "operator username" they'd never know, blocking the whole request. |
 | A confirmation message needs to show which capability is about to run | Plain quoting (`"create-member"`), not markdown `**bold**` — a real bug, now fixed: the chat page renders bot text as plain text on purpose, so asterisks showed up literally instead of rendering bold. |
 | Opening the chat page in Safari specifically | Style and script now load correctly — a real bug, now fixed: helmet's default `Strict-Transport-Security` header, sent even over plain `http://localhost`, was being honored by Safari/WebKit, which then upgraded the *next* requests for `style.css`/`chat.js` to `https://localhost:4800/...` and failed outright (nothing answers TLS there). See `SECURITY.md`'s "Rate limiting & transport hardening" for the fix and — importantly — why a browser that already cached the old header for this host needs one manual site-data clear before it loads correctly again, even after this fix. |
+| A message describes two steps where the second depends on the first ("create a member named Dave, then open a savings account for them with $100") | Detected as a chain (a deterministic text split, no model call), planned as two real plans, and confirmed together in one message — see "Chained requests" below. |
+| The chained message's second clause has no concrete member reference at all when planned on its own | A real bug, now fixed: real Gemini correctly refused to call any function rather than invent one, breaking chain detection outright. A placeholder hint anchors the model's planning without ever being trusted as real data. |
+| The first step of a chain doesn't cleanly succeed (a hard failure OR an unexpected business outcome) | The second step is never invoked — fails fast rather than inventing a value to continue with a broken first result. |
 
 ---
 
@@ -223,6 +226,17 @@ this at all, since an internal caller running the CLI is already the authenticat
 injected value is also never included in what's returned to *any* caller (`redactedParams`
 is built from the plan *before* the merge), so even an internal debugging view can't
 accidentally surface it.
+
+**A second, unrelated credential concept, added by the per-operator identity feature:**
+`CHAT_UI_OPERATOR_USERNAME`/`PASSWORD` above is the mock-bank *sign-on* credential baked
+into capability params. Separately, `CHAT_UI_SERVICE_API_KEY` (falling back to
+`CAPABILITY_API_KEY` if unset) is which named entry in `config/operators.json` this
+server's own *outbound HTTP call* to the capability API authenticates as -- setting it
+means every chat-UI-originated run's evidence/audit trail says `chat-ui-service`, not
+whichever human happens to own the shared key. See
+[`19-security-and-authentication.md`](19-security-and-authentication.md) for the full
+per-operator identity design; don't confuse the two "operator" ideas this file now
+mentions.
 
 This was verified for real, not just reasoned about, against a genuinely adversarial case:
 with only one capability in this demo's catalog, a message that didn't cleanly match it
@@ -357,6 +371,64 @@ words or a model's own guess at a value, so it's never treated as HTML) — whic
 was never going to render markdown `**bold**` either. Fixed by using plain quoting
 (`"create-member"`) instead, matching the CLI's own console-output style.
 
+### Chained requests: "create a member, then open an account for them"
+
+A single chat message can now express two capability calls where the second genuinely
+depends on the first's real output — e.g. *"create a new member named Priya Nair, then open
+a savings account for them with $100."* This is deliberately **not** a model-driven
+multi-call: a single Gemini turn can't produce step 2's real `memberId` at plan time, since
+it doesn't exist until step 1 actually runs — asking the model to supply one anyway would
+reintroduce exactly the "invent a plausible-looking value" failure mode already fixed once
+in this project. So chain *detection* is a pure, deterministic text split on a small set of
+connectors (`, then`, `and then`, `after that`, `once that's done`) — no model call, no real
+value at stake, always safe to fall back to a normal single-capability turn if anything
+about it doesn't line up (no connector found, either clause doesn't plan cleanly, or the two
+chosen capabilities have no verified relationship).
+
+`src/frontend/chain-mappings.ts` is the entire allowed chain surface, hand-authored rather
+than inferred by matching field names automatically — `create-member`'s output is
+`newMemberId`, but every consumer capability's input is `memberId`; there's no honest way to
+match those names programmatically, so the four real, verified pairs are just listed:
+`create-member` → `{open-sub-account, transfer-funds, check-balance, close-sub-account}`.
+`src/frontend/chain.ts` builds on the existing, completely unmodified `planChatTurn()` — it
+plans both clauses in parallel, and only if both come back as real plans (not `clarified`)
+for a mapped capability pair does it report `{kind: "chained"}`. The chat UI holds this in a
+new, independent `pendingChain` session field (never at the same time as the existing
+`pendingPlan`) and shows ONE combined confirmation covering both steps — since every real
+"from" capability today (`create-member`) is already risky, there's no unconfirmed-chain
+case to handle. On "yes": step 1 is invoked for real; **fails fast** (never invokes step 2)
+if step 1 comes back as anything other than a clean `success` — covering both a hard
+`failure` and an unexpected `business_outcome`, since a broken first step has nothing real
+to hand the second one. Only on a clean success is the real output value read and spliced,
+unconditionally overwriting whatever the model itself proposed for that field, into step 2's
+params before invoking it for real too.
+
+**A real bug caught live, against real Gemini, not a hypothetical.** Planning the second
+clause completely in isolation — "open a savings account for them with $100," with no
+concrete member reference at all — made the model correctly refuse to call *any* function,
+judging the request too unclear rather than inventing a value or leaving the field empty and
+proceeding anyway. That's the exact behavior this system's own prompting has always wanted
+out of the model — just not in a place this feature was ready for, since it broke chain
+detection outright (both clauses must plan cleanly for a chain to be recognized at all).
+Fixed with `MEMBER_ID_PLACEHOLDER_HINT`: the second clause's planning call gets an appended,
+syntactically concrete placeholder ("...the member ID for this request is
+CHAIN-STEP-1-MEMBER-ID") purely so the model has something to anchor `memberId` on and keeps
+choosing the right capability — never trusted as real data, since whatever the model does
+with it is unconditionally overwritten with step 1's actual output before step 2 is ever
+invoked. **A second real bug this surfaced immediately afterward:** the placeholder value
+itself leaked into the human-facing confirmation text ("...with memberId:
+CHAIN-STEP-1-MEMBER-ID...") — the same class of bug as the earlier blank-`username`
+confirmation issue, just a non-empty placeholder instead of an empty string. Fixed the same
+way: the confirmation-building code hides `mapping.toField` from step 2's displayed params,
+since it's never a real value to confirm at that point.
+
+Verified live end-to-end against the real running services, not just the unit tests that
+scripted this exact scenario: sending the literal sentence above produced a clean combined
+confirmation with no placeholder visible; replying "yes" actually created a new member *and*
+opened a real, correctly-linked sub-account for that exact new member id — confirmed by
+reading `apps/mock-bank/data/state.mock-bank.json` directly afterward, not by trusting the
+chat reply — and a separate run replying "no" instead created nothing at all.
+
 ### Where
 
 - `src/frontend/planner.ts` — `planInvocation`, `buildToolDeclarations`, `toFunctionName`,
@@ -369,9 +441,17 @@ was never going to render markdown `**bold**` either. Fixed by using plain quoti
 - `src/frontend/chat-shared.ts` — `InvokeResponse`, `redactionOptionsFor()`, `summarize()`,
   shared by the CLI and the web UI (re-exported from `agent-chat.ts` for backward
   compatibility with its own tests).
-- `src/chat-ui/server.ts` + `src/chat-ui/public/` — the web UI: the `/chat` endpoint (now with
-  the `express-session`-backed `pendingPlan` confirmation flow AND a `history` array of
-  `ConversationTurn`s, capped at `MAX_HISTORY_TURNS`) and the static page/styles/client script.
+- `src/chat-ui/server.ts` + `src/chat-ui/public/` — the web UI: `handleChat()` (the exported
+  `/chat` handler, extracted for direct unit testing without a real HTTP layer) with the
+  `express-session`-backed `pendingPlan` confirmation flow, a `history` array of
+  `ConversationTurn`s (capped at `MAX_HISTORY_TURNS`), and now `pendingChain` (an
+  independent session field for a two-step chained request awaiting one combined
+  confirmation) — plus the static page/styles/client script, unchanged.
+- `src/frontend/chain-mappings.ts` — `CHAIN_MAPPINGS`, the hand-authored, verified
+  output→input pairs a chain is allowed to splice across; `findChainMapping()`.
+- `src/frontend/chain.ts` — `splitChainedUtterance()` (the deterministic connector split),
+  `planChainedTurn()` (plans both clauses via the unmodified `planChatTurn()`), and
+  `MEMBER_ID_PLACEHOLDER_HINT` (the real-bug fix described above).
 - `src/cli/agent-chat.ts` — the CLI: argument parsing and console output around
   `runChatTurn()`.
 - `src/replay/replay-engine.ts` — `validateParams`, tightened to treat empty string as

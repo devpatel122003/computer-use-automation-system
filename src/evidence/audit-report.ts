@@ -25,6 +25,13 @@ export interface RunAuditEntry {
   capabilityLabel: string;
   tenantId?: string;
   fingerprint?: string;
+  /** Which named operator (config/operators.json) authenticated the request that triggered
+   *  this run -- only ever present for capability-API-triggered replay runs, since that's
+   *  the one call site that sets it (src/api/server.ts). Undefined for discovery and for
+   *  any run started directly via a local CLI invocation, which has no equivalent
+   *  authentication step at all. See the disclosure text this feeds into below: this
+   *  answers "who submitted the run," not "who approved an individual risky step." */
+  operatorId?: string;
   outcome: string;
   riskyActions: RiskyActionRecord[];
   evidenceDir: string;
@@ -73,6 +80,8 @@ export function buildRunAuditEntry(runId: string, events: LogEvent[], resultJson
     tenantId = override?.tenantId;
   }
 
+  const operatorId = typeof startDetail.operatorId === "string" ? startDetail.operatorId : undefined;
+
   return {
     runId,
     runType,
@@ -81,6 +90,7 @@ export function buildRunAuditEntry(runId: string, events: LogEvent[], resultJson
     capabilityLabel,
     tenantId,
     fingerprint,
+    operatorId,
     outcome: result.status ?? "incomplete (no result recorded -- run may have crashed or been interrupted)",
     riskyActions,
     evidenceDir,
@@ -110,6 +120,14 @@ export function renderAuditReportMarkdown(entries: RunAuditEntry[], generatedAt:
     "> *which human* approved a risky action or an artifact (see REPORT.md §7) -- only",
     "> *that* an action was approved/declined and when. A real deployment auditing against",
     "> this report would still need an authenticated-reviewer identity layer on top.",
+    ">",
+    "> Runs triggered through the capability API additionally record which named operator's",
+    "> credential authenticated the request (see \"Operator\" below, where present) -- but that",
+    "> identifies who *submitted the run*, not who approved any individual risky step inside",
+    "> it, since the capability API has no interactive confirmation path at all (a risky step",
+    "> is auto-declined unless the artifact is already approved). Runs triggered directly via",
+    "> a local CLI invocation carry no operator identity either way, since there's no",
+    "> equivalent authentication step for a process run at a terminal.",
     "",
     "## Summary",
     "",
@@ -129,6 +147,7 @@ export function renderAuditReportMarkdown(entries: RunAuditEntry[], generatedAt:
     lines.push(`- Capability: ${escapeMd(e.capabilityLabel)}`);
     if (e.fingerprint) lines.push(`- Artifact fingerprint: \`${e.fingerprint}\``);
     if (e.tenantId) lines.push(`- Tenant: ${escapeMd(e.tenantId)}`);
+    if (e.operatorId) lines.push(`- Operator: ${escapeMd(e.operatorId)}`);
     lines.push(`- Outcome: **${e.outcome}**`);
     if (e.riskyActions.length > 0) {
       lines.push(`- Risky actions:`);
