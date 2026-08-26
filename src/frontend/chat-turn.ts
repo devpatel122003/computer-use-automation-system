@@ -63,21 +63,49 @@ export type ChatTurnResult =
     };
 
 /**
- * The one real implementation of "natural language in, capability invoked (or not), result
- * out" -- discover capabilities, decide whether/which one + what args (the model's only
- * job), invoke it through the exact same capability API every other caller uses if so, and
- * template a deterministic summary. Used by both `src/cli/agent-chat.ts` and
- * `src/chat-ui/server.ts` so there is exactly one place this sequence is implemented.
+ * The "decide what to do" half of a turn, split out of `runChatTurn` so a caller (the chat
+ * UI) can inspect the plan -- specifically `capability.hasRiskyStep` -- and hold it for a
+ * human's explicit confirmation BEFORE `invokePlannedTurn` ever touches the capability API.
+ * The CLI (`src/cli/agent-chat.ts`) doesn't need this split: it's an already-trusted internal
+ * operator, so it goes through `runChatTurn`, which still plans and invokes in one call with
+ * behavior unchanged from before this split existed.
  */
-export async function runChatTurn(options: ChatTurnOptions): Promise<ChatTurnResult> {
-  const { genai, models, apiBase, apiKey, message, allowRisky = true, fillParams } = options;
-  const authHeaders = { Authorization: `Bearer ${apiKey}` };
+export type PlanChatTurnResult =
+  | {
+      kind: "planned";
+      capabilities: DiscoveredCapability[];
+      plan: CapabilityInvocationPlan;
+      capability: DiscoveredCapability;
+      redactedMessage: string;
+      redactedParams: Record<string, string>;
+      redactedReasoning: string;
+    }
+  | {
+      kind: "clarified";
+      capabilities: DiscoveredCapability[];
+      redactedMessage: string;
+      message: string;
+    };
 
+async function fetchCapabilities(apiBase: string, authHeaders: Record<string, string>): Promise<DiscoveredCapability[]> {
   const listRes = await fetch(`${apiBase}/capabilities`, { headers: authHeaders });
   if (!listRes.ok) throw new Error(`GET /capabilities failed: HTTP ${listRes.status}`);
-  const catalog = (await listRes.json()) as Array<{ id: string; description: string; inputParams: DiscoveredCapability["inputParams"] }>;
-  const capabilities: DiscoveredCapability[] = catalog.map((c) => ({ id: c.id, description: c.description, inputParams: c.inputParams }));
+  const catalog = (await listRes.json()) as Array<{
+    id: string;
+    description: string;
+    inputParams: DiscoveredCapability["inputParams"];
+    hasRiskyStep?: boolean;
+  }>;
+  return catalog.map((c) => ({ id: c.id, description: c.description, inputParams: c.inputParams, hasRiskyStep: c.hasRiskyStep }));
+}
 
+export async function planChatTurn(
+  options: Pick<ChatTurnOptions, "genai" | "models" | "apiBase" | "apiKey" | "message">
+): Promise<PlanChatTurnResult> {
+  const { genai, models, apiBase, apiKey, message } = options;
+  const authHeaders = { Authorization: `Bearer ${apiKey}` };
+
+  const capabilities = await fetchCapabilities(apiBase, authHeaders);
   const planResult = await planInvocation(genai, models, capabilities, message);
 
   if (planResult.kind === "clarify") {
@@ -90,7 +118,36 @@ export async function runChatTurn(options: ChatTurnOptions): Promise<ChatTurnRes
   }
 
   const plan = planResult.plan;
+  const capability = capabilities.find((c) => c.id === plan.capabilityId);
+  if (!capability) {
+    throw new Error(`Planner chose capability "${plan.capabilityId}" that isn't in the discovered catalog.`);
+  }
   const redactOpts = redactionOptionsFor(capabilities, plan);
+
+  return {
+    kind: "planned",
+    capabilities,
+    plan,
+    capability,
+    redactedMessage: redact(message, redactOpts) as string,
+    redactedParams: redact(plan.params, redactOpts) as Record<string, string>,
+    redactedReasoning: redact(plan.reasoning, redactOpts) as string,
+  };
+}
+
+/**
+ * The "actually do it" half of a turn: invoke an already-planned capability through the same
+ * capability API every other caller uses, and template a deterministic summary. Takes a plan
+ * produced by `planChatTurn` (either just now, for a safe capability, or held across a
+ * confirmation round-trip for a risky one).
+ */
+export async function invokePlannedTurn(
+  options: Pick<ChatTurnOptions, "apiBase" | "apiKey" | "allowRisky" | "fillParams">,
+  planned: Extract<PlanChatTurnResult, { kind: "planned" }>
+): Promise<Extract<ChatTurnResult, { kind: "invoked" }>> {
+  const { apiBase, apiKey, allowRisky = true, fillParams } = options;
+  const authHeaders = { Authorization: `Bearer ${apiKey}` };
+  const { plan, capabilities, redactedMessage, redactedParams, redactedReasoning } = planned;
 
   // fillParams always wins over plan.params: even if a customer's message somehow named a
   // credential, this is a customer-facing surface and that value must never be the one
@@ -108,11 +165,25 @@ export async function runChatTurn(options: ChatTurnOptions): Promise<ChatTurnRes
     kind: "invoked",
     capabilities,
     plan,
-    redactedMessage: redact(message, redactOpts) as string,
-    redactedParams: redact(plan.params, redactOpts) as Record<string, string>,
-    redactedReasoning: redact(plan.reasoning, redactOpts) as string,
+    redactedMessage,
+    redactedParams,
+    redactedReasoning,
     httpStatus: invokeRes.status,
     result,
     summary: summarize(result, invokeRes.status),
   };
+}
+
+/**
+ * The one real implementation of "natural language in, capability invoked (or not), result
+ * out" -- discover capabilities, decide whether/which one + what args (the model's only
+ * job), invoke it through the exact same capability API every other caller uses if so, and
+ * template a deterministic summary. Used by `src/cli/agent-chat.ts`, which always plans and
+ * invokes in the same turn (no confirmation step -- see `planChatTurn`'s doc comment for why
+ * the chat UI needs the split instead of this).
+ */
+export async function runChatTurn(options: ChatTurnOptions): Promise<ChatTurnResult> {
+  const planned = await planChatTurn(options);
+  if (planned.kind === "clarified") return planned;
+  return invokePlannedTurn(options, planned);
 }

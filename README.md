@@ -669,6 +669,16 @@ browser's own Web Speech API for speech-to-text and text-to-speech) -- no audio 
 anywhere, no new backend service exists to support it, and the mic button hides itself
 entirely on a browser that doesn't support it rather than failing silently.
 
+Ask it to create/change something (open an account, create a member, transfer funds, close
+an account) and it won't act right away -- it replies with a plain-language summary of
+exactly what it's about to do and waits for you to type "yes" or "no" before actually
+invoking anything. A plain read (e.g. "what's the balance for member 10001") answers
+immediately, with no confirmation step. See
+[`docs/15-conversational-frontend.md`](docs/15-conversational-frontend.md)'s "Confirm before
+executing anything risky" for how this is implemented (`hasRiskyStep` on each capability,
+`planChatTurn`/`invokePlannedTurn`, and a short-lived server-side session holding the pending
+plan across that one confirmation round-trip).
+
 **12. Assisted fallback (bounded LLM recovery).** Opt-in only -- `replay`'s own promise
 ("never calls a model") holds unless you pass this:
 

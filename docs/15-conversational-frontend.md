@@ -90,6 +90,11 @@ deliberate design decision, not an oversight.
 | The member's browser doesn't support voice input (most don't fully implement it) | The mic button simply isn't shown at all — no broken control, no silent failure, typing still works exactly the same. |
 | The chat page itself somehow got asked for operator credentials | It wouldn't matter — the chat UI's server injects its own configured service-account credential after planning, which always overrides anything a customer's message (or the model's own guess) supplied. |
 | The member just says "hi," or asks a question that doesn't match any capability | A real bug, now fixed: this used to force a function call no matter what, and once used the literal word "hi" as a brand-new member's name — creating one for real. Now the model can reply in plain text and invoke nothing; verified against real Gemini that "hi" creates no member. |
+| The request would create or change something (open a savings account, create a member, transfer funds, close an account) | Nothing is invoked yet. The chat bot first replies with a plain-language summary of exactly what it's about to do and asks the member to say "yes" or "no" — see "Confirm before executing anything risky" below. |
+| The request only reads something (check a balance) | Answered immediately, no confirmation step — there's nothing to reconsider before a read happens. |
+| The member replies "yes"/"confirm"/"go ahead" to a pending confirmation | The capability is invoked now, for real, with the exact data that was summarized. |
+| The member replies "no"/"cancel"/"nevermind" to a pending confirmation | Nothing is invoked; the pending plan is discarded. |
+| The member replies with something that's neither a clear yes nor a clear no (e.g. changes the subject) | The old pending plan is discarded rather than left dangling for a later, unrelated "yes" to accidentally confirm; the new message is planned fresh. |
 
 ---
 
@@ -122,10 +127,14 @@ split the rest of the system is built around, held all the way to the front door
   Gemini function names can't, so this is a reversible sanitization, not a rename).
 - Each tool's parameters mirror the capability's own `inputParams`, plus a model-supplied
   `reasoning` string and an optional `tenantId`.
-- Calls Gemini once with `functionCallingConfig.mode: ANY` — forced to make exactly one
-  call, the same discipline the discovery loop uses for the same reason: one unambiguous
-  decision, not a menu of options or a free-text ramble beside it.
-- Returns a `CapabilityInvocationPlan`:
+- Calls Gemini once with `functionCallingConfig.mode: AUTO` — the model may call at most one
+  function, but is also allowed to call none at all and just reply in plain text. (This used
+  to be `ANY`, forcing a call every turn; see "How" below for the real incident that changed
+  it.)
+- Returns a `PlanResult`: either `{ kind: "invoke", plan: CapabilityInvocationPlan }` or
+  `{ kind: "clarify", message: string }` — the latter when the request doesn't clearly map to
+  any capability (a greeting, small talk, a question), carrying the model's own conversational
+  reply instead of a plan.
   ```typescript
   interface CapabilityInvocationPlan {
     capabilityId: string;
@@ -227,17 +236,84 @@ failure. Fixed in `planner.ts`'s own system prompt (supply the plain numeric val
 currency symbol) and confirmed by re-running the exact same request against a live Gemini
 call afterward, not just inspecting the prompt change.
 
+### Confirm before executing anything risky
+
+A chat member should never have something created or changed just because a model decided
+that's what they meant — they should see exactly what's about to happen and say "yes" first.
+This required splitting the single discover→plan→invoke sequence into two independently
+callable halves:
+
+- **`planChatTurn()`** (`src/frontend/chat-turn.ts`) — discovers capabilities and plans, same
+  as before, but stops there. Returns `PlanChatTurnResult`: `{ kind: "clarified", ... }` (same
+  as before) or `{ kind: "planned", plan, capability, redactedMessage, redactedParams,
+  redactedReasoning, capabilities }` — note `capability` is the *matched* `DiscoveredCapability`
+  itself, carrying `hasRiskyStep`.
+- **`invokePlannedTurn()`** — takes that `planned` result and actually calls the capability
+  API, exactly what the second half of the old `runChatTurn()` did.
+- **`runChatTurn()`** itself is now just `planChatTurn()` followed by `invokePlannedTurn()` —
+  unchanged behavior for `src/cli/agent-chat.ts`, which is used by an already-trusted internal
+  operator and has no reason to gain a confirmation step.
+
+`hasRiskyStep` is where the "risky" signal actually comes from: `GET /capabilities`
+(`src/api/server.ts`) now includes `hasRiskyStep: artifact.steps.some(s => s.risk ===
+"risky")` on every catalog entry — the same per-step risk data `GuardrailsPolicy` already
+uses to gate execution, just surfaced one layer up so a caller can decide *whether to ask a
+human* before ever reaching that gate. `DiscoveredCapability` in `planner.ts` carries the same
+field through planning.
+
+`src/chat-ui/server.ts` is the one caller that actually uses this split. It adds an
+`express-session` (same memory-backed-session pattern `apps/mock-bank/src/server.ts` already
+uses for its login) holding at most one `pendingPlan` per browser session:
+
+1. A new message first checks whether a `pendingPlan` is waiting. If it is, and the message is
+   a clear affirmative (`yes`/`confirm`/`go ahead`/...), the *stored* plan — not a freshly
+   re-planned one — is invoked via `invokePlannedTurn()`, and the session is cleared. If it's a
+   clear negative (`no`/`cancel`/`nevermind`/...), the plan is discarded and nothing is
+   invoked. If it's neither, the stale pending plan is discarded and the new message is planned
+   fresh — a later, unrelated "yes" must never be able to reattach to an old plan.
+2. If there's no pending plan, the message is planned via `planChatTurn()`. If the matched
+   capability's `hasRiskyStep` is `true`, the plan is stored in the session and a plain-language
+   confirmation question is sent back — nothing is invoked yet. If it's `false` (a pure read,
+   e.g. `check-balance`), it's invoked immediately, same as before — there's nothing to
+   reconsider before a read happens.
+
+No client-side changes were needed: `chat.js`'s `fetch("/chat", ...)` is same-origin, and
+same-origin `fetch` sends cookies by default, so the session cookie round-trips automatically.
+
+**A real bug this surfaced immediately, while testing it live against real Gemini calls, not
+scripted ones:** the confirmation text for a "create a member" request initially read
+`"...with username: , fullName: Priya Chen."` — a blank `username`. `username` is a required
+field on `create-member`'s own schema but isn't marked `sensitive` (that flag governs
+redaction, not who's allowed to supply a value), so the planner's function-calling schema
+still lists it as required, and a real Gemini call invented an empty-string placeholder to
+satisfy it — exactly the anti-pattern the system prompt tells it not to do, just for a field
+the `sensitive` exclusion doesn't cover. Since `username`/`password` are always overwritten by
+the chat UI's own `fillParams` before invoking regardless of what the model proposed, showing
+the model's guess in the confirmation is pure noise, not a real value to confirm. Fixed by
+having `describePendingPlan()` filter out any param name present in `fillParams` before
+building the confirmation text.
+
+Verified live end-to-end, independent of the chat replies themselves: with a cookie jar
+preserving the session across two `curl` calls, a "create a member" request produced a clean
+confirmation with no blank field; replying "yes" actually created the member, confirmed by
+reading `apps/mock-bank/data/state.mock-bank.json` directly afterward; a second run replying
+"no" instead left the member count and `nextMemberSeq` completely unchanged; and a plain
+balance check invoked immediately with no confirmation step at all.
+
 ### Where
 
 - `src/frontend/planner.ts` — `planInvocation`, `buildToolDeclarations`, `toFunctionName`,
   the `CapabilityInvocationPlan` type.
 - `src/frontend/chat-turn.ts` — `runChatTurn()`, the one shared discover→plan→invoke
-  sequence, including the `fillParams` credential-override mechanism.
+  sequence, including the `fillParams` credential-override mechanism; also `planChatTurn()`
+  and `invokePlannedTurn()`, the two halves it's built from, used directly by the chat UI's
+  confirm-before-executing flow.
 - `src/frontend/chat-shared.ts` — `InvokeResponse`, `redactionOptionsFor()`, `summarize()`,
   shared by the CLI and the web UI (re-exported from `agent-chat.ts` for backward
   compatibility with its own tests).
-- `src/chat-ui/server.ts` + `src/chat-ui/public/` — the web UI: the `/chat` endpoint and the
-  static page/styles/client script.
+- `src/chat-ui/server.ts` + `src/chat-ui/public/` — the web UI: the `/chat` endpoint (now with
+  the `express-session`-backed `pendingPlan` confirmation flow) and the static
+  page/styles/client script.
 - `src/cli/agent-chat.ts` — the CLI: argument parsing and console output around
   `runChatTurn()`.
 - `src/replay/replay-engine.ts` — `validateParams`, tightened to treat empty string as
@@ -303,6 +379,14 @@ Done. confirmationNumber = ....
 - **A customer's message states a credential-looking value** — never used; `fillParams`
   always overrides it before the invoke call, verified against real evidence, not just the
   code path (see "A real chat + voice UI" above).
+- **A pending confirmation is never answered (member closes the tab, or just stops
+  responding)** — the session cookie expires (15-minute `maxAge`) and the plan is discarded
+  with it; nothing is ever invoked without an explicit "yes."
+- **Two risky requests in a row, the second before confirming the first** — not specially
+  handled: the new message doesn't match the yes/no regexes, so the old pending plan is
+  discarded and the new message is planned fresh (see "Confirm before executing anything
+  risky" above) — the member would need to re-confirm the first request from scratch, which
+  is the safe failure mode (never carrying forward what may have become a stale/wrong plan).
 - **No per-customer identity or session** — deliberately not built for this demo (same "one
   caller class per surface, not a full identity system" posture `19-security-and-authentication.md`
   already discloses for the capability API and dashboard); a real deployment would need to

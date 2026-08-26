@@ -16,6 +16,12 @@ export interface DiscoveredCapability {
   id: string;
   description: string;
   inputParams: Array<{ name: string; type: "string" | "number" | "boolean"; required: boolean; sensitive?: boolean; description?: string }>;
+  /** Whether any step of this capability is a guardrails "risky" (write) action -- carried
+   *  through from `GET /capabilities` (see src/api/server.ts) purely so a caller like the
+   *  chat UI can decide whether to confirm with a human before invoking, without needing to
+   *  re-fetch or re-derive it from the full artifact. Optional because nothing in planning
+   *  itself depends on it -- it only rides along for downstream callers. */
+  hasRiskyStep?: boolean;
 }
 
 export interface CapabilityInvocationPlan {

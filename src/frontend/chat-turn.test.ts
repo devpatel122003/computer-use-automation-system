@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runChatTurn } from "./chat-turn.js";
+import { runChatTurn, planChatTurn, invokePlannedTurn } from "./chat-turn.js";
 import type { GoogleGenAI } from "@google/genai";
 
 function scriptedGenai(name: string, args: Record<string, unknown>): GoogleGenAI {
@@ -23,6 +23,7 @@ const CATALOG = [
   {
     id: "open-sub-account",
     description: "Opens a new sub-account for a member.",
+    hasRiskyStep: true,
     inputParams: [
       { name: "username", type: "string", required: true, sensitive: false },
       { name: "password", type: "string", required: true, sensitive: true },
@@ -188,5 +189,50 @@ describe("runChatTurn", () => {
       // capability-specific sensitive-value list to work from.
       expect(turn.redactedMessage).not.toContain("4111111111111111");
     });
+  });
+});
+
+describe("planChatTurn / invokePlannedTurn (the split runChatTurn is built from)", () => {
+  it("planChatTurn plans without ever calling /invoke, and carries hasRiskyStep through from the catalog", async () => {
+    const calls = stubFetch({ status: "success", outputs: {} }); // only hit if a bug calls invoke during planning
+    const genai = scriptedGenai("invoke__open_sub_account", { reasoning: "r", memberId: "10001", initialDeposit: "100" });
+
+    const planned = await planChatTurn({ genai, models: ["m"], apiBase: "http://localhost:4700", apiKey: "k", message: "x" });
+
+    expect(planned.kind).toBe("planned");
+    if (planned.kind !== "planned") throw new Error("expected planned");
+    expect(planned.capability.hasRiskyStep).toBe(true);
+    expect(planned.plan.capabilityId).toBe("open-sub-account");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toContain("/capabilities");
+  });
+
+  it("invokePlannedTurn takes a planned result and actually invokes it, applying fillParams", async () => {
+    const calls = stubFetch({ status: "success", outputs: { confirmationNumber: "SA-00002" } });
+    const genai = scriptedGenai("invoke__open_sub_account", { reasoning: "r", memberId: "10001", initialDeposit: "100" });
+
+    const planned = await planChatTurn({ genai, models: ["m"], apiBase: "http://localhost:4700", apiKey: "k", message: "x" });
+    if (planned.kind !== "planned") throw new Error("expected planned");
+
+    const turn = await invokePlannedTurn(
+      { apiBase: "http://localhost:4700", apiKey: "k", fillParams: { username: "demo_operator", password: "demo_password" } },
+      planned
+    );
+
+    expect(turn.kind).toBe("invoked");
+    expect(turn.summary).toBe("Done. confirmationNumber = SA-00002.");
+    const invokeBody = JSON.parse(String(calls[1].init?.body)) as { params: Record<string, string> };
+    expect(invokeBody.params.username).toBe("demo_operator");
+  });
+
+  it("running plan then invoke separately produces the same result as runChatTurn in one call", async () => {
+    stubFetch({ status: "success", outputs: { confirmationNumber: "SA-00003" } });
+    const genai = scriptedGenai("invoke__open_sub_account", { reasoning: "r", memberId: "10001", initialDeposit: "100" });
+
+    const turn = await runChatTurn({ genai, models: ["m"], apiBase: "http://localhost:4700", apiKey: "k", message: "x" });
+
+    expect(turn.kind).toBe("invoked");
+    if (turn.kind !== "invoked") throw new Error("expected invoked");
+    expect(turn.summary).toBe("Done. confirmationNumber = SA-00003.");
   });
 });

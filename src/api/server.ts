@@ -69,6 +69,11 @@ app.get("/capabilities", (_req, res) => {
       confidence,
       inputParams: artifact.inputParams,
       outputSchema: artifact.outputSchema,
+      // Lets a caller decide whether to confirm with a human before invoking, without
+      // having to fetch the whole artifact just to inspect step-level risk itself -- the
+      // chat UI's own pre-invoke confirmation step (see src/chat-ui/server.ts) is the real
+      // reason this exists.
+      hasRiskyStep: artifact.steps.some((s) => s.risk === "risky"),
     }))
   );
 });

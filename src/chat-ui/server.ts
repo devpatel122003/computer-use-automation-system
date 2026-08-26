@@ -4,8 +4,9 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import session from "express-session";
 import { GoogleGenAI } from "@google/genai";
-import { runChatTurn } from "../frontend/chat-turn.js";
+import { planChatTurn, invokePlannedTurn, type PlanChatTurnResult } from "../frontend/chat-turn.js";
 import { resolveModelList } from "../agent/model-retry.js";
 import { requestLog } from "../http/request-log.js";
 
@@ -50,10 +51,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OPERATOR_USERNAME = process.env.CHAT_UI_OPERATOR_USERNAME ?? "demo_operator";
 const OPERATOR_PASSWORD = process.env.CHAT_UI_OPERATOR_PASSWORD ?? "demo_password";
 
+// Holds a planned-but-not-yet-invoked risky capability call across exactly one confirmation
+// round-trip -- see the /chat handler below. A memory-backed session (express-session's
+// default store, same posture as mock-bank's own login session) is enough for a demo: this
+// is a single process, and losing a pending plan on restart just means re-asking the
+// question, not a correctness problem.
+declare module "express-session" {
+  interface SessionData {
+    pendingPlan?: Extract<PlanChatTurnResult, { kind: "planned" }>;
+  }
+}
+
 const app = express();
 app.disable("x-powered-by");
 app.use(helmet());
 app.use(express.json());
+app.use(
+  session({
+    secret: process.env.CHAT_UI_SESSION_SECRET ?? "chat-ui-dev-secret-not-sensitive",
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 1000 * 60 * 15 },
+  })
+);
 app.use(requestLog("chat-ui"));
 
 app.get("/health", (_req, res) => {
@@ -64,6 +84,37 @@ app.get("/health", (_req, res) => {
 // trigger a real, guardrail-checked action against the target system, and this is the one
 // HTTP surface in this repo with no credential gate at all in front of it.
 const chatLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false });
+
+const AFFIRMATIVE_RE = /^(y|yes|yeah|yep|yup|confirm|confirmed|go ahead|do it|proceed|sure|ok|okay)[.! ]*$/i;
+const NEGATIVE_RE = /^(n|no|nope|cancel|nevermind|never mind|stop|don'?t|abort)[.! ]*$/i;
+
+function describePendingPlan(planned: Extract<PlanChatTurnResult, { kind: "planned" }>, hiddenParamNames: Set<string>): string {
+  // A field like "username" is required by the capability's own schema but isn't marked
+  // `sensitive` (that flag governs redaction, not who's allowed to supply it) -- so a real
+  // model call can invent a blank placeholder for it despite the planner's system prompt
+  // telling it not to (caught live: a bare "create a member" request produced a
+  // confirmation reading "username: "). It's always overwritten by fillParams before
+  // invoking regardless, so showing it here is pure noise, not a real value to confirm.
+  const paramList = Object.entries(planned.redactedParams)
+    .filter(([k]) => !hiddenParamNames.has(k))
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(", ");
+  const tenantNote = planned.plan.tenantId ? ` for tenant "${planned.plan.tenantId}"` : "";
+  return (
+    `Before I go ahead: I'm about to run **${planned.plan.capabilityId}**${tenantNote}` +
+    (paramList ? ` with ${paramList}.` : ".") +
+    ` Reply "yes" to confirm or "no" to cancel.`
+  );
+}
+
+function invokedTurnResponse(turn: Awaited<ReturnType<typeof invokePlannedTurn>>) {
+  return {
+    reply: turn.summary,
+    plan: { capabilityId: turn.plan.capabilityId, tenantId: turn.plan.tenantId, reasoning: turn.redactedReasoning, params: turn.redactedParams },
+    httpStatus: turn.httpStatus,
+    result: turn.result,
+  };
+}
 
 app.post("/chat", chatLimiter, async (req, res) => {
   const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
@@ -79,31 +130,55 @@ app.post("/chat", chatLimiter, async (req, res) => {
   try {
     const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const apiBase = process.env.CAPABILITY_API_BASE ?? "http://localhost:4700";
+    const apiKey = process.env.CAPABILITY_API_KEY;
+    const fillParams = { username: OPERATOR_USERNAME, password: OPERATOR_PASSWORD };
 
-    const turn = await runChatTurn({
-      genai,
-      models: MODELS,
-      apiBase,
-      apiKey: process.env.CAPABILITY_API_KEY,
-      message,
-      fillParams: { username: OPERATOR_USERNAME, password: OPERATOR_PASSWORD },
-    });
+    // A pending risky plan from a PREVIOUS turn takes priority over re-planning this
+    // message from scratch: this message's only job right now is to confirm, cancel, or
+    // (implicitly, by saying something else entirely) supersede that plan.
+    const pending = req.session.pendingPlan;
+    if (pending) {
+      if (AFFIRMATIVE_RE.test(message)) {
+        req.session.pendingPlan = undefined;
+        const turn = await invokePlannedTurn({ apiBase, apiKey, fillParams }, pending);
+        res.json(invokedTurnResponse(turn));
+        return;
+      }
+      if (NEGATIVE_RE.test(message)) {
+        req.session.pendingPlan = undefined;
+        res.json({ reply: "Okay, I won't go ahead with that. Let me know if there's something else I can help with." });
+        return;
+      }
+      // Neither a clear yes nor a clear no -- treat it as a new request and replace the
+      // pending plan below rather than leaving a stale one a later "yes" could reattach to.
+      req.session.pendingPlan = undefined;
+    }
 
-    if (turn.kind === "clarified") {
+    const planned = await planChatTurn({ genai, models: MODELS, apiBase, apiKey, message });
+
+    if (planned.kind === "clarified") {
       // No capability matched clearly enough to act on -- nothing was invoked. See
       // planner.ts's PlanResult for the real incident (a bare "hi" creating a member) this
       // closes; the model's own reply goes straight back, since there's no structured
       // result to template a deterministic one from.
-      res.json({ reply: turn.message });
+      res.json({ reply: planned.message });
       return;
     }
 
-    res.json({
-      reply: turn.summary,
-      plan: { capabilityId: turn.plan.capabilityId, tenantId: turn.plan.tenantId, reasoning: turn.redactedReasoning, params: turn.redactedParams },
-      httpStatus: turn.httpStatus,
-      result: turn.result,
-    });
+    if (planned.capability.hasRiskyStep) {
+      // Explicit user requirement: before doing anything that creates/changes something,
+      // reconfirm the data with the human and only proceed after they say so -- so hold the
+      // plan (with its REAL, unredacted params -- needed to actually invoke it once
+      // confirmed) in the session instead of invoking it now.
+      req.session.pendingPlan = planned;
+      res.json({ reply: describePendingPlan(planned, new Set(Object.keys(fillParams))) });
+      return;
+    }
+
+    // Read-only capabilities (e.g. check-balance) have nothing to confirm -- there's no
+    // action to reconsider before it happens.
+    const turn = await invokePlannedTurn({ apiBase, apiKey, fillParams }, planned);
+    res.json(invokedTurnResponse(turn));
   } catch (err) {
     const messageText = err instanceof Error ? err.message : String(err);
     // "fetch failed" (Node's undici) is exactly what a refused connection looks like -- this

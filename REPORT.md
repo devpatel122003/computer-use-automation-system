@@ -938,6 +938,39 @@ tests added for the mechanics: "hi" now gets a plain conversational reply and cr
 nothing (confirmed against the persisted member list directly), while a real request
 ("create a new member named Alex Chen with $50 in savings") still invokes correctly.
 
+**Confirm-before-executing: nothing that writes gets invoked without an explicit human
+"yes."** Even a correctly-planned request shouldn't just go ahead silently the moment a model
+decides what it means -- a member should see exactly what's about to happen and approve it
+first. This meant splitting the single discover→plan→invoke sequence
+(`chat-turn.ts`'s `runChatTurn()`) into two independently callable halves: `planChatTurn()`
+(discover + plan, stop) and `invokePlannedTurn()` (actually call the capability API). `GET
+/capabilities` (`src/api/server.ts`) now reports `hasRiskyStep` per capability -- the same
+per-step risk data `GuardrailsPolicy` already gates execution on, just surfaced one layer up
+so a caller can decide whether to ask a human *before* reaching that gate, not instead of it.
+`src/chat-ui/server.ts` is the caller that uses this: an `express-session` (mirroring
+mock-bank's own login-session pattern) holds at most one pending plan. A risky-capability plan
+is stored and answered with a plain-language summary instead of invoked; a plain "yes" invokes
+the *stored* plan, a plain "no" discards it, and anything else discards the stale plan and
+plans the new message fresh rather than risking a later, unrelated "yes" reattaching to it.
+`runChatTurn()` itself is now just those two halves composed, so `agent-chat.ts` (an
+already-trusted internal CLI operator) is unaffected.
+
+Building this surfaced a real bug immediately, against real Gemini calls, not scripted ones:
+the confirmation text for a "create a member" request initially read "...with username: ,
+fullName: Priya Chen" -- a blank `username`. `username` is required by `create-member`'s own
+schema but isn't marked `sensitive` (that flag governs redaction, not who's allowed to supply
+a value), so the planner's function-calling schema still forces it into the `required` list,
+and the model invented an empty-string placeholder to satisfy it -- the exact anti-pattern the
+system prompt already warns against, just for a field the `sensitive` exclusion doesn't cover.
+Since `username`/`password` are always overwritten by `fillParams` before invoking regardless
+of what the model proposed, showing the model's guess in the confirmation was pure noise, not
+a real value to confirm -- fixed by filtering any `fillParams` key out of the confirmation
+text. Verified live end-to-end with a cookie jar preserving the session across separate `curl`
+calls: a clean confirmation with no blank field, "yes" actually creating the member (confirmed
+by reading `apps/mock-bank/data/state.mock-bank.json` directly afterward), "no" leaving the
+member count and `nextMemberSeq` completely unchanged, and a plain balance check invoking
+immediately with no confirmation step.
+
 **No longer cut, added in the production-hardening pass:** this endpoint now requires a real
 API key on every route except `/health` (`src/http/api-key-auth.ts`, timing-safe, fails
 closed and loud at startup if unconfigured), plus a rate limit specifically on `/invoke`
