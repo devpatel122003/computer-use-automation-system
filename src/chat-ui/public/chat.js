@@ -10,10 +10,16 @@ const micBtn = document.getElementById("mic-btn");
 const micStatus = document.getElementById("mic-status");
 const speakToggle = document.getElementById("speak-toggle");
 
-function addMessage(text, who) {
+function addMessage(text, who, caption) {
   const el = document.createElement("div");
   el.className = `bubble ${who}`;
   el.textContent = text;
+  if (caption) {
+    const captionEl = document.createElement("div");
+    captionEl.className = "caption";
+    captionEl.textContent = caption;
+    el.appendChild(captionEl);
+  }
   messagesEl.appendChild(el);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return el;
@@ -46,7 +52,13 @@ async function sendMessage(text) {
   thinking.remove();
   const reply = data.reply ?? data.error ?? "Something went wrong.";
   const isError = !data.reply;
-  addMessage(reply, isError ? "bot error" : "bot");
+  // The reply text alone says "it worked" -- this caption is how you actually go verify it:
+  // the exact run this produced, so you can check evidence/runs/<runId>/ (the full step log
+  // and any screenshots) or open mock-bank itself and look the record up directly, instead
+  // of just trusting the chat bubble.
+  const runId = data.result?.runId;
+  const caption = runId ? `${data.result.status} · run ${runId}` : undefined;
+  addMessage(reply, isError ? "bot error" : "bot", caption);
   if (!isError) speak(reply);
 }
 
@@ -98,10 +110,24 @@ if (SpeechRecognitionImpl) {
     micStatus.hidden = true;
   });
 
-  recognizer.addEventListener("error", () => {
+  // The Web Speech API's own error codes -- previously swallowed entirely, which looked
+  // exactly like "the mic button goes active for a second, then just stops" with zero
+  // explanation. The single most common real cause is "not-allowed": the browser (or the
+  // OS microphone permission underneath it) denied access, which fires almost immediately
+  // after start() -- not a bug in the recognizer itself, just invisible without this.
+  const MIC_ERROR_MESSAGES = {
+    "not-allowed": "Microphone access was denied. Check your browser's site permissions for this page (click the icon in the address bar) and your OS microphone privacy settings, then try again.",
+    "audio-capture": "No microphone was found. Check that one is connected and selected as the input device.",
+    "no-speech": "Didn't catch any speech that time -- try again and speak right after clicking the mic.",
+    network: "The browser's speech recognition service couldn't be reached (it needs network access, even though your message stays local otherwise).",
+  };
+
+  recognizer.addEventListener("error", (event) => {
     listening = false;
     micBtn.classList.remove("listening");
     micStatus.hidden = true;
+    if (event.error === "aborted") return; // a deliberate stop, not a real failure
+    addMessage(MIC_ERROR_MESSAGES[event.error] ?? `Voice input failed (${event.error}).`, "bot error");
   });
 } else {
   micBtn.hidden = true;

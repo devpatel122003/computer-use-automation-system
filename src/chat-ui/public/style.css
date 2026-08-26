@@ -76,6 +76,13 @@ header .subtitle {
   white-space: pre-wrap;
 }
 
+.bubble .caption {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.65;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .bubble.user {
   align-self: flex-end;
   background: var(--user-bubble);
