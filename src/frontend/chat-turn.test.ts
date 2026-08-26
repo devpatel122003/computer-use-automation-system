@@ -10,6 +10,15 @@ function scriptedGenai(name: string, args: Record<string, unknown>): GoogleGenAI
   } as unknown as GoogleGenAI;
 }
 
+/** AUTO mode's real "didn't call anything" shape: a text part, no functionCall part. */
+function scriptedTextOnlyGenai(text: string): GoogleGenAI {
+  return {
+    models: {
+      generateContent: async () => ({ candidates: [{ content: { parts: [{ text }] } }] }),
+    },
+  } as unknown as GoogleGenAI;
+}
+
 const CATALOG = [
   {
     id: "open-sub-account",
@@ -23,7 +32,7 @@ const CATALOG = [
   },
 ];
 
-/** Stubs global fetch: first call is GET /capabilities, second is POST /invoke. */
+/** Stubs global fetch: first call is GET /capabilities, second (if it happens) is POST /invoke. */
 function stubFetch(invokeResponse: unknown, invokeStatus = 200) {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
@@ -58,6 +67,8 @@ describe("runChatTurn", () => {
       message: "open a savings account for member 10001 with $100",
     });
 
+    expect(turn.kind).toBe("invoked");
+    if (turn.kind !== "invoked") throw new Error("expected invoked");
     expect(turn.plan.capabilityId).toBe("open-sub-account");
     expect(turn.httpStatus).toBe(200);
     expect(turn.summary).toBe("Done. confirmationNumber = SA-00001.");
@@ -88,6 +99,7 @@ describe("runChatTurn", () => {
       message: "open a savings account for member 10001 with $100",
       fillParams: { username: "demo_operator", password: "demo_password" },
     });
+    if (turn.kind !== "invoked") throw new Error("expected invoked");
 
     // The credential the customer never stated must actually reach the invoke call...
     const invokeBody = JSON.parse(String(calls[1].init?.body)) as { params: Record<string, string> };
@@ -117,6 +129,7 @@ describe("runChatTurn", () => {
       apiKey: "k",
       message: "sign on as demo_operator with password demo_password and open an account for member 10001 with $100",
     });
+    if (turn.kind !== "invoked") throw new Error("expected invoked");
 
     expect(turn.redactedMessage).not.toContain("demo_password");
     expect(turn.redactedParams.password).not.toBe("demo_password");
@@ -136,8 +149,44 @@ describe("runChatTurn", () => {
     const genai = scriptedGenai("invoke__open_sub_account", { reasoning: "r", memberId: "40404", initialDeposit: "100" });
 
     const turn = await runChatTurn({ genai, models: ["m"], apiBase: "http://localhost:4700", apiKey: "k", message: "look up member 40404" });
+    if (turn.kind !== "invoked") throw new Error("expected invoked");
 
     expect(turn.result.status).toBe("business_outcome");
     expect(turn.summary).toContain("member_not_found");
+  });
+
+  describe("a message that doesn't clearly map to any capability (regression: 'hi' must never invoke anything)", () => {
+    it("returns a clarified result and never calls /invoke at all", async () => {
+      const calls = stubFetch({ status: "success", outputs: {} }); // would only be hit if a bug re-introduced an invoke call
+      const genai = scriptedTextOnlyGenai("Hi! I can help you look up a member or open a new sub-account.");
+
+      const turn = await runChatTurn({ genai, models: ["m"], apiBase: "http://localhost:4700", apiKey: "k", message: "hi" });
+
+      expect(turn.kind).toBe("clarified");
+      if (turn.kind !== "clarified") throw new Error("expected clarified");
+      expect(turn.message).toContain("look up a member");
+      // Exactly one fetch call (the capability discovery), never a second one to /invoke --
+      // this is the actual regression check: a bare greeting must not create anything.
+      expect(calls).toHaveLength(1);
+      expect(calls[0].url).toContain("/capabilities");
+    });
+
+    it("still redacts the echoed message even though no capability's sensitive-field list applies", async () => {
+      stubFetch({ status: "success", outputs: {} });
+      const genai = scriptedTextOnlyGenai("Not sure what you mean -- try asking me to open an account.");
+
+      const turn = await runChatTurn({
+        genai,
+        models: ["m"],
+        apiBase: "http://localhost:4700",
+        apiKey: "k",
+        message: "my card number is 4111111111111111, what can you do?",
+      });
+      if (turn.kind !== "clarified") throw new Error("expected clarified");
+
+      // Pattern-based (card-shaped) defense-in-depth redaction still applies even with no
+      // capability-specific sensitive-value list to work from.
+      expect(turn.redactedMessage).not.toContain("4111111111111111");
+    });
   });
 });

@@ -25,6 +25,18 @@ export interface CapabilityInvocationPlan {
   reasoning: string;
 }
 
+/**
+ * What the model decided to do with one request. `invoke` is the case everything downstream
+ * already handles (guardrails, replay, the structured result). `clarify` is the case this
+ * module didn't have until a real bug surfaced it: forcing the model to always call some
+ * function (`functionCallingConfig.mode = ANY`) meant a plain greeting ("hi") got jammed into
+ * whichever capability's required fields were easiest to satisfy -- literally using the word
+ * "hi" as a new member's full name and actually creating one. A real chat surface gets
+ * greetings, chit-chat, and incomplete requests constantly; forcing an action out of every
+ * one of them is itself the bug, not a model that "isn't calling the function right."
+ */
+export type PlanResult = { kind: "invoke"; plan: CapabilityInvocationPlan } | { kind: "clarify"; message: string };
+
 const GEMINI_TYPE: Record<"string" | "number" | "boolean", Type> = {
   string: Type.STRING,
   number: Type.NUMBER,
@@ -76,30 +88,41 @@ export function buildToolDeclarations(capabilities: DiscoveredCapability[]): Fun
 const SYSTEM_PROMPT = `You are the agent-facing front end for a bank/credit-union back-office automation system.
 A member-services request comes in as natural language. You do not execute anything yourself --
 you only decide which one capability (function) answers the request, and with what arguments,
-by calling exactly one function. Never invent a value for any field the request doesn't
-explicitly specify -- this includes placeholder-looking values ("N/A", "unknown",
-"<REQUIRED>", empty string) which are just as much an invention as a fake real-looking value.
-If a required argument is genuinely missing from the request, still choose the best-matching
-capability and leave that argument out of your call entirely -- the invocation will fail
-validation explicitly and safely, rather than silently proceeding on a made-up value. This
-matters most for credential fields: never supply a username or password unless the request
-states one verbatim; a missing credential should block the call, not get papered over.
+by calling at most one function.
+
+Call a function ONLY when the request is clearly asking for one of the available capabilities
+AND you can supply its genuinely required arguments from what the request actually says.
+Never invent a value for any field the request doesn't explicitly specify -- this includes
+placeholder-looking values ("N/A", "unknown", "<REQUIRED>", empty string) and, just as much,
+treating unrelated words from the message itself (a greeting, a stray word) as if they were a
+real field value. If a required argument is genuinely missing, either don't call any function
+at all, or call the best-matching one and leave that argument out entirely -- the invocation
+will fail validation explicitly and safely, rather than silently proceeding on a made-up value.
+
+If the message is a greeting, small talk, a question about what you can do, or otherwise
+doesn't clearly map to one of the available capabilities, do NOT call any function -- just
+reply in plain text (briefly, one or two sentences, mentioning what you can actually help
+with). Calling a function anyway "to be helpful" is exactly the mistake to avoid: it can
+trigger a real action (e.g. actually enrolling a new member) using nonsense data.
+
+Credential fields: never supply a username or password unless the request states one
+verbatim; a missing credential should block the call, not get papered over.
 When a request states a dollar amount, supply only the plain numeric value with no currency
 symbol, comma, or unit (e.g. "100" for "$100" or "one hundred dollars") -- the field this
 becomes is validated as a plain number downstream, and a literal "$100" is not one.`;
 
 /**
- * One model call, one function call back -- same `functionCallingConfig.mode = ANY`
- * discipline as the discovery loop (src/agent/discovery-agent.ts), for the same reason: the
- * caller needs exactly one unambiguous decision per request, not a choice among several or
- * a free-text ramble beside it.
+ * One model call, at most one function call back. Deliberately `AUTO`, not `ANY`: forcing a
+ * function call on every turn is what let a bare "hi" get treated as a real enrollment
+ * request (see `PlanResult`'s own doc comment) -- the model needs a real way to decide
+ * "nothing here" without that being an error.
  */
 export async function planInvocation(
   genai: GoogleGenAI,
   models: string[],
   capabilities: DiscoveredCapability[],
   utterance: string
-): Promise<CapabilityInvocationPlan> {
+): Promise<PlanResult> {
   if (capabilities.length === 0) {
     throw new Error("No capabilities available to plan against -- discover at least one before invoking.");
   }
@@ -117,14 +140,20 @@ export async function planInvocation(
       config: {
         systemInstruction: SYSTEM_PROMPT,
         tools: [{ functionDeclarations: buildToolDeclarations(capabilities) }],
-        toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.ANY } },
+        toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO } },
       },
     })
   );
 
-  const call = response.candidates?.[0]?.content?.parts?.find((p) => p.functionCall !== undefined)?.functionCall;
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  const call = parts.find((p) => p.functionCall !== undefined)?.functionCall;
+
   if (!call?.name) {
-    throw new Error("Model response contained no function call.");
+    // AUTO mode means "no function call" is a real, expected outcome, not an error -- the
+    // model chose to just talk. Fall back to a generic line if it somehow didn't include
+    // one, but that's the fallback, not the reasoning we're relying on here.
+    const text = parts.find((p) => typeof p.text === "string" && !p.thought)?.text;
+    return { kind: "clarify", message: text?.trim() || "I'm not sure how to help with that -- could you rephrase, or ask me to look up or open something specific?" };
   }
 
   const capabilityId = nameToId.get(call.name);
@@ -146,5 +175,5 @@ export async function planInvocation(
     if (value !== undefined) params[key] = String(value);
   }
 
-  return { capabilityId, params, tenantId, reasoning };
+  return { kind: "invoke", plan: { capabilityId, params, tenantId, reasoning } };
 }

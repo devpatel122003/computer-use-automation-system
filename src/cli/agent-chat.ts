@@ -58,6 +58,14 @@ async function main(): Promise<void> {
   // leak the discovery agent's own goal string had (see REPORT.md "Safety") -- runChatTurn
   // already computed the redacted versions before this file ever sees them.
   console.log(`\nRequest: "${turn.redactedMessage}"`);
+
+  if (turn.kind === "clarified") {
+    // No capability matched (or clearly enough to act on) -- nothing was invoked, so there's
+    // nothing to redact/report beyond the model's own reply. See planner.ts's PlanResult.
+    console.log(`\n${turn.message}`);
+    return;
+  }
+
   console.log(
     `Plan: invoke "${turn.plan.capabilityId}"${turn.plan.tenantId ? ` for tenant "${turn.plan.tenantId}"` : ""} with ${JSON.stringify(turn.redactedParams)}`
   );

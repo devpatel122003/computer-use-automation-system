@@ -887,6 +887,25 @@ rewriting the persisted file, not just in-memory state. Verified by actually kil
 restarting the process, not just reasoning about the code: a member created before the
 restart was still there after it.
 
+**A more serious real bug, found the same way: a bare "hi" actually created a new member.**
+`planInvocation` forced a function call on every turn (`functionCallingConfig.mode = ANY`),
+which was fine when the only realistic caller was a CLI already stating a specific request.
+Once a real chat surface existed, an ordinary greeting had nowhere honest to go: the model
+still had to call *some* function, still had to supply `fullName` since it's genuinely
+required, and used the literal word "hi" -- creating a real member named "hi." This is
+exactly the class of bug this system's own guardrail philosophy exists to prevent (a
+write happening from data nobody actually provided), just arriving through the front door
+instead of the target app. Fixed properly, not patched around: switched to
+`functionCallingConfig.mode = AUTO`, so the model has a real, first-class way to reply in
+plain text and invoke nothing when a message doesn't clearly map to a capability with its
+genuinely-required fields actually stated. `planInvocation` now returns a `PlanResult`
+union (`{ kind: "invoke" }` or `{ kind: "clarify", message }`) instead of always assuming an
+invocation follows, threaded through `chat-turn.ts`'s `ChatTurnResult` and both of its
+callers (the CLI, the chat UI). Verified against real Gemini calls, not just the unit
+tests added for the mechanics: "hi" now gets a plain conversational reply and creates
+nothing (confirmed against the persisted member list directly), while a real request
+("create a new member named Alex Chen with $50 in savings") still invokes correctly.
+
 **No longer cut, added in the production-hardening pass:** this endpoint now requires a real
 API key on every route except `/health` (`src/http/api-key-auth.ts`, timing-safe, fails
 closed and loud at startup if unconfigured), plus a rate limit specifically on `/invoke`

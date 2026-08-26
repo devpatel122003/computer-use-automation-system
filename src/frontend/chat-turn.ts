@@ -22,25 +22,50 @@ export interface ChatTurnOptions {
   fillParams?: Record<string, string>;
 }
 
-export interface ChatTurnResult {
-  capabilities: DiscoveredCapability[];
-  plan: CapabilityInvocationPlan;
-  /** The customer's own message, redacted -- safe to log or display. */
-  redactedMessage: string;
-  /** The model's chosen params, redacted, BEFORE any fillParams merge -- an injected
-   *  service credential should never appear in anything shown back to the caller, redacted
-   *  or not, since it was never something the caller stated in the first place. */
-  redactedParams: Record<string, string>;
-  redactedReasoning: string;
-  httpStatus: number;
-  result: InvokeResponse;
-  summary: string;
-}
+/**
+ * `invoked` is the case that actually calls the capability API. `clarified` is the case a
+ * real bug forced into existence: a message that doesn't clearly map to any capability (a
+ * greeting, small talk, an incomplete request) must NOT invoke anything -- see
+ * `planner.ts`'s `PlanResult` doc comment for the "hi" became a real enrollment incident
+ * this closes. Both branches still redact the customer's own message before it goes
+ * anywhere -- a `clarify` turn was never checked against any capability's sensitive-field
+ * list, so it only gets the pattern-based (SSN/card-shaped) defense-in-depth scrub, not
+ * value-based redaction, same as the discovery goal string before the password field was
+ * ever "seen."
+ */
+export type ChatTurnResult =
+  | {
+      kind: "invoked";
+      capabilities: DiscoveredCapability[];
+      plan: CapabilityInvocationPlan;
+      /** The customer's own message, redacted -- safe to log or display. */
+      redactedMessage: string;
+      /** The model's chosen params, redacted, BEFORE any fillParams merge -- an injected
+       *  service credential should never appear in anything shown back to the caller,
+       *  redacted or not, since it was never something the caller stated in the first
+       *  place. */
+      redactedParams: Record<string, string>;
+      redactedReasoning: string;
+      httpStatus: number;
+      result: InvokeResponse;
+      summary: string;
+    }
+  | {
+      kind: "clarified";
+      capabilities: DiscoveredCapability[];
+      redactedMessage: string;
+      /** The model's own conversational reply -- not templated, since there's no
+       *  structured result to template it from. This is the one place in this system's
+       *  conversational front end where the reply IS the model's own words, not a
+       *  deterministic summary -- deliberately, since nothing was decided or executed to
+       *  summarize. */
+      message: string;
+    };
 
 /**
- * The one real implementation of "natural language in, capability invoked, structured
- * result out" -- discover capabilities, decide which one + what args (the model's only
- * job), invoke it through the exact same capability API every other caller uses, and
+ * The one real implementation of "natural language in, capability invoked (or not), result
+ * out" -- discover capabilities, decide whether/which one + what args (the model's only
+ * job), invoke it through the exact same capability API every other caller uses if so, and
  * template a deterministic summary. Used by both `src/cli/agent-chat.ts` and
  * `src/chat-ui/server.ts` so there is exactly one place this sequence is implemented.
  */
@@ -53,7 +78,18 @@ export async function runChatTurn(options: ChatTurnOptions): Promise<ChatTurnRes
   const catalog = (await listRes.json()) as Array<{ id: string; description: string; inputParams: DiscoveredCapability["inputParams"] }>;
   const capabilities: DiscoveredCapability[] = catalog.map((c) => ({ id: c.id, description: c.description, inputParams: c.inputParams }));
 
-  const plan = await planInvocation(genai, models, capabilities, message);
+  const planResult = await planInvocation(genai, models, capabilities, message);
+
+  if (planResult.kind === "clarify") {
+    return {
+      kind: "clarified",
+      capabilities,
+      redactedMessage: redact(message, {}) as string,
+      message: planResult.message,
+    };
+  }
+
+  const plan = planResult.plan;
   const redactOpts = redactionOptionsFor(capabilities, plan);
 
   // fillParams always wins over plan.params: even if a customer's message somehow named a
@@ -69,6 +105,7 @@ export async function runChatTurn(options: ChatTurnOptions): Promise<ChatTurnRes
   const result = (await invokeRes.json()) as InvokeResponse;
 
   return {
+    kind: "invoked",
     capabilities,
     plan,
     redactedMessage: redact(message, redactOpts) as string,

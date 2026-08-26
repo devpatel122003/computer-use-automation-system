@@ -89,6 +89,7 @@ deliberate design decision, not an oversight.
 | The member types "$100" instead of "100" | Handled at the prompt level now — a real bug found by actually running this: the target app's own numeric parsing read a literal `"$100"` as `NaN` and misreported it as below the minimum deposit. Fixed by telling the model explicitly to strip currency symbols. |
 | The member's browser doesn't support voice input (most don't fully implement it) | The mic button simply isn't shown at all — no broken control, no silent failure, typing still works exactly the same. |
 | The chat page itself somehow got asked for operator credentials | It wouldn't matter — the chat UI's server injects its own configured service-account credential after planning, which always overrides anything a customer's message (or the model's own guess) supplied. |
+| The member just says "hi," or asks a question that doesn't match any capability | A real bug, now fixed: this used to force a function call no matter what, and once used the literal word "hi" as a brand-new member's name — creating one for real. Now the model can reply in plain text and invoke nothing; verified against real Gemini that "hi" creates no member. |
 
 ---
 

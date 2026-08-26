@@ -89,6 +89,15 @@ app.post("/chat", chatLimiter, async (req, res) => {
       fillParams: { username: OPERATOR_USERNAME, password: OPERATOR_PASSWORD },
     });
 
+    if (turn.kind === "clarified") {
+      // No capability matched clearly enough to act on -- nothing was invoked. See
+      // planner.ts's PlanResult for the real incident (a bare "hi" creating a member) this
+      // closes; the model's own reply goes straight back, since there's no structured
+      // result to template a deterministic one from.
+      res.json({ reply: turn.message });
+      return;
+    }
+
     res.json({
       reply: turn.summary,
       plan: { capabilityId: turn.plan.capabilityId, tenantId: turn.plan.tenantId, reasoning: turn.redactedReasoning, params: turn.redactedParams },
