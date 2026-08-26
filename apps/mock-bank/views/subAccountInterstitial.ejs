@@ -1,0 +1,39 @@
+<html>
+<head><title><%= labels.brandName %> &mdash; Additional Confirmation Required</title></head>
+<body bgcolor="#d6d3ce">
+<table width="100%" cellpadding="4" cellspacing="0" border="0">
+  <tr bgcolor="#003366">
+    <td><font color="#ffffff" face="Arial" size="4"><b>Member Services Terminal</b></font></td>
+    <td align="right"><font color="#ffffff" face="Arial" size="2">Signed on as <%= username %> &nbsp; | &nbsp; <a href="/logout"><font color="#ffffff">Sign Off</font></a></font></td>
+  </tr>
+</table>
+<% if (labels.bannerText) { %>
+  <table width="100%" cellpadding="6" cellspacing="0" border="0">
+    <tr bgcolor="#e8edf5"><td><font face="Arial" size="2"><i><%= labels.bannerText %></i></font></td></tr>
+  </table>
+<% } %>
+<br/>
+<table bgcolor="#fff3cd" cellpadding="8" cellspacing="0" border="1">
+  <tr><td>
+    <font color="#7a5c00" face="Arial" size="3"><b>Additional Confirmation Required</b></font>
+    <br/><br/>
+    <font face="Arial" size="2">
+      This member is flagged dormant. Opening a new sub-account for member <%= memberId %>
+      requires an operator to explicitly confirm before it proceeds.
+    </font>
+  </td></tr>
+</table>
+<br/>
+<table cellpadding="8" cellspacing="0" border="1">
+  <tr>
+    <td>
+      <form method="POST" action="/members/<%= memberId %>/sub-accounts/confirm-interstitial">
+        <input type="hidden" name="accountType" value="<%= accountType %>" />
+        <input type="hidden" name="initialDeposit" value="<%= initialDeposit %>" />
+        <input type="submit" value="Confirm & Continue" />
+      </form>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

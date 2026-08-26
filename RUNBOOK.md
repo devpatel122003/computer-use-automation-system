@@ -27,9 +27,22 @@ treat these as a floor, not the real beat length.
 3. **`src/cli/agent-invoke-demo.ts`** printed a factually wrong decline reason ("isn't
    approved yet") for an artifact that genuinely *was* approved but had low/drift-capped
    confidence instead — confusing if said out loud live. Now distinguishes the two cases.
+4. **`src/escalation/controller.ts`'s `requestIntervention()` could not tell "no one was
+   there to answer" apart from "a human deliberately pressed Enter to resume"** — both
+   collapsed to the same empty string after fix #2 above, so a closed-stdin escalation would
+   have silently resumed instead of aborting. Found while building replay's own
+   escalation-resume (see below); fixed by having `promptLine` return `null` specifically for
+   stream closure, distinct from a real blank answer.
 
-All three fixes are sitting uncommitted in the working tree as of this writing (222/222
-tests passing, typecheck clean) — commit them before Friday.
+All four fixes are sitting uncommitted in the working tree as of this writing (234/234 tests
+passing, typecheck clean) — commit them before Friday.
+
+**New since the clean-clone verification: replay-side escalation-resume.** Discovery already
+had real mid-run resume; replay (the brief's own "production execution path") didn't — a hard
+failure just ended the run. `ReplayOptions.onEscalate` closes that gap: a genuine hard failure
+now offers a human one bounded chance to fix live state and resume, opt-in via
+`--interactive-escalation true` (same posture as `--assisted-recovery`). See the new Beat 3b
+below and REPORT.md §5/§7 for the full design and the bug found while building it (#4 above).
 
 ## The night before (2026-08-27, before the flight)
 
@@ -147,6 +160,24 @@ redirects the *same live session* → discovery **re-observes**, doesn't assume 
 completes on the same session. Explicitly name the seam: `controller: 'automation' | 'human'`,
 and that a real console would attach to the same page via its CDP endpoint without changing
 this model at all.
+
+### Beat 3b — The same resume story, on the REPLAY path this time `[real: ~5-10s]`
+
+```bash
+curl -s -X POST http://localhost:4000/__test__/reset
+npm run escalation-resume-replay-demo
+```
+Say explicitly what this closes: Beat 3 showed *discovery* resuming; until this pass, *replay*
+— the brief's own "production execution path," the one an AI agent triggers unattended — had
+no equivalent, so a hard failure just ended the run. Member `77777` hits an unexpected
+confirmation interstitial (the brief's own named runtime condition, Section 1) the recorded
+artifact never accounted for. Narrate: hard failure at step-10 (nothing in `knownOutcomes`
+explains it) → escalation raised → (scripted) human dismisses the interstitial on the *same*
+session → replay's post-resume checkpoint recheck picks it up → real confirmation number,
+without re-doing any step the human already handled by hand. If asked how this differs from
+`--assisted-recovery`: that's a bounded *model* call proposing a fix; this is a bounded
+*human* decision — the two are deliberately separate mechanisms for two different kinds of
+"replay can't figure this out alone."
 
 ### Beat 4 — Cross-tenant reuse, with the negative control `[real: ~5s per replay, once northgate mock-bank is up]`
 

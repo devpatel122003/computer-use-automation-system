@@ -183,6 +183,32 @@ app.post("/members/:id/sub-accounts", requireAuth, (req, res) => {
     return;
   }
 
+  // An unexpected interstitial the recorded flow never accounted for -- see the
+  // `requiresInterstitialConfirmation` doc comment in data.ts. Deliberately not something
+  // the caller can pass a param to skip: a real unanticipated dialog isn't something the
+  // artifact's own inputs could have predicted either.
+  if (member.requiresInterstitialConfirmation) {
+    res.render("subAccountInterstitial", { username: req.session.username, memberId: id, accountType, initialDeposit: rawDeposit });
+    return;
+  }
+
+  const record = createSubAccount(id, accountType, initialDeposit);
+  res.redirect(`/members/${id}/sub-accounts/${record.id}/confirm`);
+});
+
+// Dismissing the interstitial above -- a human's manual action on the live session, not
+// something the recorded artifact's own steps ever reach on their own.
+app.post("/members/:id/sub-accounts/confirm-interstitial", requireAuth, (req, res) => {
+  const { id } = req.params;
+  const member = findMember(id);
+  if (!member) {
+    res.redirect(`/search?memberId=${encodeURIComponent(id)}`);
+    return;
+  }
+
+  const accountType = String(req.body.accountType ?? "Savings") as "Savings" | "Checking" | "CD";
+  const initialDeposit = Number(req.body.initialDeposit ?? "0");
+
   const record = createSubAccount(id, accountType, initialDeposit);
   res.redirect(`/members/${id}/sub-accounts/${record.id}/confirm`);
 });

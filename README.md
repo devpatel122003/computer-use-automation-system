@@ -70,7 +70,9 @@ guardrail design in one place.
   invoked through the exact same capability API above.
 - `src/guardrails/` — the allowlist policy, risk classification, and redaction utilities.
 - `src/escalation/` — the intervention/handoff controller (pause automation, let a human
-  drive the same live browser session, capture what they did, hand control back).
+  drive the same live browser session, capture what they did, hand control back); shared by
+  both discovery and, as of this pass, replay's own `--interactive-escalation` (see
+  `src/replay/replay-engine.ts`'s `onEscalate` and README step 4c below).
 - `src/http/` — production-hardening middleware shared by the capability API and dashboard:
   `api-key-auth.ts` (bearer/API-key auth for the capability API, HTTP Basic auth for the
   dashboard, both timing-safe and fail-closed at startup if unconfigured — see `SECURITY.md`)
@@ -80,8 +82,8 @@ guardrail design in one place.
   stretch goal — a non-numbered addition that reformats the same redacted evidence every run
   already writes into a compliance/audit report for a bank's audit function).
 - `src/cli/` — the entry points (`run-agent`, `replay`, `approve`, `escalation-resume-demo`,
-  `compliance-report`, `canary-check`) and the `open-sub-account` capability's domain config
-  (param mappings, checkpoints, known outcomes).
+  `escalation-resume-replay-demo`, `compliance-report`, `canary-check`) and the
+  `open-sub-account` capability's domain config (param mappings, checkpoints, known outcomes).
 - `apps/mock-bank/src/tenants.ts` + `config/tenant-overrides/` — a second tenant ("Northgate
   Credit Union") served from the *same* mock-bank app/routes/views with different copy and
   DOM structure, and the override file that adapts the base artifact to it.
@@ -310,6 +312,41 @@ npm run replay -- \
 ```
 
 This also lowered the approved artifact's confidence score for real -- see step 5.
+
+**4c. See that same three-way contract's fourth possibility: a human resuming a REPLAY hard
+failure, not just discovery's.** Step 2b showed discovery resuming after a human intervenes;
+until now, replay -- the brief's own "production execution path" -- had no equivalent, so a
+genuinely unanticipated hard failure like 4b's just ended the run. `apps/mock-bank`'s
+`requiresInterstitialConfirmation` scenario (member `77777`) simulates the brief's own named
+"unexpected confirmation dialog" (Section 1): opening a sub-account renders an interstitial
+the recorded artifact never accounted for, so step-10's checkpoint genuinely fails with
+nothing in `knownOutcomes` to explain it:
+
+```bash
+curl -s -X POST http://localhost:4000/__test__/reset
+npm run escalation-resume-replay-demo
+```
+
+Real, not simulated: the pause, the resume decision routed back into `replay()`, and the run
+completing afterward on the same session with a real confirmation number. Scripted, and
+disclosed as such (see the header comment in `src/cli/escalation-resume-replay-demo.ts`): the
+one click a human would make to dismiss the interstitial, since this process has no mouse to
+hand to an actual person.
+
+```
+Replay finished with status: success
+{
+  "status": "success",
+  "outputs": { "confirmationNumber": "SA-00001" }
+}
+```
+
+The same capability is available as a plain CLI flag for any artifact/params, not just this
+one scripted scenario -- `npm run replay -- ... --interactive-escalation true` offers a human
+at the terminal the same one-shot resume-or-abort choice on any genuine hard failure. Omitted
+by default everywhere (same opt-in posture as `--assisted-recovery`): an unattended caller
+(the capability API, `canary-check`) has no human to hand a stuck run to, so it keeps failing
+immediately unless this is explicitly turned on.
 
 **5. Confidence & approval (Section 8 stretch goal).** Every replay records its outcome
 against the artifact's exact content fingerprint in `evidence/artifacts/registry.json`, and
@@ -598,9 +635,10 @@ evidence, same "replay never calls a model" promise as step 3.
 
 Containerizes the three long-running services -- mock-bank (both tenants), the capability
 API, and the dashboard -- as an alternative to running each with its own `npm run` command.
-Deliberately does **not** containerize `run-agent`, `escalation-resume-demo`, or
-`vision-fallback-demo`: those launch a real *headed* Chromium window meant to be watched
-live, which can't run headless in a container; step 1-7 and 12-13 above still need the host
+Deliberately does **not** containerize `run-agent`, `escalation-resume-demo`,
+`escalation-resume-replay-demo`, or `vision-fallback-demo`: those launch a real *headed*
+Chromium window meant to be watched live, which can't run headless in a container; step
+1-7 and 12-13 above still need the host
 setup for that reason. `docker-compose.yml` builds `Dockerfile.mock-bank`,
 `Dockerfile.capability-api` (runtime base `mcr.microsoft.com/playwright:v1.49.1-jammy`, so
 the browser binaries baked into the image match this repo's `playwright` version -- no
@@ -649,7 +687,7 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (192 tests across 24 files, no network/browser
+`npm test` runs a real Vitest unit suite (234 tests across 28 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route
@@ -675,6 +713,11 @@ claim about what real Gemini would decide), and, where a class's own private sta
 stub impractical, a real `GuardrailsPolicy` against a temp config.
 What's deliberately not unit-tested with mocks: the real Playwright surface, and Gemini's
 actual judgment about what to click/propose -- see `REPORT.md` "Architecture" for why real
-runs in `/evidence` (including `escalation-resume-demo`, the `failure`-result replay above,
-the cross-tenant reuse pair in step 6, and the assisted/vision-fallback runs in steps 12-13)
-are the right verification for those instead.
+runs in `/evidence` (including `escalation-resume-demo` and its replay-side counterpart
+`escalation-resume-replay-demo`, the `failure`-result replay above, the cross-tenant reuse
+pair in step 6, and the assisted/vision-fallback runs in steps 12-13) are the right
+verification for those instead. The escalation-resume decision logic itself
+(`resolveInterventionDecision` in `src/escalation/controller.ts`) and the replay engine's
+own post-escalation retry/checkpoint-recheck logic (`src/replay/replay-engine.ts`) *are*
+real Vitest-covered, near-pure logic -- only the live Page/browser parts stay
+evidence-verified.

@@ -13,6 +13,16 @@ export interface Member {
   savingsBalance: number;
   permissionRestricted?: boolean;
   simulateSlow?: boolean;
+  /** Simulates the brief's own named "unexpected confirmation dialog" runtime condition
+   *  (Section 1): opening a sub-account for this member renders an interstitial the
+   *  recorded flow never accounted for, instead of going straight to confirmation --
+   *  deliberately NOT modeled as a knownOutcome, so replay genuinely hard-fails at step-10's
+   *  checkpoint with nothing to explain it, the same way a real unanticipated dialog would.
+   *  Standing scenario for the replay-side escalation-resume demo (see
+   *  src/cli/escalation-resume-replay-demo.ts): a human dismissing the interstitial on the
+   *  live session is something automation cannot do on its own, and there's no way to
+   *  detect-and-recover from it generically the way session-timeout is. */
+  requiresInterstitialConfirmation?: boolean;
 }
 
 const seedMembers: Member[] = [
@@ -21,6 +31,7 @@ const seedMembers: Member[] = [
   { id: "99999", name: "Restricted Member", checkingBalance: 0, savingsBalance: 0, permissionRestricted: true },
   { id: "55555", name: "Slow Member", checkingBalance: 500, savingsBalance: 500, simulateSlow: true },
   { id: "90909", name: "Tempo Member", checkingBalance: 1500.0, savingsBalance: 2200.0 },
+  { id: "77777", name: "Dormant-Flag Member", checkingBalance: 75.0, savingsBalance: 40.0, requiresInterstitialConfirmation: true },
 ];
 
 // Populated by resetData() below, called once at module load -- a single source of truth

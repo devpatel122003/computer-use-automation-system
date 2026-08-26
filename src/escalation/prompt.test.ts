@@ -34,18 +34,24 @@ describe("promptLine", () => {
     expect(answer).toBe("yes");
   });
 
-  it("resolves as declined (empty string), not hanging, when input closes before any answer", async () => {
+  it("resolves as null, not hanging, when input closes before any answer", async () => {
     // Simulates `--allow-risky true < /dev/null`: stdin is a genuinely closed, zero-byte
     // stream, as opposed to a pipe carrying a real answer. Regression coverage for a real bug
     // found while verifying the demo path from a fresh clone -- this used to hang forever
     // (with a live Playwright browser open elsewhere in the process keeping the event loop
     // alive, so it never even exited on its own).
+    //
+    // Resolves to `null`, not `""`: a human pressing bare Enter to answer (e.g. "resume") is
+    // also an empty string, and collapsing "no answer was possible" into that same value
+    // would make a caller like EscalationController.requestIntervention() unable to tell a
+    // closed stream apart from a deliberate blank-Enter resume -- found while wiring replay's
+    // own escalation-resume, see controller.ts.
     const answer = await withTimeout(
       promptLine("continue? ", Readable.from([]), nullWritable()),
       1000,
       "promptLine with closed/empty input",
     );
-    expect(answer).toBe("");
+    expect(answer).toBeNull();
   });
 
   it("still resolves with the real answer even though the input stream ends right after it", async () => {

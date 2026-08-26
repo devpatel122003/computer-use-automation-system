@@ -118,12 +118,13 @@ first, so the model has to justify itself as part of the structured call, not be
 
 **Verification.** Near-pure logic — checkpoint evaluation, redaction, allowlist route
 matching (including origin-parsing edge cases), the confidence/registry math, the recorder's
-artifact-building, schema cross-field validation, the replay engine's recovery/retry state
-machine, and now the discovery loop's own control flow (escalate/resume, dead-end detection,
-risky-action confirmation) — has a real unit test suite (`npm test`, Vitest, 89 tests) built
-against small fakes (a stub `Surface`, a scripted fake model *output*, a real
-`GuardrailsPolicy` against a temp config where the class's private state made a plain fake
-impractical), not mocks of the browser or of what the model would actually decide. What's
+artifact-building, schema cross-field validation, the replay engine's recovery/retry/
+escalation-resume state machine, and the discovery loop's own control flow (escalate/resume,
+dead-end detection, risky-action confirmation) — has a real unit test suite (`npm test`,
+Vitest, 234 tests across 28 files as of this pass) built against small fakes (a stub
+`Surface`, a scripted fake model *output*, a real `GuardrailsPolicy` against a temp config
+where the class's private state made a plain fake impractical), not mocks of the browser or
+of what the model would actually decide. What's
 deliberately *not* unit-tested: the real Playwright surface, and Gemini's actual judgment
 about what to click next. Mocking a browser or asserting what an LLM "should" say would test
 the mock, not the system; those are verified by the real discovery/replay runs in `/evidence`
@@ -318,9 +319,58 @@ what makes "same session, not a fresh one" actually true rather than aspirationa
 
 **Handing back control.** For discovery, `resume` re-enters the observe→decide→act loop
 with a function-response telling the model a human just acted, so it re-orients from the
-current state. For replay, the risky-step confirmation gate is the same mechanism; a
-production build would extend it to resume mid-artifact after a hard failure, which today
-just returns the `failure` result for the caller to handle (see Cuts).
+current state. For replay, the risky-step confirmation gate is one mechanism; as of this
+pass, a genuine hard failure has a second: `ReplayOptions.onEscalate`
+(`src/replay/replay-engine.ts`) offers a human one bounded chance to fix the live session and
+resume mid-artifact, rather than only ending the run — closing what this report used to list
+first under Cuts. Opt-in only (`replay --interactive-escalation true`), for the same reason
+`--assisted-recovery` is: an unattended caller (the capability API, `canary-check`) has no
+human to hand a stuck run to, so it should keep failing immediately by default, not pause
+waiting for someone who isn't there.
+
+On resume, replay does **not** blindly re-run the step that failed — it first re-checks that
+step's own checkpoint directly against the live page. If the human's manual fix already
+satisfies it (they did the equivalent of the step's work by hand, or the mechanical action
+had already fired and only the checkpoint hadn't settled), the step is treated as done
+without a redundant or duplicate action; only if the checkpoint still doesn't hold (or the
+step has none to check, e.g. an `extract`) does it retry the recorded action once — the
+right behavior for "the human cleared an obstacle but didn't do the step's actual work
+themselves." The landed URL is re-checked against the allowlist either way, the same
+guardrail every other landing site in the replay engine already applies: a human's
+intervention is a real navigation too, not exempt from where it's allowed to land. Escalation
+is capped at one attempt per step, same reasoning as recovery's own cap — a failure that
+recurs immediately after a human already tried once is a systemic problem, not something a
+second prompt fixes.
+
+This mechanism has real evidence, not just unit tests: `npm run escalation-resume-replay-demo`
+(`src/cli/escalation-resume-replay-demo.ts`) drives a replay of the real `open-sub-account`
+artifact against a member (`77777`, `apps/mock-bank`'s `requiresInterstitialConfirmation`
+scenario) that renders an unexpected confirmation interstitial — the brief's own named
+runtime condition (Section 1) — which the recorded artifact never accounted for and which
+isn't modeled in `knownOutcomes`, so step-10's checkpoint genuinely hard-fails with nothing
+to explain it automatically. On escalation, a scripted stand-in for a human (disclosed in the
+script's header, same posture as `escalation-resume-demo.ts`'s scripted navigation) clicks
+"Confirm & Continue" on the live page; replay's post-resume checkpoint recheck picks up that
+the confirmation page has now been reached, and the run completes with a real confirmation
+number (`SA-00001`) — real evidence at `evidence/runs/replay-2026-08-26T00-40-07-082Z`. A
+second real run proved the *unattended* default holds even for this new path: piping closed
+stdin at `replay --interactive-escalation true` against the same scenario correctly reports
+the original checkpoint failure rather than hanging or, worse, silently resuming — see the
+next paragraph for the bug that finding surfaced.
+
+**A real bug found while building this, distinct from the one that motivated
+`src/escalation/prompt.ts`'s original fix.** That earlier fix made closed stdin resolve
+instead of hanging forever, but it resolved to the *same* empty string a human deliberately
+pressing bare Enter to resume also produces — so `EscalationController.requestIntervention()`
+could not tell "no one was there to answer" apart from "a human answered and chose to
+resume," and would have silently resumed an escalation nobody actually reviewed. Fixed by
+having `promptLine` return `null` specifically for stream closure, distinct from a real
+(possibly blank) answer; `resolveInterventionDecision` (`src/escalation/controller.ts`, now
+extracted as a pure, directly unit-tested function) treats `null` as `abort` — the same
+conservative default `confirmRiskyAction` already applied for the risky-action-confirmation
+case — while a real blank Enter still means resume, exactly as the console prompt promises.
+Found by re-running the manual verification for this exact feature from the CLI, not by
+inspection — the same "run it for real" discipline this report keeps citing elsewhere.
 
 This resume path has its own dedicated real evidence, not just the abort path: `npm run
 escalation-resume-demo` (`src/cli/escalation-resume-demo.ts`) drives a goal against a
@@ -344,11 +394,12 @@ Surface — closing what was, until this pass, the one part of the system with l
 test coverage.
 
 **What's mocked deliberately:** the operator "console" is a terminal prompt, per the
-brief's explicit scope note, and (per above) the operator's manual browser action in the
-resume demo specifically. What's *not* mocked: the actual control-transfer model (who's
-driving, on which session, with what evidence trail) is real and exercised in `/evidence`,
-for both the abort and resume outcomes. A real console would swap the CLI prompt for a web
-UI that attaches to the same Playwright `Page` (e.g. via its CDP endpoint) — the same
+brief's explicit scope note, and (per above) the operator's manual browser action in both
+resume demos (discovery's navigation, replay's interstitial dismissal) specifically. What's
+*not* mocked: the actual control-transfer model (who's driving, on which session, with what
+evidence trail) is real and exercised in `/evidence`, for the abort outcome, discovery's
+resume, and now replay's resume alike. A real console would swap the CLI prompt for a web UI
+that attaches to the same Playwright `Page` (e.g. via its CDP endpoint) — the same
 `controller` flag and intervention-request shape would carry over unchanged.
 
 ## 6. Safety
@@ -418,7 +469,11 @@ in a config file), not inferred from anything about the data being touched.
   the least load-bearing of the six for what this system is actually for. A further,
   separate pass (§8's "A non-stretch-goal addition: production hardening") added real auth,
   transport hardening, containerization, and CI on top — closing gaps this report had
-  already named as cuts rather than adding new stretch-goal-shaped capability.
+  already named as cuts rather than adding new stretch-goal-shaped capability. A still later
+  pass closed the cut this section used to list first — "no mid-artifact resume after a
+  replay hard failure" — for real: `ReplayOptions.onEscalate` (`src/replay/replay-engine.ts`)
+  offers a human one bounded chance to fix live state and resume a genuine hard failure,
+  mirroring discovery's own resume rather than just ending the run; see §5.
 - **`known_outcomes` are human-authored, not auto-mined.** A single happy-path discovery
   run never observes its own error states by definition. A production version would run
   discovery against seeded error fixtures too, or gate known-outcome additions behind
@@ -436,9 +491,6 @@ in a config file), not inferred from anything about the data being touched.
   invocation, and a way to exclude steps whose "text" candidate is inherently dynamic data
   (like `step-11`'s confirmation number) rather than static copy, so they stop being a
   permanent false positive.
-- **No mid-artifact resume after a replay hard failure.** A failure returns to the caller
-  today; a fuller build would let a human fix the live state during escalation and resume
-  replay from the next step, mirroring what discovery's `resume` already does.
 - **Desktop/legacy-web/multi-tenant are design-only**, per the brief's explicit "not
   necessarily build" — addressed in §4, not implemented.
 - **The approval registry has no per-user identity** — `approve` records *that* an artifact
@@ -469,16 +521,17 @@ exercise:
     than anything Playwright or the DOM guarantees — the kind of thing that quietly breaks
     on a toolchain upgrade.
 
-**What I'd build next**, roughly in order: (1) mid-artifact resume-after-failure, since
-escalation without it is only half the story; (2) reviewer identity on approval;
-(3) some outside-the-system check on `knownOutcomes` detector correctness, since that's the
-one gap above that quietly undermines a feature (confidence scoring) that already shipped;
-(4) closing the vision-grounding accuracy gap (§8 "Assisted fallback") — cropping/zooming
+**What I'd build next**, roughly in order: (1) reviewer identity on approval; (2) some
+outside-the-system check on `knownOutcomes` detector correctness, since that's the one gap
+above that quietly undermines a feature (confidence scoring) that already shipped;
+(3) closing the vision-grounding accuracy gap (§8 "Assisted fallback") — cropping/zooming
 the screenshot, or passing the target element's approximate region as a hint — since the
 real evidence already shows the mechanism works end to end and accuracy is the one
-remaining piece; (5) scoping the confidence registry's key to `(fingerprint, tenantId)`
+remaining piece; (4) scoping the confidence registry's key to `(fingerprint, tenantId)`
 instead of just `fingerprint`, closing the URL-only-override fingerprint collision found
-while building cross-tenant reuse.
+while building cross-tenant reuse; (5) now that replay's own escalation-resume exists
+(§5), a per-run flag distinguishing "this success needed a human" from a fully unattended
+one, so the confidence registry stops silently crediting both the same way.
 
 ## 8. Stretch goals: Confidence & approval, Cross-tenant reuse, Agent-facing capability interface, Assisted fallback, and Multi-run stability
 

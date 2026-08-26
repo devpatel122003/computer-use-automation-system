@@ -589,6 +589,183 @@ describe("replay: business outcomes", () => {
   });
 });
 
+describe("replay: escalation-resume after a hard failure", () => {
+  it("does not prompt at all when no onEscalate is wired -- the default (unattended callers) is unchanged", async () => {
+    const state = { url: "http://x/start", text: "" };
+    const artifact = makeArtifact({ steps: [step({ id: "step-1", actionType: "click", locator: locator("Continue") })] });
+    const { policy } = fakePolicy();
+    const surface = fakeSurface(state, async () => ({ ok: false, error: "element not found", url: state.url }));
+
+    const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true });
+    expect(result.status).toBe("failure");
+  });
+
+  it("on resume, treats the step as already done if its checkpoint now holds -- without re-performing the recorded action", async () => {
+    const state = { url: "http://x/form", text: "" };
+    let clickCount = 0;
+
+    const artifact = makeArtifact({
+      steps: [
+        step({
+          id: "step-1",
+          actionType: "click",
+          locator: locator("Submit"),
+          checkpoint: { kind: "url", expr: "/confirm", description: "reached confirmation" },
+        }),
+      ],
+      successCheckpoint: { kind: "text_match", expr: "done", description: "" },
+    });
+
+    const { policy } = fakePolicy();
+    const surface = fakeSurface(state, async () => {
+      clickCount += 1;
+      // The click never succeeds -- simulates an unexpected interstitial blocking it, the
+      // way apps/mock-bank's requiresInterstitialConfirmation scenario does for real.
+      return { ok: false, error: "an unexpected dialog is blocking this control", url: state.url };
+    });
+
+    const onEscalate = vi.fn(async () => {
+      // Stand-in for a human dismissing the interstitial on the live session: the page now
+      // shows the confirmation the recorded step was trying to reach, without automation
+      // ever having to re-click anything.
+      state.url = "http://x/confirm";
+      state.text = "done";
+      return "resume" as const;
+    });
+
+    const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true, onEscalate });
+
+    expect(result.status).toBe("success");
+    expect(onEscalate).toHaveBeenCalledTimes(1);
+    // Only the one real attempt -- the checkpoint recheck resolved it without a second click.
+    expect(clickCount).toBe(1);
+  });
+
+  it("on resume, retries the recorded action once if the checkpoint still doesn't hold -- the human only cleared an obstacle", async () => {
+    const state = { url: "http://x/form", text: "" };
+    let clickCount = 0;
+
+    const artifact = makeArtifact({
+      steps: [step({ id: "step-1", actionType: "click", locator: locator("Submit") })],
+      successCheckpoint: { kind: "text_match", expr: "done", description: "" },
+    });
+
+    const { policy } = fakePolicy();
+    const surface = fakeSurface(state, async () => {
+      clickCount += 1;
+      if (clickCount === 1) return { ok: false, error: "element not found (dialog in the way)", url: state.url };
+      state.text = "done";
+      return { ok: true, url: state.url };
+    });
+
+    const onEscalate = vi.fn(async () => "resume" as const);
+
+    const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true, onEscalate });
+
+    expect(result.status).toBe("success");
+    expect(clickCount).toBe(2); // the failed attempt, then the post-resume retry
+  });
+
+  it("reports the original failure when the human declines to resume (abort)", async () => {
+    const state = { url: "http://x/form", text: "" };
+    const artifact = makeArtifact({ steps: [step({ id: "step-1", actionType: "click", locator: locator("Submit") })] });
+    const { policy } = fakePolicy();
+    const surface = fakeSurface(state, async () => ({ ok: false, error: "element not found", url: state.url }));
+    const onEscalate = vi.fn(async () => "abort" as const);
+
+    const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true, onEscalate });
+
+    expect(result.status).toBe("failure");
+    if (result.status === "failure") expect(result.observed).toBe("element not found");
+    expect(onEscalate).toHaveBeenCalledTimes(1);
+  });
+
+  it("only escalates once per step -- if the identical failure recurs right after resuming, it hard-fails without prompting again", async () => {
+    const state = { url: "http://x/form", text: "" };
+    const artifact = makeArtifact({ steps: [step({ id: "step-1", actionType: "click", locator: locator("Submit") })] });
+    const { policy } = fakePolicy();
+    const surface = fakeSurface(state, async () => ({ ok: false, error: "still broken", url: state.url }));
+    const onEscalate = vi.fn(async () => "resume" as const);
+
+    const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true, onEscalate });
+
+    expect(result.status).toBe("failure");
+    expect(onEscalate).toHaveBeenCalledTimes(1);
+  });
+
+  it("always retries an 'extract' step's action on resume -- there's no checkpoint concept for 'was this already read'", async () => {
+    const state = { url: "http://x/page", text: "" };
+    let extractCount = 0;
+
+    const artifact = makeArtifact({
+      steps: [step({ id: "step-1", actionType: "extract", locator: locator("Balance"), outputName: "balance" })],
+      outputSchema: [{ name: "balance", type: "string", sourceStepId: "step-1" }],
+      successCheckpoint: { kind: "text_match", expr: "ok", description: "" },
+    });
+
+    const { policy } = fakePolicy();
+    const surface = fakeSurface(state, async () => {
+      extractCount += 1;
+      if (extractCount === 1) return { ok: false, error: "element not found", url: state.url };
+      state.text = "ok";
+      return { ok: true, url: state.url, extractedValue: "$500.00" };
+    });
+
+    const onEscalate = vi.fn(async () => "resume" as const);
+    const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true, onEscalate });
+
+    expect(result.status).toBe("success");
+    if (result.status === "success") expect(result.outputs.balance).toBe("$500.00");
+    expect(extractCount).toBe(2);
+  });
+
+  it("re-checks the landed URL against the allowlist before declaring a resumed step successful", async () => {
+    const state = { url: "http://x/form", text: "" };
+    const artifact = makeArtifact({
+      steps: [step({ id: "step-1", actionType: "click", locator: locator("Submit"), checkpoint: { kind: "url", expr: "/confirm", description: "" } })],
+    });
+
+    const { policy } = fakePolicy({
+      authorizeLandedUrl: (url) => (url === "http://evil/confirm" ? { allowed: false, reason: "off-allowlist", risk: "risky" } : { allowed: true, risk: "safe" }),
+    });
+    const surface = fakeSurface(state, async () => ({ ok: false, error: "element not found", url: state.url }));
+
+    const onEscalate = vi.fn(async () => {
+      // The checkpoint's URL pattern happens to match, but it's not an allowlisted origin.
+      state.url = "http://evil/confirm";
+      return "resume" as const;
+    });
+
+    const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true, onEscalate });
+
+    expect(result.status).toBe("failure");
+    if (result.status === "failure") expect(result.observed).toContain("off-allowlist");
+  });
+
+  it("also offers escalation-resume on a checkpoint failure (mechanical action succeeded, checkpoint didn't)", async () => {
+    const state = { url: "http://x/form", text: "" };
+
+    const artifact = makeArtifact({
+      steps: [step({ id: "step-1", actionType: "click", locator: locator("Submit"), checkpoint: { kind: "url", expr: "/confirm", description: "" } })],
+      successCheckpoint: { kind: "text_match", expr: "done", description: "" },
+    });
+
+    const { policy } = fakePolicy();
+    const surface = fakeSurface(state, async () => ({ ok: true, url: state.url })); // action "succeeds" but never reaches /confirm on its own
+
+    const onEscalate = vi.fn(async () => {
+      state.url = "http://x/confirm";
+      state.text = "done";
+      return "resume" as const;
+    });
+
+    const result = await replay({ artifact, params: {}, surface, policy, logger: fakeLogger(), runId: "r1", allowRisky: true, onEscalate });
+
+    expect(result.status).toBe("success");
+    expect(onEscalate).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("replay: input param validation", () => {
   it("throws a clear error when a param declared type 'number' isn't numeric", async () => {
     const artifact = makeArtifact({

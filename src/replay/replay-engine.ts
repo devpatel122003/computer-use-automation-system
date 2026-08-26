@@ -22,12 +22,28 @@ export interface ReplayOptions {
    *  replay's core promise ("never calls a model") holds unless a caller explicitly opts in
    *  here (see src/cli/replay.ts's `--assisted-recovery` flag). */
   assistedRecovery?: AssistedRecoveryConfig;
+  /** Brief §3.6 "escalate to a human," applied to the replay path specifically -- until now
+   *  only the discovery loop could actually resume mid-run; a replay hard failure just ended
+   *  the run. When set, a genuine hard failure (nothing in `knownOutcomes` explains it, and
+   *  assisted recovery either wasn't configured or didn't help) offers the human one chance
+   *  to fix live state on the SAME session and resume, exactly like discovery's own
+   *  `onEscalate`. Omitted by default everywhere (see src/cli/replay.ts's
+   *  `--interactive-escalation` flag) -- an unattended caller (the capability API, canary
+   *  checks) has no human to hand a stuck run to, so it should keep failing immediately, not
+   *  hang waiting for one. */
+  onEscalate?: (ctx: { step: ArtifactStep; stepNum: number; reason: string }) => Promise<"resume" | "abort">;
 }
 
 /** A step is retried after recovery at most once -- if the same condition recurs
  *  immediately (e.g. the session times out again right after re-authenticating), that's a
  *  systemic problem recovery can't paper over, and we should hard-fail rather than loop. */
 const MAX_RECOVERY_ATTEMPTS_PER_STEP = 1;
+
+/** Same one-shot ceiling as recovery, for the same reason: if the exact same step still
+ *  fails immediately after a human already intervened once, that's not something a second
+ *  escalation prompt would fix -- it's a genuinely broken step, and hard-failing lets a
+ *  human debug it properly instead of getting stuck in a re-prompt loop. */
+const MAX_ESCALATION_ATTEMPTS_PER_STEP = 1;
 
 function substituteTemplate(template: string, params: Record<string, string>): string {
   return template.replace(/\{(.+?)\}/g, (_match, name: string) => params[name] ?? "");
@@ -104,6 +120,7 @@ interface ReplayContext {
   allowRisky: boolean;
   onRiskyStep?: (ctx: { step: ArtifactStep }) => Promise<boolean>;
   assistedRecovery?: AssistedRecoveryConfig;
+  onEscalate?: (ctx: { step: ArtifactStep; stepNum: number; reason: string }) => Promise<"resume" | "abort">;
 }
 
 type StepOutcome = { outcome: "success"; extracted?: { name: string; value: string } } | { outcome: "failure"; result: ReplayResult };
@@ -246,13 +263,80 @@ async function handleOutcome(ctx: ReplayContext, outcome: KnownOutcome, stepId: 
   };
 }
 
+/** After a human resolves an escalation with "resume," the live page may already satisfy
+ *  what this step needed -- the human did the equivalent action by hand, or the mechanical
+ *  action had already fired and only the checkpoint hadn't settled. Checking the checkpoint
+ *  directly first avoids a redundant or duplicate action (e.g. re-submitting a form the
+ *  human just submitted by hand). An extract step's "already done" can't be verified this
+ *  way (there's no checkpoint concept for "did we already read the right value"), so it
+ *  always falls through to a real retry. Only when the checkpoint still doesn't hold, or
+ *  there's none to check, does this retry the step's own recorded action -- the right
+ *  behavior for "the human cleared an obstacle (an unexpected dialog, a stuck state) but
+ *  didn't do the step's actual work themselves." */
+async function resumeAfterEscalation(ctx: ReplayContext, step: ArtifactStep, stepNum: number, escalationAttempt: number): Promise<StepOutcome> {
+  if (step.checkpoint && step.actionType !== "extract") {
+    const checkpointOk = await evaluateCheckpoint(ctx.surface, step.checkpoint, ctx.params);
+    ctx.logger.log({
+      step: stepNum,
+      phase: "checkpoint",
+      summary: `Post-escalation checkpoint recheck for ${step.id}: ${checkpointOk ? "already satisfied" : "still not satisfied"}`,
+    });
+    if (checkpointOk) {
+      // Same allowlist re-check every other landing site in this file does -- the human's
+      // intervention is a real navigation too, not exempt from where it's allowed to land.
+      const landed = ctx.policy.authorizeLandedUrl(ctx.surface.currentUrl());
+      if (!landed.allowed) {
+        const evidenceRef = await ctx.surface.screenshot(`landed-outside-allowlist-post-escalation-${step.id}`);
+        return {
+          outcome: "failure",
+          result: {
+            status: "failure",
+            runId: ctx.runId,
+            stepId: step.id,
+            expected: "landed URL within allowlist after human intervention",
+            observed: landed.reason ?? "blocked",
+            evidenceRef,
+          },
+        };
+      }
+      return { outcome: "success" };
+    }
+  }
+  return executeStep(ctx, step, stepNum, MAX_RECOVERY_ATTEMPTS_PER_STEP, escalationAttempt);
+}
+
+/** The one call site for offering a human the chance to resume a step that's about to hard
+ *  fail (brief §3.6, applied to replay -- see ReplayOptions.onEscalate). Declines to the
+ *  given fallback failure immediately, with no prompt at all, if no escalation callback is
+ *  wired (the capability API, canary checks) or this step already used its one escalation
+ *  attempt -- an unattended caller has no human to hand a stuck run to. */
+async function tryEscalate(
+  ctx: ReplayContext,
+  step: ArtifactStep,
+  stepNum: number,
+  escalationAttempt: number,
+  reason: string,
+  fallback: ReplayResult
+): Promise<StepOutcome> {
+  if (!ctx.onEscalate || escalationAttempt >= MAX_ESCALATION_ATTEMPTS_PER_STEP) {
+    return { outcome: "failure", result: fallback };
+  }
+  const decision = await ctx.onEscalate({ step, stepNum, reason });
+  if (decision !== "resume") {
+    return { outcome: "failure", result: fallback };
+  }
+  return resumeAfterEscalation(ctx, step, stepNum, escalationAttempt + 1);
+}
+
 /** Executes one step end to end: authorize -> act (with wait-policy retries) -> on failure,
  *  try known-outcome recovery -> on success, verify the checkpoint -> on checkpoint
  *  failure, also try recovery. Recovering from EITHER failure mode retries via a recursive
  *  call to this same function, so a post-recovery retry gets full re-verification
  *  (re-authorized, checkpoint re-checked, output re-captured) instead of a shortcut that
- *  skips them -- previously the action-failure path's retry skipped both. */
-async function executeStep(ctx: ReplayContext, step: ArtifactStep, stepNum: number, recoveryAttempt = 0): Promise<StepOutcome> {
+ *  skips them -- previously the action-failure path's retry skipped both. A genuine hard
+ *  failure (nothing in knownOutcomes, assisted recovery unavailable/unsuccessful) gets one
+ *  last chance via tryEscalate before actually failing out. */
+async function executeStep(ctx: ReplayContext, step: ArtifactStep, stepNum: number, recoveryAttempt = 0, escalationAttempt = 0): Promise<StepOutcome> {
   const action = buildAction(step, ctx.params, ctx.artifact.target.baseUrlPattern);
 
   const authorization = await authorizeAndConfirm(ctx, action, step, stepNum);
@@ -281,7 +365,7 @@ async function executeStep(ctx: ReplayContext, step: ArtifactStep, stepNum: numb
       const outcome = await detectKnownOutcome(ctx.surface, ctx.artifact.knownOutcomes, ctx.params);
       if (outcome) {
         const handled = await handleOutcome(ctx, outcome, step.id);
-        if (handled.recovered) return executeStep(ctx, step, stepNum, recoveryAttempt + 1);
+        if (handled.recovered) return executeStep(ctx, step, stepNum, recoveryAttempt + 1, escalationAttempt);
         if (handled.result) return { outcome: "failure", result: handled.result };
       }
     }
@@ -315,10 +399,14 @@ async function executeStep(ctx: ReplayContext, step: ArtifactStep, stepNum: numb
     if (!assistedRecoverySucceeded) {
       const evidenceRef = await ctx.surface.screenshot(`failure-${step.id}`);
       ctx.logger.log({ step: stepNum, phase: "error", summary: `Hard failure at ${step.id}: ${result.error}` });
-      return {
-        outcome: "failure",
-        result: { status: "failure", runId: ctx.runId, stepId: step.id, expected: `${step.actionType} to succeed`, observed: result.error ?? "unknown error", evidenceRef },
-      };
+      return tryEscalate(
+        ctx,
+        step,
+        stepNum,
+        escalationAttempt,
+        `${step.actionType} failed at ${step.id}: ${result.error ?? "unknown error"}`,
+        { status: "failure", runId: ctx.runId, stepId: step.id, expected: `${step.actionType} to succeed`, observed: result.error ?? "unknown error", evidenceRef }
+      );
     }
   }
 
@@ -357,22 +445,19 @@ async function executeStep(ctx: ReplayContext, step: ArtifactStep, stepNum: numb
         const outcome = await detectKnownOutcome(ctx.surface, ctx.artifact.knownOutcomes, ctx.params);
         if (outcome) {
           const handled = await handleOutcome(ctx, outcome, step.id);
-          if (handled.recovered) return executeStep(ctx, step, stepNum, recoveryAttempt + 1);
+          if (handled.recovered) return executeStep(ctx, step, stepNum, recoveryAttempt + 1, escalationAttempt);
           if (handled.result) return { outcome: "failure", result: handled.result };
         }
       }
       const evidenceRef = await ctx.surface.screenshot(`checkpoint-failed-${step.id}`);
-      return {
-        outcome: "failure",
-        result: {
-          status: "failure",
-          runId: ctx.runId,
-          stepId: step.id,
-          expected: step.checkpoint.description,
-          observed: `url=${ctx.surface.currentUrl()}`,
-          evidenceRef,
-        },
-      };
+      return tryEscalate(ctx, step, stepNum, escalationAttempt, `Checkpoint failed at ${step.id}: ${step.checkpoint.description}`, {
+        status: "failure",
+        runId: ctx.runId,
+        stepId: step.id,
+        expected: step.checkpoint.description,
+        observed: `url=${ctx.surface.currentUrl()}`,
+        evidenceRef,
+      });
     }
   }
 
@@ -400,6 +485,7 @@ export async function replay(options: ReplayOptions): Promise<ReplayResult> {
     allowRisky: options.allowRisky ?? false,
     onRiskyStep: options.onRiskyStep,
     assistedRecovery: options.assistedRecovery,
+    onEscalate: options.onEscalate,
   };
 
   logger.log({

@@ -4,6 +4,20 @@ import type { EvidenceLogger } from "../evidence/logger.js";
 import { promptLine } from "./prompt.js";
 import type { CapturedHumanAction, InterventionDecision, InterventionRequest } from "./types.js";
 
+/** Pure decision logic, extracted so it's directly unit-testable without a real Page (this
+ *  class otherwise takes one, and per this repo's own testing philosophy, that's the kind of
+ *  thing verified by real evidence runs, not mocks). `null` means stdin closed with no one
+ *  able to answer at all (see prompt.ts) -- that's not the same as a human pressing bare
+ *  Enter to resume, and must not be silently treated as if it were: only a real answer that
+ *  isn't "abort" resumes; no answer at all aborts, the same conservative default
+ *  confirmRiskyAction already applies. Found for real while wiring replay's own
+ *  escalation-resume: an earlier version of this collapsed "no one was there to answer" and
+ *  "a human deliberately pressed Enter" into the same empty string, which would have silently
+ *  resumed an unattended run no human ever actually reviewed. */
+export function resolveInterventionDecision(answer: string | null): InterventionDecision {
+  return answer === null || answer.trim().toLowerCase() === "abort" ? "abort" : "resume";
+}
+
 /**
  * Real (not mocked) handoff mechanism: the browser is launched headed, so "ceding
  * control" means automation simply stops issuing commands on this exact Page/session
@@ -96,7 +110,7 @@ export class EscalationController {
     }
     this.controller = "automation";
 
-    const decision: InterventionDecision = answer.trim().toLowerCase() === "abort" ? "abort" : "resume";
+    const decision = resolveInterventionDecision(answer);
     this.logger.log({
       step: typeof params.step === "number" ? params.step : 0,
       phase: "escalation",
@@ -110,7 +124,10 @@ export class EscalationController {
     console.log("\n=== RISKY ACTION REQUIRES CONFIRMATION ===");
     console.log(reason);
     const answer = await promptLine("Type 'yes' to proceed, anything else to decline: ");
-    const approved = answer.trim().toLowerCase() === "yes";
+    // `null` (stdin closed, no answer possible) is "not yes" the same as any other
+    // non-affirmative answer -- this one was already correct, kept explicit for clarity now
+    // that promptLine distinguishes the two cases.
+    const approved = (answer ?? "").trim().toLowerCase() === "yes";
     this.logger.log({ step: 0, phase: "escalation", summary: `Risky action ${approved ? "approved" : "declined"} by operator`, detail: { reason, approved } });
     return approved;
   }

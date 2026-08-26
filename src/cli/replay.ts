@@ -35,6 +35,12 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Opt-in only, same reasoning as --assisted-recovery: an unattended caller (the
+  // capability API, canary-check) has no human to hand a stuck run to, so a genuine hard
+  // failure should keep failing immediately by default. This is the CLI's own explicit
+  // "yes, a human is at this terminal and can take over" signal.
+  const useInteractiveEscalation = args["interactive-escalation"] === "true";
+
   const raw = JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
   const baseArtifact = CapabilityArtifactSchema.parse(raw);
   const params = JSON.parse(paramsJson) as Record<string, string>;
@@ -136,6 +142,9 @@ async function main(): Promise<void> {
     if (useAssistedRecovery) {
       console.log("--assisted-recovery is on: a mechanical step failure with no known outcome gets one bounded LLM recovery attempt.");
     }
+    if (useInteractiveEscalation) {
+      console.log("--interactive-escalation is on: a genuine hard failure offers a human one chance to fix the live session and resume.");
+    }
     console.log(`Params: ${JSON.stringify(redactedParams)}\n`);
 
     const result = await replay({
@@ -148,6 +157,7 @@ async function main(): Promise<void> {
       allowRisky,
       onRiskyStep: async ({ step }) => escalation.confirmRiskyAction(`Step ${step.id}: ${step.description}`),
       assistedRecovery: useAssistedRecovery ? { genai: new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! }) } : undefined,
+      onEscalate: useInteractiveEscalation ? async ({ step, reason }) => escalation.requestIntervention({ step: step.id, reason }) : undefined,
     });
 
     logger.writeJson("replay-result.json", result);
