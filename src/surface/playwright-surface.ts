@@ -42,10 +42,20 @@ interface LocatorCandidateInputs {
   /** nth within elements sharing this exact testId -- test ids are normally unique, but
    *  don't assume it. */
   testIdNth: number;
+  /** True when `name` came from `dom-scan.ts`'s last-resort raw `name`-ATTRIBUTE fallback,
+   *  not a real accessible-name source. Found live, adapting to a target with no `<label>`
+   *  elements at all: a "role" candidate built from this name can never resolve via
+   *  Playwright's real `getByRole()` (the `name` attribute isn't part of any browser's
+   *  accessible-name computation), and a "text" candidate built from it can't resolve via
+   *  `getByText()` either (the attribute value was never rendered as visible page text) --
+   *  both would PERMANENTLY fall through to css_structural on every single replay, which
+   *  `drift-report` would then flag as "drifting" forever for a target that was simply
+   *  never going to resolve any other way, not because anything actually changed. */
+  nameFromAttributeFallback?: boolean;
 }
 
 function buildLocatorCandidates(inputs: LocatorCandidateInputs): LocatorCandidate[] {
-  const { role, name, testId, cssPath, roleNameNth, isUniqueRoleName, nameOnlyNth, testIdNth } = inputs;
+  const { role, name, testId, cssPath, roleNameNth, isUniqueRoleName, nameOnlyNth, testIdNth, nameFromAttributeFallback } = inputs;
   const candidates: LocatorCandidate[] = [];
 
   if (testId) {
@@ -58,7 +68,7 @@ function buildLocatorCandidates(inputs: LocatorCandidateInputs): LocatorCandidat
     });
   }
 
-  if (VALID_ARIA_ROLES.has(role)) {
+  if (VALID_ARIA_ROLES.has(role) && !nameFromAttributeFallback) {
     candidates.push({
       strategy: "role",
       role: role as ElementRole,
@@ -71,21 +81,25 @@ function buildLocatorCandidates(inputs: LocatorCandidateInputs): LocatorCandidat
     });
   }
 
-  candidates.push({
-    strategy: "text",
-    name,
-    nth: nameOnlyNth,
-    confidence: "medium",
-    rationale: "Exact visible text match; stable as long as copy doesn't change.",
-  });
+  if (!nameFromAttributeFallback) {
+    candidates.push({
+      strategy: "text",
+      name,
+      nth: nameOnlyNth,
+      confidence: "medium",
+      rationale: "Exact visible text match; stable as long as copy doesn't change.",
+    });
+  }
 
   if (cssPath) {
     candidates.push({
       strategy: "css_structural",
       cssPath,
       nth: 0,
-      confidence: "low",
-      rationale: "Structural DOM position fallback; brittle to markup reordering, used only if the above fail.",
+      confidence: nameFromAttributeFallback ? "medium" : "low",
+      rationale: nameFromAttributeFallback
+        ? "No real accessible name or visible text available for this control (a raw HTML `name` attribute is neither) -- structural position is the only strategy that can ever resolve it, not a last-ditch fallback below better options."
+        : "Structural DOM position fallback; brittle to markup reordering, used only if the above fail.",
     });
   }
 
@@ -97,6 +111,10 @@ export class PlaywrightSurface implements Surface {
   private context?: BrowserContext;
   private page?: Page;
   private stepCounter = 0;
+  /** The most recent main-frame navigation response status -- reset at the start of each
+   *  `perform()` call and read back at the end, so it's only ever attributed to the action
+   *  that actually caused it (see `ActionResult.httpStatus`'s own doc comment). */
+  private lastResponseStatus?: number;
 
   constructor(private readonly options: PlaywrightSurfaceOptions) {
     fs.mkdirSync(options.evidenceDir, { recursive: true });
@@ -106,6 +124,11 @@ export class PlaywrightSurface implements Surface {
     this.browser = await chromium.launch({ headless: this.options.headed === false });
     this.context = await this.browser.newContext();
     this.page = await this.context.newPage();
+    this.page.on("response", (response) => {
+      if (response.request().isNavigationRequest() && response.frame() === this.page?.mainFrame()) {
+        this.lastResponseStatus = response.status();
+      }
+    });
     await this.page.goto(startUrl, { waitUntil: "load" });
   }
 
@@ -163,6 +186,7 @@ export class PlaywrightSurface implements Surface {
           isUniqueRoleName: isUnique,
           nameOnlyNth,
           testIdNth,
+          nameFromAttributeFallback: el.nameFromAttributeFallback,
         }),
         sensitive: el.sensitive,
       };
@@ -258,10 +282,13 @@ export class PlaywrightSurface implements Surface {
 
   async perform(action: Action): Promise<ActionResult> {
     const page = this.getPage();
+    // Reset first so httpStatus, if set below, is unambiguously attributable to whatever
+    // navigation THIS action causes -- not a stale value left over from an earlier step.
+    this.lastResponseStatus = undefined;
     try {
       if (action.type === "navigate") {
         await page.goto(action.url, { waitUntil: "load" });
-        return { ok: true, url: page.url() };
+        return { ok: true, url: page.url(), httpStatus: this.lastResponseStatus };
       }
 
       if (action.type === "click_coordinates") {
@@ -269,7 +296,7 @@ export class PlaywrightSurface implements Surface {
         await page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => undefined);
         // No `matchedStrategy`: a coordinate click never consults a recorded
         // LocatorCandidate at all, so there's no strategy tier to report.
-        return { ok: true, url: page.url() };
+        return { ok: true, url: page.url(), httpStatus: this.lastResponseStatus };
       }
 
       const resolved = await this.resolve(action.target);
@@ -281,7 +308,7 @@ export class PlaywrightSurface implements Surface {
       if (action.type === "click") {
         await locator.click({ timeout: action.timeoutMs ?? 5000 });
         await page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => undefined);
-        return { ok: true, matchedStrategy: strategyUsed, url: page.url() };
+        return { ok: true, matchedStrategy: strategyUsed, url: page.url(), httpStatus: this.lastResponseStatus };
       }
 
       if (action.type === "type") {
@@ -305,7 +332,7 @@ export class PlaywrightSurface implements Surface {
 
       return { ok: false, error: `Unhandled action type: ${(action as Action).type}`, url: page.url() };
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err), url: page.url() };
+      return { ok: false, error: err instanceof Error ? err.message : String(err), url: page.url(), httpStatus: this.lastResponseStatus };
     }
   }
 

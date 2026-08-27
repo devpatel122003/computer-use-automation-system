@@ -1,0 +1,619 @@
+{
+  "id": "meridian-transfer-funds",
+  "name": "MERIDIAN: Transfer Funds",
+  "description": "Signs on to MERIDIAN CORE, moves funds between a member's own shares (review -> post), and reports the confirmation number.",
+  "version": "1.0.0",
+  "createdAt": "2026-08-27T00:40:11.364Z",
+  "target": {
+    "appId": "meridian-core",
+    "surfaceType": "web",
+    "baseUrlPattern": "https://web-sample.interface-hiring.com"
+  },
+  "inputParams": [
+    {
+      "name": "username",
+      "type": "string",
+      "required": true,
+      "sensitive": false,
+      "description": "Operator ID used to sign on."
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "required": true,
+      "sensitive": true,
+      "description": "Operator password used to sign on."
+    },
+    {
+      "name": "branch",
+      "type": "string",
+      "required": true,
+      "sensitive": false,
+      "description": "Branch to sign on at (e.g. MAIN-001)."
+    },
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "sensitive": false,
+      "description": "The member whose shares to transfer between."
+    },
+    {
+      "name": "fromShare",
+      "type": "string",
+      "required": true,
+      "sensitive": false,
+      "description": "Exact share id to move funds OUT of, e.g. \"100234-S0001\" -- MERIDIAN identifies shares by id, not a fixed checking/savings pair."
+    },
+    {
+      "name": "toShare",
+      "type": "string",
+      "required": true,
+      "sensitive": false,
+      "description": "Exact share id to move funds INTO, e.g. \"100234-S0070\"."
+    },
+    {
+      "name": "amount",
+      "type": "string",
+      "required": true,
+      "sensitive": false,
+      "description": "Dollar amount to transfer. Plain numeric value, no currency symbol."
+    },
+    {
+      "name": "memo",
+      "type": "string",
+      "required": false,
+      "sensitive": false,
+      "description": "Optional memo text for this transfer."
+    }
+  ],
+  "outputSchema": [
+    {
+      "name": "confirmationNumber",
+      "type": "string",
+      "sourceStepId": "step-17",
+      "description": "Extracted from text \"CN480363\""
+    }
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "actionType": "navigate",
+      "description": "Navigate to /signon",
+      "url": "/signon",
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-2",
+      "actionType": "type",
+      "description": "Type into textbox \"operator\"",
+      "locator": [
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2) > input:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "No real accessible name or visible text available for this control (a raw HTML `name` attribute is neither) -- structural position is the only strategy that can ever resolve it, not a last-ditch fallback below better options."
+        }
+      ],
+      "input": {
+        "paramRef": "username"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-3",
+      "actionType": "type",
+      "description": "Type into textbox \"password\"",
+      "locator": [
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(2) > input:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "No real accessible name or visible text available for this control (a raw HTML `name` attribute is neither) -- structural position is the only strategy that can ever resolve it, not a last-ditch fallback below better options."
+        }
+      ],
+      "input": {
+        "paramRef": "password"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-4",
+      "actionType": "select_option",
+      "description": "Select option on combobox \"branch\"",
+      "locator": [
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(2) > select:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "No real accessible name or visible text available for this control (a raw HTML `name` attribute is neither) -- structural position is the only strategy that can ever resolve it, not a last-ditch fallback below better options."
+        }
+      ],
+      "input": {
+        "paramRef": "branch"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-5",
+      "actionType": "click",
+      "description": "Click button \"Sign On\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "button",
+          "name": "Sign On",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Sign On",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(4) > td:nth-of-type(2) > input:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 1
+      },
+      "checkpoint": {
+        "kind": "url",
+        "expr": "/menu",
+        "description": "Reached the main menu after signing on."
+      }
+    },
+    {
+      "id": "step-6",
+      "actionType": "click",
+      "description": "Click link \"Funds Transfer\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "link",
+          "name": "Funds Transfer",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Funds Transfer",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(2) > a:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 1
+      }
+    },
+    {
+      "id": "step-7",
+      "actionType": "select_option",
+      "description": "Select option on combobox \"by\"",
+      "locator": [
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2) > select:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "No real accessible name or visible text available for this control (a raw HTML `name` attribute is neither) -- structural position is the only strategy that can ever resolve it, not a last-ditch fallback below better options."
+        }
+      ],
+      "input": {
+        "literal": "number"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-8",
+      "actionType": "type",
+      "description": "Type into textbox \"q\"",
+      "locator": [
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(2) > input:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "No real accessible name or visible text available for this control (a raw HTML `name` attribute is neither) -- structural position is the only strategy that can ever resolve it, not a last-ditch fallback below better options."
+        }
+      ],
+      "input": {
+        "paramRef": "memberId"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-9",
+      "actionType": "click",
+      "description": "Click button \"Search\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "button",
+          "name": "Search",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Search",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(2) > input:nth-of-type(2)",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 1
+      },
+      "checkpoint": {
+        "kind": "url",
+        "expr": "/members",
+        "description": "Reached the member search results page."
+      }
+    },
+    {
+      "id": "step-10",
+      "actionType": "click",
+      "description": "Click link \"Select\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "link",
+          "name": "Select",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Select",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(4) > a:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 1
+      },
+      "checkpoint": {
+        "kind": "url",
+        "expr": "/members/{memberId}/transfer",
+        "description": "Reached the transfer form directly (via the Main Menu's Funds Transfer shortcut)."
+      }
+    },
+    {
+      "id": "step-11",
+      "actionType": "select_option",
+      "description": "Select option on combobox \"from\"",
+      "locator": [
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2) > select:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "No real accessible name or visible text available for this control (a raw HTML `name` attribute is neither) -- structural position is the only strategy that can ever resolve it, not a last-ditch fallback below better options."
+        }
+      ],
+      "input": {
+        "paramRef": "fromShare"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-12",
+      "actionType": "select_option",
+      "description": "Select option on combobox \"to\"",
+      "locator": [
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(2) > select:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "No real accessible name or visible text available for this control (a raw HTML `name` attribute is neither) -- structural position is the only strategy that can ever resolve it, not a last-ditch fallback below better options."
+        }
+      ],
+      "input": {
+        "paramRef": "toShare"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-13",
+      "actionType": "type",
+      "description": "Type into textbox \"amount\"",
+      "locator": [
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(2) > input:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "No real accessible name or visible text available for this control (a raw HTML `name` attribute is neither) -- structural position is the only strategy that can ever resolve it, not a last-ditch fallback below better options."
+        }
+      ],
+      "input": {
+        "paramRef": "amount"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-14",
+      "actionType": "type",
+      "description": "Type into textbox \"memo\"",
+      "locator": [
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(4) > td:nth-of-type(2) > input:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "No real accessible name or visible text available for this control (a raw HTML `name` attribute is neither) -- structural position is the only strategy that can ever resolve it, not a last-ditch fallback below better options."
+        }
+      ],
+      "input": {
+        "paramRef": "memo"
+      },
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-15",
+      "actionType": "click",
+      "description": "Click button \"Continue\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "button",
+          "name": "Continue",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Continue",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > form:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(5) > td:nth-of-type(2) > input:nth-of-type(1)",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 1
+      },
+      "checkpoint": {
+        "kind": "url",
+        "expr": "/members/{memberId}/transfer/review",
+        "description": "Reached the transfer review/confirmation page."
+      }
+    },
+    {
+      "id": "step-16",
+      "actionType": "click",
+      "description": "Click button \"Post Transfer\"",
+      "locator": [
+        {
+          "strategy": "role",
+          "role": "button",
+          "name": "Post Transfer",
+          "nth": 0,
+          "confidence": "high",
+          "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+        },
+        {
+          "strategy": "text",
+          "name": "Post Transfer",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > form:nth-of-type(1) > input:nth-of-type(6)",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "risk": "risky",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 1
+      }
+    },
+    {
+      "id": "step-17",
+      "actionType": "extract",
+      "description": "Extract value from text \"CN480363\"",
+      "locator": [
+        {
+          "strategy": "text",
+          "name": "CN480363",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "body > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1) > div:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2)",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "outputName": "confirmationNumber",
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    }
+  ],
+  "successCheckpoint": {
+    "kind": "text_match",
+    "expr": "TRANSFER POSTED",
+    "description": "The transfer confirmation banner is visible, with a real confirmation number."
+  },
+  "knownOutcomes": [
+    {
+      "name": "insufficient_funds",
+      "category": "business_outcome",
+      "detector": {
+        "kind": "text_match",
+        "expr": "Insufficient available balance",
+        "description": "The source share doesn't have enough available balance."
+      },
+      "description": "The source share's balance is lower than the requested transfer amount -- a legitimate business outcome, not a system error."
+    },
+    {
+      "name": "source_share_on_hold",
+      "category": "business_outcome",
+      "detector": {
+        "kind": "text_match",
+        "expr": "is HOLD and cannot be debited",
+        "description": "The source share has an active account hold."
+      },
+      "description": "The source share is on HOLD and cannot be debited -- a legitimate business outcome, not a system error."
+    },
+    {
+      "name": "validation_rejected",
+      "category": "business_outcome",
+      "detector": {
+        "kind": "text_match",
+        "expr": "TRANSACTION REJECTED",
+        "description": "MERIDIAN's own validation-fault interstitial (?inject=validation)."
+      },
+      "description": "The request was rejected as malformed by the target app."
+    },
+    {
+      "name": "record_not_found",
+      "category": "business_outcome",
+      "detector": {
+        "kind": "text_match",
+        "expr": "RECORD NOT FOUND",
+        "description": "MERIDIAN's own not-found interstitial (natural 404, or ?inject=notfound)."
+      },
+      "description": "The member record could not be located on the host."
+    },
+    {
+      "name": "permission_denied",
+      "category": "business_outcome",
+      "detector": {
+        "kind": "text_match",
+        "expr": "SUPERVISOR OVERRIDE REQUIRED",
+        "description": "MERIDIAN's own permission-fault interstitial (?inject=permission)."
+      },
+      "description": "The signed-on operator is not authorized for this function."
+    },
+    {
+      "name": "maintenance",
+      "category": "recoverable",
+      "detector": {
+        "kind": "text_match",
+        "expr": "SCHEDULED MAINTENANCE IN PROGRESS",
+        "description": "A transient maintenance interstitial (natural or ?inject=maintenance)."
+      },
+      "description": "The host reported a transient maintenance window; safe to retry the same step once -- this occurs before the irreversible /post step commits anything.",
+      "recovery": "retry_step"
+    },
+    {
+      "name": "application_error",
+      "category": "recoverable",
+      "detector": {
+        "kind": "text_match",
+        "expr": "APPLICATION ERROR",
+        "description": "A transient hard-application-error interstitial (natural or ?inject=server)."
+      },
+      "description": "The host reported an unexpected application error; safe to retry the same step once.",
+      "recovery": "retry_step"
+    }
+  ]
+}

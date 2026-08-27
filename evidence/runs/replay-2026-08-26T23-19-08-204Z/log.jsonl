@@ -1,0 +1,2 @@
+{"ts":"2026-08-26T23:19:08.214Z","step":0,"phase":"start","summary":"Capability API invoked Check Balance v1.0.0","detail":{"operatorId":"local-operator","fingerprint":"ae35f3385f5baf31","approvalState":"approved","driftAdjustedConfidenceLabel":"high","allowRiskyRequested":false,"allowRiskyEffective":false,"params":{"memberId":"10001"}}}
+{"ts":"2026-08-26T23:19:09.068Z","step":0,"phase":"error","summary":"Capability API invocation error: Missing required input params: username, password"}

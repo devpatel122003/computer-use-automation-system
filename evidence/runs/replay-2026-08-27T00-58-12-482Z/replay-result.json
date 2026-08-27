@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-27T00-58-12-482Z",
+  "outcome": "permission_denied",
+  "description": "The signed-on operator is not authorized for this function.",
+  "stepId": "step-6",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T00-58-12-482Z/screenshots/001-outcome-permission_denied.png"
+}

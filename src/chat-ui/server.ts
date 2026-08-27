@@ -52,6 +52,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const OPERATOR_USERNAME = process.env.CHAT_UI_OPERATOR_USERNAME ?? "demo_operator";
 const OPERATOR_PASSWORD = process.env.CHAT_UI_OPERATOR_PASSWORD ?? "demo_password";
+// A third sign-on field, needed by MERIDIAN CORE's capabilities (operator/password/branch)
+// but not mock-bank's (operator/password only). Included in fillParams unconditionally --
+// validateParams (src/replay/replay-engine.ts) only checks params a capability actually
+// DECLARES as required, so an unused "branch" key is harmlessly ignored by any mock-bank
+// capability that doesn't have one.
+const OPERATOR_BRANCH = process.env.CHAT_UI_OPERATOR_BRANCH ?? "MAIN-001";
 
 // Unrelated to the above: CHAT_UI_OPERATOR_USERNAME/PASSWORD is the mock-bank sign-on
 // credential injected into capability params (see the header comment's item 2). This is a
@@ -205,7 +211,7 @@ export async function handleChat(req: express.Request, res: express.Response): P
     const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const apiBase = process.env.CAPABILITY_API_BASE ?? "http://localhost:4700";
     const apiKey = CAPABILITY_API_KEY;
-    const fillParams = { username: OPERATOR_USERNAME, password: OPERATOR_PASSWORD };
+    const fillParams = { username: OPERATOR_USERNAME, password: OPERATOR_PASSWORD, branch: OPERATOR_BRANCH };
     const history = req.session.history ?? [];
 
     // Checked FIRST, before the single-plan branch below: a pending CHAIN from a previous

@@ -1,0 +1,8 @@
+{
+  "status": "failure",
+  "runId": "replay-2026-08-27T00-26-54-400Z",
+  "stepId": "step-10",
+  "expected": "Reached the member record page.",
+  "observed": "url=https://web-sample.interface-hiring.com/members/100987/transfer",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T00-26-54-400Z/screenshots/001-checkpoint-failed-step-10.png"
+}

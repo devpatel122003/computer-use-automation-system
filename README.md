@@ -792,6 +792,112 @@ directly in its own header that this system doesn't record *which human* approve
 action, only *that* one did and when (see `REPORT.md` "Safety" and "A non-stretch-goal
 addition: compliance audit export").
 
+## MERIDIAN CORE adaptation demo path
+
+Everything above is the take-home system, driving the local `mock-bank` app. This section
+points the exact same core at a real, live, hosted legacy target -- MERIDIAN CORE, a
+credit-union servicing console at `https://web-sample.interface-hiring.com` -- with no code
+changes beyond the handful named in `ADAPTATION.md`. Read that file first for what
+adapting actually took and why; this section is just the commands.
+
+No local app to start -- the target is already live. Six capabilities are recorded and
+approved under `evidence/artifacts-meridian/`, covering the brief's full function list
+(sign-on is embedded as the first steps of every capability, matching the take-home's own
+`create-member` precedent):
+
+| Capability | Kind | Artifact |
+|---|---|---|
+| `meridian-check-balance` | read | member lookup by number, first share row's balance/status |
+| `meridian-member-search` | read | search by member number *or* last name |
+| `meridian-transfer-funds` | write, review→post, irreversible | **minimum-bar #2** |
+| `meridian-open-share` | write, review→post | |
+| `meridian-update-member` | write, single direct POST (no review step) | |
+| `meridian-place-hold` | write, review→post, supervisor-gated | records with `super1` |
+
+Re-record any of them for real against the live target (each needs `GEMINI_API_KEY`; risky
+writes prompt for confirmation -- pipe an *unbounded* `yes`-style stream if scripting more
+than one confirmation in a row, not a fixed `printf`, see `ADAPTATION.md`'s "what was cut"):
+
+```bash
+npm run run-agent-meridian-check-balance
+npm run run-agent-meridian-transfer-funds
+```
+
+Replay any of them deterministically, against the correct MERIDIAN registry (the
+`--registry` flag matters -- it defaults to the mock-bank one otherwise):
+
+```bash
+npm run replay -- \
+  --artifact evidence/artifacts-meridian/meridian-check-balance.artifact.json \
+  --registry evidence/artifacts-meridian/registry.json \
+  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"100234"}'
+
+npm run replay -- \
+  --artifact evidence/artifacts-meridian/meridian-transfer-funds.artifact.json \
+  --registry evidence/artifacts-meridian/registry.json \
+  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"100987","fromShare":"100987-S0001-13","toShare":"100987-MMKT-14","amount":"5.00"}' \
+  --allow-risky true
+```
+
+A clean exceptional state, live -- a teller attempting the supervisor-only Place Hold:
+
+```bash
+npm run replay -- \
+  --artifact evidence/artifacts-meridian/meridian-place-hold.artifact.json \
+  --registry evidence/artifacts-meridian/registry.json \
+  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"102777","shareId":"102777-S0001","reasonCode":"LEGAL","notes":""}' \
+  --allow-risky true
+```
+
+Returns `status: "business_outcome"`, `outcome: "supervisor_override_required"` -- a real
+403 from the live app, not a guardrail block. Injected faults work the same way against any
+capability, either per-request (`?inject=<kind>` appended to a URL you drive manually) or
+globally via the live app's own `/settings` screen (`errorRate`, `forcedInject` -- remember
+to reset `forcedInject` back to `""` afterward, since it's global and affects every other
+session against the shared demo target).
+
+**Capability API, chatbot, and dashboard, pointed at MERIDIAN's own catalog** -- a second
+instance of each, mirroring the existing `northgate-cu` multi-tenant pattern (same server
+code, separate config, see `ADAPTATION.md`):
+
+```bash
+CAPABILITY_ARTIFACTS_DIR=evidence/artifacts-meridian CAPABILITY_API_PORT=4701 npm run capability-api
+CAPABILITY_ARTIFACTS_DIR=evidence/artifacts-meridian DASHBOARD_PORT=4601 npm run dashboard
+CHAT_UI_OPERATOR_BRANCH=MAIN-001 CAPABILITY_API_BASE=http://localhost:4701 CHAT_UI_PORT=4801 npm run chat-ui
+```
+
+Open `http://localhost:4801` and ask it something like *"what's the balance for member
+100234"* or *"transfer $5 from share 100987-S0001-13 to 100987-MMKT-14 for member 100987"* --
+the same confirm-before-risky-action flow as the take-home's chat UI, just talking to
+MERIDIAN's capability catalog. Open `http://localhost:4601` (HTTP Basic auth, same
+`DASHBOARD_PASSWORD`) to watch the run history, contract, and drift signal for all six
+capabilities.
+
+**The escalation demo.** A real, live, end-to-end proof of "stuck → stop → escalate," not
+simulated: force a session-timeout mid-flow at a write capability's risky `/post` step (via
+the live app's `/settings` screen, timed to land after sign-on/review already succeeded),
+and -- because the write capabilities deliberately carry no `session_timeout` recovery --
+watch it fall through to a real `requestIntervention` prompt instead of a silent retry or a
+hang:
+
+```bash
+npm run replay -- \
+  --artifact evidence/artifacts-meridian/meridian-transfer-funds.artifact.json \
+  --registry evidence/artifacts-meridian/registry.json \
+  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"100987","fromShare":"100987-S0001-13","toShare":"100987-MMKT-14","amount":"1.00"}' \
+  --interactive-escalation true
+```
+
+Type `yes` at the risky-action prompt, then -- in another terminal, before answering the
+"HUMAN INTERVENTION REQUESTED" prompt that follows -- set the live app's global fault
+injection to `timeout` via its `/settings` form (or drive it manually in a browser: sign on,
+open `/settings`, select `timeout` under "Force error," Apply). The run correctly fails to
+find a confirmation number on the resulting "YOUR SESSION HAS TIMED OUT" page, escalates for
+real, and the only safe answer is `abort` -- there's nothing left to resume. Real evidence
+from exactly this sequence: `evidence/runs/replay-2026-08-27T01-08-57-002Z/` (see
+`ADAPTATION.md`'s "Safety, evidence, and escalation survival"). Remember to reset
+`forcedInject` back to `""` afterward.
+
 ## Running without live services
 
 The mock-bank app *is* the "live service" here -- there's no external dependency beyond

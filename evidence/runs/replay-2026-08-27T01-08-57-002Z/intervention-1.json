@@ -1,0 +1,11 @@
+{
+  "id": "replay-2026-08-27T01-08-57-002Z-intervention-1",
+  "runId": "replay-2026-08-27T01-08-57-002Z",
+  "runType": "replay",
+  "capability": "MERIDIAN: Transfer Funds",
+  "step": "step-17",
+  "reason": "extract failed at step-17: No locator candidate resolved to an element.",
+  "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T01-08-57-002Z/screenshots/intervention-1.png",
+  "url": "https://web-sample.interface-hiring.com/members/100987/transfer/post",
+  "createdAt": "2026-08-27T01:09:03.894Z"
+}

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import path from "node:path";
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -34,8 +35,13 @@ import { requestLog } from "../http/request-log.js";
  * /invoke.
  */
 
-const ARTIFACTS_DIR = "evidence/artifacts";
-const REGISTRY_PATH = "evidence/artifacts/registry.json";
+// Configurable (mirrors CAPABILITY_API_PORT below), not just a literal, so a second instance
+// of this exact server can run against a second, separate capability catalog -- e.g. one
+// pointed at mock-bank's artifacts, another at a different target app's -- the same
+// "same code, a second instance, separate config" pattern already used for the northgate-cu
+// mock-bank tenant, one level up (a whole different target app, not just a rebrand).
+const ARTIFACTS_DIR = process.env.CAPABILITY_ARTIFACTS_DIR ?? "evidence/artifacts";
+const REGISTRY_PATH = path.join(ARTIFACTS_DIR, "registry.json");
 
 const app = express();
 app.disable("x-powered-by");

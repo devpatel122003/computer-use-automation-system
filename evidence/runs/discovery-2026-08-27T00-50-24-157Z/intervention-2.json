@@ -1,0 +1,11 @@
+{
+  "id": "discovery-2026-08-27T00-50-24-157Z-intervention-2",
+  "runId": "discovery-2026-08-27T00-50-24-157Z",
+  "runType": "discovery",
+  "capability": "meridian-open-share",
+  "step": 18,
+  "reason": "Unable to select option S0002 or Money Market in share type dropdown via select_option.",
+  "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-27T00-50-24-157Z/screenshots/intervention-2.png",
+  "url": "https://web-sample.interface-hiring.com/members/100987/open-share",
+  "createdAt": "2026-08-27T00:51:18.488Z"
+}

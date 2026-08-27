@@ -24,7 +24,7 @@ import { requestLog } from "../http/request-log.js";
  * /health stays open for orchestrator checks.
  */
 
-const ARTIFACTS_DIR = "evidence/artifacts";
+const ARTIFACTS_DIR = process.env.CAPABILITY_ARTIFACTS_DIR ?? "evidence/artifacts";
 const RUNS_DIR = "evidence/runs";
 
 function readRunLog(runDir: string): LogEvent[] {

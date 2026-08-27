@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-27T01-03-32-209Z",
+  "outcome": "record_not_found",
+  "description": "The member record could not be located on the host.",
+  "stepId": "step-6",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T01-03-32-209Z/screenshots/001-outcome-record_not_found.png"
+}

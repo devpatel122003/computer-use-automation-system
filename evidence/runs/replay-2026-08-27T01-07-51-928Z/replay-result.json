@@ -1,0 +1,8 @@
+{
+  "status": "failure",
+  "runId": "replay-2026-08-27T01-07-51-928Z",
+  "stepId": "step-17",
+  "expected": "extract to succeed",
+  "observed": "No locator candidate resolved to an element.",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T01-07-51-928Z/screenshots/001-failure-step-17.png"
+}

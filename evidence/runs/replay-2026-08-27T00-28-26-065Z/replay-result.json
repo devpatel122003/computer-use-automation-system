@@ -1,0 +1,8 @@
+{
+  "status": "failure",
+  "runId": "replay-2026-08-27T00-28-26-065Z",
+  "stepId": "step-5",
+  "expected": "Reached the main menu after signing on.",
+  "observed": "url=https://web-sample.interface-hiring.com/signon?err=Invalid%20operator%20ID%20or%20password.",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T00-28-26-065Z/screenshots/001-checkpoint-failed-step-5.png"
+}

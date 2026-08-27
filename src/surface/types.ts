@@ -60,6 +60,14 @@ export interface ActionResult {
   matchedStrategy?: LocatorStrategy;
   extractedValue?: string;
   url: string;
+  /** The target app's own HTTP response status for whatever navigation this action caused,
+   *  if any -- supplementary evidence only, never consulted by checkpoint/known-outcome
+   *  detection (which stays entirely on page text/URL/DOM content, per Checkpoint's own
+   *  three kinds). Real legacy targets can return distinct status codes per error kind
+   *  (e.g. 400/403/404/440/500/503); this surfaces that signal in evidence logs without
+   *  adding a new Checkpoint kind. `undefined` when the action caused no fresh navigation
+   *  (e.g. a `type` into a field). */
+  httpStatus?: number;
 }
 
 export interface PredictedNavigation {
