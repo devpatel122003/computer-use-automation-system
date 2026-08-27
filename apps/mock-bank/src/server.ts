@@ -10,6 +10,7 @@ import {
   createSubAccount,
   findMember,
   findSubAccount,
+  findSubAccountForMember,
   resetData,
   subAccounts,
   transferFunds,
@@ -323,22 +324,22 @@ app.get("/members/:id/sub-accounts/:subId/confirm", requireAuth, (req, res) => {
 });
 
 app.get("/members/:id/sub-accounts/:subId/close", requireAuth, (req, res) => {
-  const member = findMember(req.params.id);
-  const subAccount = findSubAccount(req.params.subId);
-  if (!member || !subAccount || subAccount.memberId !== member.id) {
+  const found = findSubAccountForMember(req.params.id, req.params.subId);
+  if (!found) {
     res.status(404).send("Sub-account not found.");
     return;
   }
+  const { member, subAccount } = found;
   res.render("closeSubAccount", { username: req.session.username, member, subAccount, error: undefined });
 });
 
 app.post("/members/:id/sub-accounts/:subId/close", requireAuth, (req, res) => {
-  const member = findMember(req.params.id);
-  const subAccount = findSubAccount(req.params.subId);
-  if (!member || !subAccount || subAccount.memberId !== member.id) {
+  const found = findSubAccountForMember(req.params.id, req.params.subId);
+  if (!found) {
     res.status(404).send("Sub-account not found.");
     return;
   }
+  const { member, subAccount } = found;
 
   const result = closeSubAccount(subAccount.id);
   if (!result.ok) {
@@ -350,12 +351,12 @@ app.post("/members/:id/sub-accounts/:subId/close", requireAuth, (req, res) => {
 });
 
 app.get("/members/:id/sub-accounts/:subId/closed", requireAuth, (req, res) => {
-  const member = findMember(req.params.id);
-  const subAccount = findSubAccount(req.params.subId);
-  if (!member || !subAccount || subAccount.memberId !== member.id) {
+  const found = findSubAccountForMember(req.params.id, req.params.subId);
+  if (!found) {
     res.status(404).send("Sub-account not found.");
     return;
   }
+  const { member, subAccount } = found;
   res.render("subAccountClosed", { username: req.session.username, member, subAccount });
 });
 

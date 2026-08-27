@@ -1,5 +1,5 @@
-import type { ArtifactStep, CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
-import { attachStepCheckpoint, type ParamMapping } from "../../artifact/recorder.js";
+import type { CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
+import { attachStepCheckpoint, isClickNamed, type ParamMapping } from "../../artifact/recorder.js";
 
 /**
  * Domain knowledge for the fifth real capability: closing an existing sub-account. Takes
@@ -63,8 +63,6 @@ export const CLOSE_SUB_ACCOUNT_KNOWN_OUTCOMES: KnownOutcome[] = [
  *  to be a real input instead (see REPORT.md "Cuts" for the same class of limitation
  *  named for open-sub-account's literal-value step-11); noted here rather than glossed over. */
 export function annotateCloseSubAccountCheckpoints(artifact: CapabilityArtifact): void {
-  const isClickNamed = (step: ArtifactStep, name: string) => step.actionType === "click" && step.description.includes(`"${name}"`);
-
   attachStepCheckpoint(artifact, (s) => isClickNamed(s, "Sign On"), {
     kind: "url",
     expr: "/search",

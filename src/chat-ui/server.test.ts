@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { Request, Response } from "express";
+import type { Request } from "express";
+import { fakeRes } from "../test-support/fixtures.js";
 
 /**
  * Tests `handleChat` (the exported /chat route handler) directly with a fake req/res --
@@ -78,19 +79,6 @@ function stubFetch(invokeResponses: Record<string, unknown> = {}) {
 
 function fakeReq(message: string, session: Record<string, unknown> = {}): Request {
   return { body: { message }, session } as unknown as Request;
-}
-
-function fakeRes(): Response & { statusCode?: number; body?: unknown } {
-  const res: Partial<Response> & { statusCode?: number; body?: unknown } = {};
-  res.status = vi.fn((code: number) => {
-    res.statusCode = code;
-    return res as Response;
-  }) as unknown as Response["status"];
-  res.json = vi.fn((body: unknown) => {
-    res.body = body;
-    return res as Response;
-  }) as unknown as Response["json"];
-  return res as Response & { statusCode?: number; body?: unknown };
 }
 
 afterEach(() => {

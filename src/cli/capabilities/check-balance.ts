@@ -1,5 +1,5 @@
-import type { ArtifactStep, CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
-import { attachStepCheckpoint, type ParamMapping } from "../../artifact/recorder.js";
+import type { CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
+import { attachStepCheckpoint, isClickNamed, type ParamMapping } from "../../artifact/recorder.js";
 
 /**
  * Domain knowledge for the third real capability: a read-only lookup, not a write. Every
@@ -67,8 +67,6 @@ export const CHECK_BALANCE_KNOWN_OUTCOMES: KnownOutcome[] = [
  *  no "submit" step to distinguish here (this never writes anything), so unlike
  *  open-sub-account/create-member, only the sign-on and lookup milestones need annotating. */
 export function annotateCheckBalanceCheckpoints(artifact: CapabilityArtifact): void {
-  const isClickNamed = (step: ArtifactStep, name: string) => step.actionType === "click" && step.description.includes(`"${name}"`);
-
   attachStepCheckpoint(artifact, (s) => isClickNamed(s, "Sign On"), {
     kind: "url",
     expr: "/search",

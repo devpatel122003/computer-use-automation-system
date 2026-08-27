@@ -1,5 +1,5 @@
-import type { ArtifactStep, CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
-import { attachStepCheckpoint, type ParamMapping } from "../../artifact/recorder.js";
+import type { CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
+import { attachStepCheckpoint, isClickNamed, type ParamMapping } from "../../artifact/recorder.js";
 
 /**
  * Domain knowledge about THIS target app's error surface and milestones. Not mined from
@@ -91,8 +91,6 @@ export const OPEN_SUB_ACCOUNT_KNOWN_OUTCOMES: KnownOutcome[] = [
 /** Attaches milestone checkpoints by matching on step content, not a guessed step index --
  *  robust to the discovery agent taking a slightly different number/order of steps. */
 export function annotateOpenSubAccountCheckpoints(artifact: CapabilityArtifact): void {
-  const isClickNamed = (step: ArtifactStep, name: string) => step.actionType === "click" && step.description.includes(`"${name}"`);
-
   attachStepCheckpoint(artifact, (s) => isClickNamed(s, "Sign On"), {
     kind: "url",
     expr: "/search",

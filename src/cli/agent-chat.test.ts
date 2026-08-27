@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redactionOptionsFor, summarize } from "./agent-chat.js";
+import { redactionOptionsFor, summarize } from "../frontend/chat-shared.js";
 import { redact } from "../guardrails/redaction.js";
 import type { DiscoveredCapability } from "../frontend/planner.js";
 

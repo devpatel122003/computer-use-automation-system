@@ -56,6 +56,21 @@ function toRelativePath(url: string, baseUrlPattern: string): string {
   return url.startsWith(baseUrlPattern) ? url.slice(baseUrlPattern.length) || "/" : url;
 }
 
+/** Matches a step by its action type and the exact quoted control name in its own
+ *  description (e.g. `Click button "Sign On"`) -- every capability's `annotate*Checkpoints`
+ *  function uses this same predicate shape to find the step to attach a checkpoint to. */
+export function isClickNamed(step: ArtifactStep, name: string): boolean {
+  return step.actionType === "click" && step.description.includes(`"${name}"`);
+}
+
+/** Same shape as `isClickNamed`, but a case-insensitive substring match instead of an exact
+ *  quoted name -- for capabilities whose nav-link and submit-button copy can vary slightly
+ *  from what discovery happened to record (e.g. "Create New Member" vs. "Enroll New
+ *  Member"). */
+export function isClickMatching(step: ArtifactStep, name: string): boolean {
+  return step.actionType === "click" && step.description.toLowerCase().includes(name.toLowerCase());
+}
+
 /** Post-processing helper: attach a checkpoint to the first step matching a predicate.
  *  Matching on step content (not a guessed step index) keeps this robust to the discovery
  *  agent taking a slightly different number/order of steps to reach the same milestone. */

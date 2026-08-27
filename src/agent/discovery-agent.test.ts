@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DiscoveryAgent } from "./discovery-agent.js";
 import type { Action, ActionResult, PredictedNavigation, StateSnapshot, Surface } from "../surface/types.js";
 import type { GuardrailsPolicy, AuthorizationResult } from "../guardrails/policy.js";
-import type { EvidenceLogger } from "../evidence/logger.js";
+import { fakeLogger } from "../test-support/fixtures.js";
 
 /**
  * The discovery loop's control flow (escalate/resume, dead-end detection, risky-action
@@ -35,7 +35,7 @@ function scriptedGenai(calls: Array<{ name: string; args: Record<string, unknown
 function fakeSurface(elements: StateSnapshot["elements"] = []): Surface {
   return {
     observe: async (): Promise<StateSnapshot> => ({ url: "http://x/page", title: "Page", elements, screenshotPath: "s.png" }),
-    perform: async (action: Action): Promise<ActionResult> => ({ ok: true, url: "http://x/page" }),
+    perform: async (): Promise<ActionResult> => ({ ok: true, url: "http://x/page" }),
     predictNavigation: async (): Promise<PredictedNavigation | null> => null,
     getVisibleText: async () => "",
     screenshot: async (label: string) => `screenshot-${label}.png`,
@@ -48,15 +48,6 @@ function fakePolicy(overrides: { authorize?: (surface: Surface, action: Action) 
   return {
     authorize: overrides.authorize ?? (async () => ({ allowed: true, risk: "safe" as const })),
   } as unknown as GuardrailsPolicy;
-}
-
-function fakeLogger(): EvidenceLogger {
-  return {
-    log: () => undefined,
-    addSensitiveKeys: () => undefined,
-    addSensitiveValue: () => undefined,
-    writeJson: () => "",
-  } as unknown as EvidenceLogger;
 }
 
 describe("discovery agent: escalate -> resume -> finish", () => {

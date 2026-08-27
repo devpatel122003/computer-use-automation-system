@@ -6,7 +6,7 @@ import { attemptAssistedRecovery } from "./assisted-recovery.js";
 import type { ArtifactStep } from "../artifact/schema.js";
 import type { Action, ActionResult, PredictedNavigation, StateSnapshot, Surface } from "../surface/types.js";
 import type { AuthorizationResult, GuardrailsPolicy } from "../guardrails/policy.js";
-import type { EvidenceLogger } from "../evidence/logger.js";
+import { fakeLogger } from "../test-support/fixtures.js";
 import type { GoogleGenAI } from "@google/genai";
 
 /** attemptAssistedRecovery reads the screenshot path's bytes for real (to send as an
@@ -57,10 +57,6 @@ function fakePolicy(authorize?: (surface: Surface, action: Action) => Promise<Au
     authorize: authorize ?? (async () => ({ allowed: true, risk: "safe" as const })),
     authorizeLandedUrl: () => ({ allowed: true, risk: "safe" as const }),
   } as unknown as GuardrailsPolicy;
-}
-
-function fakeLogger(): EvidenceLogger {
-  return { log: () => undefined, addSensitiveKeys: () => undefined, addSensitiveValue: () => undefined, writeJson: () => "" } as unknown as EvidenceLogger;
 }
 
 const element = {

@@ -1,5 +1,5 @@
-import type { ArtifactStep, CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
-import { attachStepCheckpoint, type ParamMapping } from "../../artifact/recorder.js";
+import type { CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
+import { attachStepCheckpoint, isClickNamed, type ParamMapping } from "../../artifact/recorder.js";
 
 /**
  * First capability recorded against MERIDIAN CORE (the Adaptation Project's real, live
@@ -92,8 +92,6 @@ export const MERIDIAN_CHECK_BALANCE_KNOWN_OUTCOMES: KnownOutcome[] = [
  *  after the search submit, so a genuine no-match is classified there instead of the next
  *  step failing to find a "Select" link that was never rendered. */
 export function annotateMeridianCheckBalanceCheckpoints(artifact: CapabilityArtifact): void {
-  const isClickNamed = (step: ArtifactStep, name: string) => step.actionType === "click" && step.description.includes(`"${name}"`);
-
   attachStepCheckpoint(artifact, (s) => isClickNamed(s, "Sign On"), {
     kind: "url",
     expr: "/menu",

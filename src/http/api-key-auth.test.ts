@@ -1,24 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Request, Response } from "express";
+import type { Request } from "express";
 import { extractBearerToken, requireApiKey, requireBasicAuth } from "./api-key-auth.js";
 import type { OperatorConfigEntry } from "./operator-registry.js";
+import { fakeRes } from "../test-support/fixtures.js";
 
 function fakeReq(headers: Record<string, string>): Request {
   return { header: (name: string) => headers[name.toLowerCase()] } as unknown as Request;
-}
-
-function fakeRes(): Response & { statusCode?: number; body?: unknown } {
-  const res: Partial<Response> & { statusCode?: number; body?: unknown } = {};
-  res.status = vi.fn((code: number) => {
-    res.statusCode = code;
-    return res as Response;
-  }) as unknown as Response["status"];
-  res.json = vi.fn((body: unknown) => {
-    res.body = body;
-    return res as Response;
-  }) as unknown as Response["json"];
-  res.setHeader = vi.fn(() => res as Response) as unknown as Response["setHeader"];
-  return res as Response & { statusCode?: number; body?: unknown };
 }
 
 function basicAuthHeader(username: string, password: string): string {

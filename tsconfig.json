@@ -10,7 +10,9 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "outDir": "dist",
-    "rootDir": "."
+    "rootDir": ".",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["src/**/*.ts", "apps/**/*.ts"]
 }

@@ -1,5 +1,5 @@
-import type { ArtifactStep, CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
-import { attachStepCheckpoint, type ParamMapping } from "../../artifact/recorder.js";
+import type { CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
+import { attachStepCheckpoint, isClickNamed, type ParamMapping } from "../../artifact/recorder.js";
 
 /**
  * Second capability against MERIDIAN CORE, and minimum-bar #2 from the brief: an
@@ -102,8 +102,6 @@ export const MERIDIAN_TRANSFER_FUNDS_KNOWN_OUTCOMES: KnownOutcome[] = [
  *  page) are genuinely distinct, so matching on the FULL description avoids the ambiguity a
  *  shared label would cause (same reasoning as every other capability's annotate function). */
 export function annotateMeridianTransferFundsCheckpoints(artifact: CapabilityArtifact): void {
-  const isClickNamed = (step: ArtifactStep, name: string) => step.actionType === "click" && step.description.includes(`"${name}"`);
-
   attachStepCheckpoint(artifact, (s) => isClickNamed(s, "Sign On"), {
     kind: "url",
     expr: "/menu",

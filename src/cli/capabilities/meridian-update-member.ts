@@ -1,5 +1,5 @@
-import type { ArtifactStep, CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
-import { attachStepCheckpoint, type ParamMapping } from "../../artifact/recorder.js";
+import type { CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
+import { attachStepCheckpoint, isClickNamed, type ParamMapping } from "../../artifact/recorder.js";
 
 /**
  * Fifth capability against MERIDIAN CORE: "Update Member Information" -- a genuinely
@@ -75,8 +75,6 @@ export const MERIDIAN_UPDATE_MEMBER_KNOWN_OUTCOMES: KnownOutcome[] = [
 /** Attaches milestone checkpoints. No "review" checkpoint exists here -- genuinely absent
  *  from this capability's real shape, not an oversight (see file-level doc comment). */
 export function annotateMeridianUpdateMemberCheckpoints(artifact: CapabilityArtifact): void {
-  const isClickNamed = (step: ArtifactStep, name: string) => step.actionType === "click" && step.description.includes(`"${name}"`);
-
   attachStepCheckpoint(artifact, (s) => isClickNamed(s, "Sign On"), {
     kind: "url",
     expr: "/menu",

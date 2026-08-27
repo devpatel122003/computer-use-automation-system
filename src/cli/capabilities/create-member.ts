@@ -1,5 +1,5 @@
-import type { ArtifactStep, CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
-import { attachStepCheckpoint, type ParamMapping } from "../../artifact/recorder.js";
+import type { CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
+import { attachStepCheckpoint, isClickMatching, isClickNamed, type ParamMapping } from "../../artifact/recorder.js";
 
 /**
  * Domain knowledge for the second real capability this system records: enrolling a brand
@@ -74,8 +74,6 @@ export const CREATE_MEMBER_KNOWN_OUTCOMES: KnownOutcome[] = [
  *  ("Create New Member" vs. "Create Member") specifically so this matching can tell them
  *  apart; sharing one label would have made this annotation ambiguous. */
 export function annotateCreateMemberCheckpoints(artifact: CapabilityArtifact): void {
-  const isClickNamed = (step: ArtifactStep, name: string) => step.actionType === "click" && step.description.includes(`"${name}"`);
-  const isClickMatching = (step: ArtifactStep, name: string) => step.actionType === "click" && step.description.toLowerCase().includes(name.toLowerCase());
 
   attachStepCheckpoint(artifact, (s) => isClickNamed(s, "Sign On"), {
     kind: "url",

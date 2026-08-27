@@ -3,7 +3,7 @@
   "name": "MERIDIAN: Open New Share",
   "description": "Signs on to MERIDIAN CORE, opens a new share for a member, and reports the confirmation number and new share id.",
   "version": "1.0.0",
-  "createdAt": "2026-08-27T00:52:06.351Z",
+  "createdAt": "2026-08-27T06:12:17.937Z",
   "target": {
     "appId": "meridian-core",
     "surfaceType": "web",
@@ -58,13 +58,13 @@
       "name": "confirmationNumber",
       "type": "string",
       "sourceStepId": "step-15",
-      "description": "Extracted from text \"CN480368\""
+      "description": "Extracted from text \"CN480406\""
     },
     {
       "name": "newShareId",
       "type": "string",
       "sourceStepId": "step-16",
-      "description": "Extracted from text \"100987-MMKT-19\""
+      "description": "Extracted from text \"100987-MMKT-22\""
     }
   ],
   "steps": [
@@ -460,11 +460,11 @@
     {
       "id": "step-15",
       "actionType": "extract",
-      "description": "Extract value from text \"CN480368\"",
+      "description": "Extract value from text \"CN480406\"",
       "locator": [
         {
           "strategy": "text",
-          "name": "CN480368",
+          "name": "CN480406",
           "nth": 0,
           "confidence": "medium",
           "rationale": "Exact visible text match; stable as long as copy doesn't change."
@@ -487,11 +487,11 @@
     {
       "id": "step-16",
       "actionType": "extract",
-      "description": "Extract value from text \"100987-MMKT-19\"",
+      "description": "Extract value from text \"100987-MMKT-22\"",
       "locator": [
         {
           "strategy": "text",
-          "name": "100987-MMKT-19",
+          "name": "100987-MMKT-22",
           "nth": 0,
           "confidence": "medium",
           "rationale": "Exact visible text match; stable as long as copy doesn't change."

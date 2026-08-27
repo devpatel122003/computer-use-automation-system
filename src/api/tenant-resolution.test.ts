@@ -3,32 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { resolveEffectiveArtifact } from "./tenant-resolution.js";
-import { CapabilityArtifactSchema, type CapabilityArtifact } from "../artifact/schema.js";
-
-function baseArtifact(): CapabilityArtifact {
-  return CapabilityArtifactSchema.parse({
-    id: "open-sub-account",
-    name: "Open Sub-Account",
-    description: "test",
-    version: "1.0.0",
-    createdAt: new Date().toISOString(),
-    target: { appId: "mock-bank", surfaceType: "web", baseUrlPattern: "http://localhost:4000" },
-    inputParams: [],
-    outputSchema: [],
-    steps: [
-      {
-        id: "step-4",
-        actionType: "click",
-        description: 'Click button "Sign On"',
-        locator: [{ strategy: "role", role: "button", name: "Sign On", nth: 0, confidence: "high", rationale: "r" }],
-        risk: "safe",
-        waitPolicy: { timeoutMs: 5000, retries: 0 },
-      },
-    ],
-    successCheckpoint: { kind: "text_match", expr: "done", description: "d" },
-    knownOutcomes: [],
-  });
-}
+import { baseArtifact } from "../test-support/fixtures.js";
 
 function tempOverridesDir(): string {
   const dir = path.join(os.tmpdir(), `tenant-overrides-${Date.now()}-${Math.random().toString(36).slice(2)}`);

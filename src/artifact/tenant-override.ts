@@ -31,7 +31,6 @@ export const CheckpointOverrideSchema = z.object({
   target: z.string(),
   expr: z.string(),
 });
-export type CheckpointOverride = z.infer<typeof CheckpointOverrideSchema>;
 
 export const TenantOverrideSchema = z.object({
   tenantId: z.string(),

@@ -1,5 +1,5 @@
-import type { ArtifactStep, CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
-import { attachStepCheckpoint, type ParamMapping } from "../../artifact/recorder.js";
+import type { CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
+import { attachStepCheckpoint, isClickMatching, isClickNamed, type ParamMapping } from "../../artifact/recorder.js";
 
 /**
  * Domain knowledge for the fourth real capability: moving funds between a member's OWN
@@ -87,8 +87,6 @@ export const TRANSFER_FUNDS_KNOWN_OUTCOMES: KnownOutcome[] = [
  *  same reasoning as create-member's link/submit split -- sharing one label would make this
  *  matching ambiguous. */
 export function annotateTransferFundsCheckpoints(artifact: CapabilityArtifact): void {
-  const isClickNamed = (step: ArtifactStep, name: string) => step.actionType === "click" && step.description.includes(`"${name}"`);
-  const isClickMatching = (step: ArtifactStep, name: string) => step.actionType === "click" && step.description.toLowerCase().includes(name.toLowerCase());
 
   attachStepCheckpoint(artifact, (s) => isClickNamed(s, "Sign On"), {
     kind: "url",

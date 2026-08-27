@@ -3,7 +3,7 @@
   "name": "MERIDIAN: Check Balance",
   "description": "Signs on to MERIDIAN CORE, looks up a member by number, and reports every share's current balance and status.",
   "version": "1.0.0",
-  "createdAt": "2026-08-27T00:39:09.398Z",
+  "createdAt": "2026-08-27T05:50:04.165Z",
   "target": {
     "appId": "meridian-core",
     "surfaceType": "web",

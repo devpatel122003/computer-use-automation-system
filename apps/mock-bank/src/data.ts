@@ -167,6 +167,16 @@ export function findSubAccount(id: string): SubAccount | undefined {
   return subAccounts.get(id);
 }
 
+/** The combined "does this member own this sub-account" lookup+ownership check that
+ *  server.ts's close-sub-account routes (GET/POST .../close, GET .../closed) each repeated
+ *  verbatim -- centralized here since all three need the exact same answer. */
+export function findSubAccountForMember(memberId: string, subId: string): { member: Member; subAccount: SubAccount } | undefined {
+  const member = findMember(memberId);
+  const subAccount = findSubAccount(subId);
+  if (!member || !subAccount || subAccount.memberId !== member.id) return undefined;
+  return { member, subAccount };
+}
+
 export function createMember(name: string, checkingBalance: number, savingsBalance: number): Member {
   const id = String(nextMemberSeq++);
   const record: Member = { id, name, checkingBalance, savingsBalance };

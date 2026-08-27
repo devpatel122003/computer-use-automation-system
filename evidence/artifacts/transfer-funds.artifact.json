@@ -3,7 +3,7 @@
   "name": "Transfer Funds",
   "description": "Signs on, looks up a member, and moves funds between their own checking and savings balances, then confirms the result.",
   "version": "1.0.0",
-  "createdAt": "2026-08-26T19:03:32.803Z",
+  "createdAt": "2026-08-27T05:52:16.777Z",
   "target": {
     "appId": "mock-bank",
     "surfaceType": "web",

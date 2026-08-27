@@ -3,7 +3,7 @@
   "name": "Check Balance",
   "description": "Signs on, looks up a member by ID, and reports their current checking and savings balance.",
   "version": "1.0.0",
-  "createdAt": "2026-08-26T18:55:57.476Z",
+  "createdAt": "2026-08-27T05:48:14.108Z",
   "target": {
     "appId": "mock-bank",
     "surfaceType": "web",

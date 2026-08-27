@@ -6,7 +6,7 @@ import { replay } from "./replay-engine.js";
 import type { CapabilityArtifact, ArtifactStep, LocatorCandidate } from "../artifact/schema.js";
 import type { Action, ActionResult, PredictedNavigation, StateSnapshot, Surface } from "../surface/types.js";
 import type { GuardrailsPolicy, AuthorizationResult } from "../guardrails/policy.js";
-import type { EvidenceLogger } from "../evidence/logger.js";
+import { fakeLogger } from "../test-support/fixtures.js";
 
 function locator(name: string): LocatorCandidate[] {
   return [{ strategy: "text", name, nth: 0, confidence: "medium", rationale: "test fixture" }];
@@ -64,15 +64,6 @@ function fakePolicy(overrides: {
     authorizeLandedUrl: overrides.authorizeLandedUrl ?? (() => ({ allowed: true, risk: "safe" as const })),
   } as unknown as GuardrailsPolicy;
   return { policy, authorizeCalls };
-}
-
-function fakeLogger(): EvidenceLogger {
-  return {
-    log: () => undefined,
-    addSensitiveKeys: () => undefined,
-    addSensitiveValue: () => undefined,
-    writeJson: () => "",
-  } as unknown as EvidenceLogger;
 }
 
 describe("replay: happy path", () => {

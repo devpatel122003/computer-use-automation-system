@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveModelList, withModelFallback, withModelRetry } from "./model-retry.js";
-import type { EvidenceLogger } from "../evidence/logger.js";
-
-function fakeLogger(): EvidenceLogger {
-  return { log: () => undefined, addSensitiveKeys: () => undefined, addSensitiveValue: () => undefined, writeJson: () => "" } as unknown as EvidenceLogger;
-}
+import { fakeLogger } from "../test-support/fixtures.js";
 
 function errorWithStatus(status: number, message = "error"): Error {
   return Object.assign(new Error(message), { status });

@@ -20,11 +20,6 @@ import { resolveModelList } from "../agent/model-retry.js";
  * the CLI's own argument parsing and console output around that one shared implementation.
  */
 
-// Re-exported for backward compatibility: this file's own tests (agent-chat.test.ts)
-// import these from here, and other internal callers may too. The real definitions live in
-// ../frontend/chat-shared.ts now, alongside runChatTurn's other shared pieces.
-export { redactionOptionsFor, summarize, type InvokeResponse } from "../frontend/chat-shared.js";
-
 const MODELS = resolveModelList();
 
 async function main(): Promise<void> {

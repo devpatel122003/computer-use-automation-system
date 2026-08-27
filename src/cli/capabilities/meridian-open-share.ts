@@ -1,5 +1,5 @@
-import type { ArtifactStep, CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
-import { attachStepCheckpoint, type ParamMapping } from "../../artifact/recorder.js";
+import type { CapabilityArtifact, Checkpoint, KnownOutcome } from "../../artifact/schema.js";
+import { attachStepCheckpoint, isClickNamed, type ParamMapping } from "../../artifact/recorder.js";
 
 /**
  * Fourth capability against MERIDIAN CORE: "Open New Share" -- write, review->post, same
@@ -84,8 +84,6 @@ export const MERIDIAN_OPEN_SHARE_KNOWN_OUTCOMES: KnownOutcome[] = [
 
 /** Attaches milestone checkpoints, same pattern/reasoning as every other MERIDIAN capability. */
 export function annotateMeridianOpenShareCheckpoints(artifact: CapabilityArtifact): void {
-  const isClickNamed = (step: ArtifactStep, name: string) => step.actionType === "click" && step.description.includes(`"${name}"`);
-
   attachStepCheckpoint(artifact, (s) => isClickNamed(s, "Sign On"), {
     kind: "url",
     expr: "/menu",
