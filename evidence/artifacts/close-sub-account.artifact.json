@@ -338,6 +338,16 @@
         "description": "The close-confirmation page reported the sub-account was already closed."
       },
       "description": "This sub-account was already closed (e.g. by a previous run of this same artifact) -- a legitimate outcome, not a system error."
+    },
+    {
+      "name": "no_sub_account_to_close",
+      "category": "business_outcome",
+      "detector": {
+        "kind": "text_match",
+        "expr": "No sub-accounts on file",
+        "description": "The member page itself shows no sub-accounts at all."
+      },
+      "description": "This member has no sub-account to close. A legitimate result, not a crash."
     }
   ]
 }

@@ -399,14 +399,44 @@ what real Gemini would decide) the same way the replay engine's tests already fa
 Surface — closing what was, until this pass, the one part of the system with literally zero
 test coverage.
 
-**What's mocked deliberately:** the operator "console" is a terminal prompt, per the
-brief's explicit scope note, and (per above) the operator's manual browser action in both
-resume demos (discovery's navigation, replay's interstitial dismissal) specifically. What's
-*not* mocked: the actual control-transfer model (who's driving, on which session, with what
-evidence trail) is real and exercised in `/evidence`, for the abort outcome, discovery's
-resume, and now replay's resume alike. A real console would swap the CLI prompt for a web UI
-that attaches to the same Playwright `Page` (e.g. via its CDP endpoint) — the same
-`controller` flag and intervention-request shape would carry over unchanged.
+**A third path, closing the "a real console would..." gap this report used to end on.**
+Every escalation above blocks on a CLI prompt — real, but reachable only from a terminal, not
+from anything a demo audience watching the chat console would see. `src/api/http-escalation.ts`
+gives the capability API its own `onEscalate`, distinct from `EscalationController`: instead
+of a terminal prompt, a genuine mid-replay hard failure pauses on an in-memory `Promise`,
+exposed as `GET /interventions` (the pending request, plus a live screenshot streamed from
+disk) and `POST /interventions/:id/resolve` (`resume`/`abort`) — proxied through the chat-ui
+console at the same two paths, polled every 2.5s, rendered as a card. The original
+`POST /capabilities/:id/invoke` (and therefore the `/chat` request that triggered it) stays
+open, genuinely blocked, until a human answers from the console or a 10-minute timeout
+resolves it to `abort` (the same conservative "no answer means abort" default
+`resolveInterventionDecision` already applies to closed stdin). The live, headed Chromium
+window this launches (capability-api runs headed by default) is visible on the same machine
+running the demo — a real person can click the actual page, then click Resume in the console
+tab, and the blocked chat reply completes for real.
+
+Verified live, both branches: triggering the member-`77777` interstitial through the chat
+console and resolving `abort` (without touching the page) reproduces the exact same clean
+failure shape as the CLI path (`"observed": "url=http://localhost:4000/members/77777/sub-accounts"`);
+resolving `resume` without a real fix correctly re-attempts and reports a distinct, equally
+clean failure (`"observed": "No locator candidate resolved to an element."` — the
+interstitial's own Submit button, since the retry lands on a page that no longer has one).
+One live run, driven through the same path with the browser actually visible during manual
+testing, resolved `resume` and completed with a real confirmation number after several
+seconds' delay with no scripted action taken — consistent with a real click having landed on
+the live window in that window, not with anything in this code path fabricating success; the
+two clean-failure reproductions above confirm the checkpoint recheck itself does not
+rubber-stamp an unfixed page.
+
+**What's mocked deliberately:** the *terminal-prompt* operator surface (`EscalationController`)
+and the operator's manual browser action in the two scripted CLI demos (discovery's
+navigation, replay's interstitial dismissal), per the brief's explicit scope note. What's
+**not** mocked, as of the HTTP path above: a real, console-reachable "watch it pause, look at
+a live screenshot, resolve it" loop exists today, not just as a described extension — the gap
+this section used to end on ("a real console would swap the CLI prompt for a web UI...") is
+now closed for the capability-API path specifically. A fuller operator console (a live
+CDP-attached view of the page itself, not just a screenshot-and-buttons card) remains future
+work; see Cuts.
 
 ## 6. Safety
 

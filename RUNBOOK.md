@@ -268,7 +268,7 @@ one real, non-config fix" — this is the honest answer to "where wasn't it clea
 npm run replay -- \
   --artifact evidence/artifacts-meridian/meridian-transfer-funds.artifact.json \
   --registry evidence/artifacts-meridian/registry.json \
-  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"100987","fromShare":"100987-S0001-13","toShare":"100987-MMKT-14","amount":"5.00"}' \
+  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"100987","fromShare":"100987-S0001","toShare":"100987-MMKT-3","amount":"5.00"}' \
   --allow-risky true
 ```
 Point at the real confirmation number (`CN######`) that comes back — this is the brief's own
@@ -299,7 +299,7 @@ undetected failure mode reaching a real human decision point.
 npm run replay -- \
   --artifact evidence/artifacts-meridian/meridian-transfer-funds.artifact.json \
   --registry evidence/artifacts-meridian/registry.json \
-  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"100987","fromShare":"100987-S0001-13","toShare":"100987-MMKT-14","amount":"1.00"}' \
+  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"100987","fromShare":"100987-S0001","toShare":"100987-MMKT-3","amount":"1.00"}' \
   --interactive-escalation true
 ```
 Type `yes` at the risky-action prompt. In a **second** terminal, right after — before
@@ -315,19 +315,24 @@ back to blank immediately after** — it's global and affects the shared demo ta
 everyone. Real evidence from exactly this sequence, if asked for a backup:
 `evidence/runs/replay-2026-08-27T01-08-57-002Z/`.
 
-### Beat M5 (only if time remains) — the chatbot and dashboard, live
+### Beat M5 (only if time remains) — the chatbot/console and dashboard, live
 
 ```bash
 CAPABILITY_ARTIFACTS_DIR=evidence/artifacts-meridian CAPABILITY_API_PORT=4701 npm run capability-api   # T5
 CAPABILITY_ARTIFACTS_DIR=evidence/artifacts-meridian DASHBOARD_PORT=4601 npm run dashboard              # T5
-CHAT_UI_OPERATOR_BRANCH=MAIN-001 CAPABILITY_API_BASE=http://localhost:4701 CHAT_UI_PORT=4801 npm run chat-ui  # T5
+npm run chat-ui   # one console, every target -- no MERIDIAN-specific env vars needed        # T5
 ```
-Open `localhost:4801`, ask it *"what's the balance for member 100234"* — same
-confirm-before-risky-action flow as the take-home's own chat UI (Part 1), just talking to a
-second capability-api instance pointed at MERIDIAN's catalog instead of mock-bank's, mirroring
-the existing `northgate-cu` multi-tenant pattern rather than a merged, ambiguous catalog. Open
-`localhost:4601` (same `DASHBOARD_PASSWORD`) to show all six MERIDIAN capabilities' approval
-state and confidence in one place.
+Open `localhost:4800`, click **"MERIDIAN CORE (teller)"** in the sidebar's target switcher
+(catalog and demo scripts update to MERIDIAN's own), and ask it *"what's the balance for
+member 100234"* — same confirm-before-risky-action flow as the take-home's own chat UI (Part
+1), just talking to a second capability-api instance pointed at MERIDIAN's catalog instead of
+mock-bank's, mirroring the existing `northgate-cu` multi-tenant pattern rather than a merged,
+ambiguous catalog. For the strongest live proof the switch is real, not cosmetic: ask it to
+place a hold on share `102777-S0001` for member `102777`, reason `LEGAL` — as the teller it
+comes back `supervisor_override_required`; click **"MERIDIAN CORE (supervisor)"** and ask the
+exact same question — same backend, only the signed-on identity changed, and it actually
+posts. Open `localhost:4601` (same `DASHBOARD_PASSWORD`) to show all six MERIDIAN
+capabilities' approval state and confidence in one place.
 
 ## Contingency playbook
 

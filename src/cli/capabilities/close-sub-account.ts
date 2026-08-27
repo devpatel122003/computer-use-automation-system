@@ -54,6 +54,17 @@ export const CLOSE_SUB_ACCOUNT_KNOWN_OUTCOMES: KnownOutcome[] = [
     detector: { kind: "text_match", expr: "already", description: "The close-confirmation page reported the sub-account was already closed." },
     description: "This sub-account was already closed (e.g. by a previous run of this same artifact) -- a legitimate outcome, not a system error.",
   },
+  {
+    // Found live: with no sub-account to act on, step-7's "Close" click has no locator to
+    // resolve at all -- a mechanical action failure, not a navigation to an unexpected page.
+    // detectKnownOutcome() still runs on the CURRENT page after that failure (see
+    // replay-engine.ts's executeStep), so this is reachable the same way any other outcome
+    // is -- it just needed the right detector text for the member page's own empty state.
+    name: "no_sub_account_to_close",
+    category: "business_outcome",
+    detector: { kind: "text_match", expr: "No sub-accounts on file", description: "The member page itself shows no sub-accounts at all." },
+    description: "This member has no sub-account to close. A legitimate result, not a crash.",
+  },
 ];
 
 /** The sub-account's own recorded step-level locator (its `:subId` in the URL/click target)

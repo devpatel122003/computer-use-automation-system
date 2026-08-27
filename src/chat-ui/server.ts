@@ -1,4 +1,5 @@
 import "dotenv/config";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
@@ -41,32 +42,126 @@ import { requestLog } from "../http/request-log.js";
  *      capability still needs to sign on to the back-office system as SOME authenticated
  *      operator. A real bank customer would never know (or need to know) that operator's
  *      password -- so this server injects its OWN configured service-account credential
- *      (CHAT_UI_OPERATOR_USERNAME/PASSWORD) via runChatTurn's `fillParams`, which always
- *      wins over anything the model itself proposed. The customer's chat text is never
- *      trusted for a credential, mirroring exactly why planner.ts excludes sensitive
- *      params from its function-calling `required` list in the first place.
+ *      (the active TARGETS entry's own `fillParams`, below) via runChatTurn's `fillParams`,
+ *      which always wins over anything the model itself proposed. The customer's chat text
+ *      is never trusted for a credential, mirroring exactly why planner.ts excludes
+ *      sensitive params from its function-calling `required` list in the first place.
+ *
+ * This same server is also the "unified demo console" shell: /catalog and /config exist
+ * only to feed the sidebar in public/index.html (capability list, demo-script buttons, an
+ * optional dashboard link) so a live demo has one page to drive instead of three separate
+ * ports. Neither route adds new business logic -- /catalog is a redacted read-through of
+ * capability-api's own /capabilities, and a demo-script button just fills the existing chat
+ * input and submits it through the unchanged /chat path above.
+ *
+ * One port, multiple targets: rather than running a separate chat-ui PROCESS per target
+ * (the original mock-bank-only design, then a second `chat-ui-meridian` instance bolted on
+ * for the adaptation), this single process holds a small TARGETS registry (which
+ * capability-api instance, which fillParams identity, which demo scripts, which dashboard)
+ * and a per-BROWSER-SESSION `activeTargetId` (POST /target) selects among them -- the same
+ * "one process, session-scoped selection" shape express-session already uses for
+ * pendingPlan/pendingChain, just applied to "which backend" instead of "which pending
+ * action." Switching targets clears pendingPlan/pendingChain/history: a different target
+ * means a different capability catalog and a different signed-on identity, so anything
+ * pending against the OLD target is actively wrong against the new one, not just stale.
  */
 
 const MODELS = resolveModelList();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const OPERATOR_USERNAME = process.env.CHAT_UI_OPERATOR_USERNAME ?? "demo_operator";
-const OPERATOR_PASSWORD = process.env.CHAT_UI_OPERATOR_PASSWORD ?? "demo_password";
-// A third sign-on field, needed by MERIDIAN CORE's capabilities (operator/password/branch)
-// but not mock-bank's (operator/password only). Included in fillParams unconditionally --
-// validateParams (src/replay/replay-engine.ts) only checks params a capability actually
-// DECLARES as required, so an unused "branch" key is harmlessly ignored by any mock-bank
-// capability that doesn't have one.
-const OPERATOR_BRANCH = process.env.CHAT_UI_OPERATOR_BRANCH ?? "MAIN-001";
-
-// Unrelated to the above: CHAT_UI_OPERATOR_USERNAME/PASSWORD is the mock-bank sign-on
-// credential injected into capability params (see the header comment's item 2). This is a
-// different concept -- which named entry in config/operators.json this server's OWN
-// outbound call to the capability API authenticates as. Falls back to CAPABILITY_API_KEY
-// (resolving to "local-operator") when unset, so a solo dev's setup needs no extra config;
-// setting it lets every chat-UI-originated run's evidence/audit trail say "chat-ui-service"
-// instead of whichever human happens to own the shared key.
+// Unrelated to fillParams below: which named entry in config/operators.json this server's
+// OWN outbound calls to any capability-api instance authenticate as. Falls back to
+// CAPABILITY_API_KEY (resolving to "local-operator") when unset. Verified shared across
+// instances: every capability-api process (mock-bank's on :4700, MERIDIAN's on :4701) loads
+// the SAME config/operators.json and resolves the SAME env var, so one key here works
+// against either -- this is what makes a single process safely multi-target in the first
+// place, not an assumption.
 const CAPABILITY_API_KEY = process.env.CHAT_UI_SERVICE_API_KEY ?? process.env.CAPABILITY_API_KEY;
+
+interface TargetDefinition {
+  id: string;
+  label: string;
+  apiBase: string;
+  /** The operator identity this target's capabilities sign on as -- injected into every
+   *  capability invocation via fillParams (see the header comment's item 2), always
+   *  overwriting anything the model itself proposed. A customer's chat text is never
+   *  trusted for a credential; which target is active decides which credential, not the
+   *  user's own message. */
+  fillParams: Record<string, string>;
+  demoScriptsFile?: string;
+  dashboardUrl?: string;
+}
+
+// Built-in default covering both targets this repo actually ships evidence for, at their
+// standard documented ports (README's "MERIDIAN CORE adaptation demo path"). A third entry
+// signs on as the MERIDIAN supervisor rather than the teller -- not a different backend, the
+// same capability-api instance and catalog, just a different identity -- so a demo can show
+// both sides of the Place Hold permission boundary (teller: supervisor_override_required;
+// supervisor: succeeds) from the same console via the target switcher, without a fourth port.
+const DEFAULT_TARGETS: TargetDefinition[] = [
+  {
+    id: "mock-bank",
+    label: "Mock Bank",
+    apiBase: "http://localhost:4700",
+    fillParams: { username: "demo_operator", password: "demo_password" },
+    demoScriptsFile: "config/demo-scripts/mock-bank.json",
+    dashboardUrl: "http://localhost:4600",
+  },
+  {
+    id: "meridian",
+    label: "MERIDIAN CORE (teller)",
+    apiBase: "http://localhost:4701",
+    fillParams: { username: "teller1", password: "password", branch: "MAIN-001" },
+    demoScriptsFile: "config/demo-scripts/meridian.json",
+    dashboardUrl: "http://localhost:4601",
+  },
+  {
+    id: "meridian-supervisor",
+    label: "MERIDIAN CORE (supervisor)",
+    apiBase: "http://localhost:4701",
+    fillParams: { username: "super1", password: "password", branch: "MAIN-001" },
+    demoScriptsFile: "config/demo-scripts/meridian-supervisor.json",
+    dashboardUrl: "http://localhost:4601",
+  },
+];
+
+/** Optional full override -- a JSON file shaped like DEFAULT_TARGETS above -- for anyone
+ *  pointing this console at a different port layout or a third real target entirely.
+ *  Falls back to DEFAULT_TARGETS (not an empty list) so this console is never target-less
+ *  over a typo'd path or an unset env var. */
+function loadTargets(): TargetDefinition[] {
+  const filePath = process.env.CHAT_UI_TARGETS_FILE;
+  if (!filePath) return DEFAULT_TARGETS;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  } catch {
+    // Malformed/missing file -- fall back rather than crash a demo server over a typo'd path.
+  }
+  return DEFAULT_TARGETS;
+}
+
+export const TARGETS = loadTargets();
+const TARGETS_BY_ID = new Map(TARGETS.map((t) => [t.id, t]));
+
+/** Unknown/unset id (a fresh browser session that never called POST /target, or a stale id
+ *  from before a targets-file edit) resolves to the first configured target rather than
+ *  throwing -- same "never target-less" posture as loadTargets itself. */
+export function resolveTarget(id: string | undefined): TargetDefinition {
+  return (id && TARGETS_BY_ID.get(id)) || TARGETS[0];
+}
+
+function loadDemoScripts(filePath: string | undefined): Array<{ label: string; message: string }> {
+  if (!filePath) return [];
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    if (Array.isArray(parsed)) return parsed;
+  } catch {
+    // Malformed/missing file -- an empty script list, not a crash; the chat panel itself
+    // still works with no buttons.
+  }
+  return [];
+}
 
 // Holds a planned-but-not-yet-invoked risky capability call across exactly one confirmation
 // round-trip -- see the /chat handler below. A memory-backed session (express-session's
@@ -75,6 +170,10 @@ const CAPABILITY_API_KEY = process.env.CHAT_UI_SERVICE_API_KEY ?? process.env.CA
 // question, not a correctness problem.
 declare module "express-session" {
   interface SessionData {
+    /** Which TARGETS entry this browser session is currently talking to. Unset until the
+     *  first POST /target -- resolveTarget(undefined) falls back to TARGETS[0], so a fresh
+     *  session works with no explicit selection. */
+    activeTargetId?: string;
     pendingPlan?: Extract<PlanChatTurnResult, { kind: "planned" }>;
     /** Independent of `pendingPlan` above -- a two-step chained request (see
      *  src/frontend/chain.ts) awaiting one combined "yes"/"no" before either step is
@@ -117,6 +216,125 @@ app.use(requestLog("chat-ui"));
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+// Static, local config the browser needs to render the console shell (the active target,
+// the full target list for the switcher, which demo-script buttons to show, whether an ops
+// dashboard link exists). No secrets here -- same posture as /health, deliberately
+// unauthenticated and unlimited.
+app.get("/config", (req, res) => {
+  const target = resolveTarget(req.session.activeTargetId);
+  res.json({
+    activeTarget: { id: target.id, label: target.label },
+    targets: TARGETS.map((t) => ({ id: t.id, label: t.label })),
+    dashboardUrl: target.dashboardUrl ?? null,
+    demoScripts: loadDemoScripts(target.demoScriptsFile),
+  });
+});
+
+// Switches which TARGETS entry this browser session talks to. A GET-based design (e.g.
+// `?target=meridian`) would let a stray link or a bookmarked URL silently switch a live
+// session's backend/identity; a POST keeps that an explicit action.
+app.post("/target", (req, res) => {
+  const targetId = typeof req.body?.targetId === "string" ? req.body.targetId : undefined;
+  const target = targetId ? TARGETS_BY_ID.get(targetId) : undefined;
+  if (!target) {
+    res.status(400).json({ error: `Unknown target "${targetId}". Valid targets: ${TARGETS.map((t) => t.id).join(", ")}` });
+    return;
+  }
+  req.session.activeTargetId = target.id;
+  // See the file header comment: a different target means a different capability catalog
+  // and a different signed-on identity, so anything pending against the OLD target is
+  // actively wrong against the new one, not just stale.
+  req.session.pendingPlan = undefined;
+  req.session.pendingChain = undefined;
+  req.session.history = undefined;
+  res.json({ activeTarget: { id: target.id, label: target.label } });
+});
+
+// Read-only proxy for the console's capability-catalog sidebar. Holds CAPABILITY_API_KEY
+// server-side and forwards it -- the browser never sees a key of its own, same boundary
+// /chat already relies on for invocations. GET-only and just a pass-through of
+// capability-api's own /capabilities (itself already redacted/non-sensitive metadata), so
+// this doesn't need the rate limiter guarding /chat's real invocations.
+app.get("/catalog", async (req, res) => {
+  const target = resolveTarget(req.session.activeTargetId);
+  if (!CAPABILITY_API_KEY) {
+    res.status(500).json({ error: "Server is not configured (missing CHAT_UI_SERVICE_API_KEY or CAPABILITY_API_KEY)." });
+    return;
+  }
+  try {
+    const listRes = await fetch(`${target.apiBase}/capabilities`, { headers: { Authorization: `Bearer ${CAPABILITY_API_KEY}` } });
+    if (!listRes.ok) {
+      res.status(502).json({ error: `GET /capabilities failed: HTTP ${listRes.status}` });
+      return;
+    }
+    res.json(await listRes.json());
+  } catch (err) {
+    const messageText = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Couldn't reach the capability API at ${target.apiBase}: ${messageText}` });
+  }
+});
+
+// Human-escalation proxy, same pattern as /catalog: the browser polls this instead of
+// holding a capability-api key of its own. Scoped to the ACTIVE target -- an escalation
+// raised by one target's capability-api instance is only visible while that target is
+// selected, since it's genuinely a different process with its own in-memory registry (see
+// http-escalation.ts). Read-only and cheap enough to poll every couple of seconds.
+app.get("/interventions", async (req, res) => {
+  const target = resolveTarget(req.session.activeTargetId);
+  if (!CAPABILITY_API_KEY) {
+    res.status(500).json({ error: "Server is not configured (missing CHAT_UI_SERVICE_API_KEY or CAPABILITY_API_KEY)." });
+    return;
+  }
+  try {
+    const listRes = await fetch(`${target.apiBase}/interventions`, { headers: { Authorization: `Bearer ${CAPABILITY_API_KEY}` } });
+    if (!listRes.ok) {
+      res.status(502).json({ error: `GET /interventions failed: HTTP ${listRes.status}` });
+      return;
+    }
+    res.json(await listRes.json());
+  } catch (err) {
+    const messageText = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Couldn't reach the capability API at ${target.apiBase}: ${messageText}` });
+  }
+});
+
+app.get("/interventions/:id/screenshot", async (req, res) => {
+  const target = resolveTarget(req.session.activeTargetId);
+  try {
+    const imgRes = await fetch(`${target.apiBase}/interventions/${req.params.id}/screenshot`, {
+      headers: { Authorization: `Bearer ${CAPABILITY_API_KEY ?? ""}` },
+    });
+    if (!imgRes.ok) {
+      res.status(imgRes.status).end();
+      return;
+    }
+    res.type("png").send(Buffer.from(await imgRes.arrayBuffer()));
+  } catch {
+    res.status(502).end();
+  }
+});
+
+// The one write route in this proxy group -- a human clicking Resume/Abort in the console.
+// No new rate limiter: this can only ever act on an intervention that already exists (a
+// stray or repeated call just gets a 404 from capability-api, same as any other bad id), so
+// it carries none of /chat's "can trigger a fresh real action" risk.
+app.post("/interventions/:id/resolve", async (req, res) => {
+  const target = resolveTarget(req.session.activeTargetId);
+  const decision = req.body?.decision;
+  try {
+    const resolveRes = await fetch(`${target.apiBase}/interventions/${req.params.id}/resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${CAPABILITY_API_KEY ?? ""}` },
+      body: JSON.stringify({ decision }),
+    });
+    const data = await resolveRes.json().catch(() => ({}));
+    res.status(resolveRes.status).json(data);
+  } catch (err) {
+    const messageText = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: `Couldn't reach the capability API at ${target.apiBase}: ${messageText}` });
+  }
 });
 
 // Unauthenticated by design (see header comment) but still rate-limited: an invocation can
@@ -208,10 +426,11 @@ export async function handleChat(req: express.Request, res: express.Response): P
   }
 
   try {
+    const target = resolveTarget(req.session.activeTargetId);
     const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const apiBase = process.env.CAPABILITY_API_BASE ?? "http://localhost:4700";
+    const apiBase = target.apiBase;
     const apiKey = CAPABILITY_API_KEY;
-    const fillParams = { username: OPERATOR_USERNAME, password: OPERATOR_PASSWORD, branch: OPERATOR_BRANCH };
+    const fillParams = target.fillParams;
     const history = req.session.history ?? [];
 
     // Checked FIRST, before the single-plan branch below: a pending CHAIN from a previous
@@ -334,7 +553,12 @@ export async function handleChat(req: express.Request, res: express.Response): P
     const hint = /fetch failed/i.test(messageText)
       ? ` -- is it running? (npm run mock-bank, then npm run capability-api, then this)`
       : "";
-    res.status(502).json({ error: `Couldn't reach the capability API at ${process.env.CAPABILITY_API_BASE ?? "http://localhost:4700"}: ${messageText}${hint}` });
+    // Re-resolved rather than reused from the try block above -- `target` there is scoped to
+    // that block, and this catch can be reached before it's assigned (e.g. GEMINI_API_KEY
+    // check aside, a throw from resolveTarget itself never happens, but keeping this
+    // independent avoids relying on try-block variable lifetime across a catch boundary).
+    const target = resolveTarget(req.session.activeTargetId);
+    res.status(502).json({ error: `Couldn't reach the capability API at ${target.apiBase}: ${messageText}${hint}` });
   }
 }
 

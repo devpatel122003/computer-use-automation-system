@@ -1,0 +1,11 @@
+[
+  { "label": "Check a balance (happy path)", "message": "What's the balance for member 100234?" },
+  { "label": "Member not found (business outcome)", "message": "What's the balance for member 999999?" },
+  { "label": "Search by last name", "message": "Search for a member with last name Lovelace" },
+  { "label": "Transfer funds (review → post)", "message": "Transfer $5 from share 100987-S0001 to 100987-MMKT-3 for member 100987" },
+  { "label": "Open a new share", "message": "Open a Money Market share for member 100987 with a $30 deposit" },
+  { "label": "Certificate below minimum (business outcome)", "message": "Open a Certificate share for member 102777 with a $25 deposit" },
+  { "label": "Update member info", "message": "Update member 101555's email to grace.hopper@example.com, phone to 555-0177, and address to 1 Compiler Way, Arlington" },
+  { "label": "Invalid email (business outcome)", "message": "Update member 102777's email to not-an-email, phone to 555-0177, and address to 1 Compiler Way, Arlington" },
+  { "label": "Place hold as teller (permission denied)", "message": "Place a hold on share 102777-S0001 for member 102777, reason code LEGAL" }
+]

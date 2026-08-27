@@ -11,10 +11,10 @@ import { fileURLToPath } from "node:url";
  * *which human*..."). Same loading convention as `src/guardrails/allowlist.ts`: a committed
  * JSON file pointing at env var NAMES, never containing a secret value itself.
  *
- * Naming note: this "operator" is a DIFFERENT concept from `CHAT_UI_OPERATOR_USERNAME`/
- * `PASSWORD` (the mock-bank sign-on credential the chat UI injects into capability params --
- * see chat-ui/server.ts). This one is "who authenticated to THIS system's own HTTP surfaces
- * (the capability API, the dashboard)." The two are unrelated; don't conflate them.
+ * Naming note: this "operator" is a DIFFERENT concept from a chat-ui TARGETS entry's own
+ * `fillParams` (the target-system sign-on credential the chat UI injects into capability
+ * params -- see chat-ui/server.ts). This one is "who authenticated to THIS system's own HTTP
+ * surfaces (the capability API, the dashboard)." The two are unrelated; don't conflate them.
  */
 
 export interface OperatorConfigEntry {

@@ -40,6 +40,8 @@ vi.mock("@google/genai", () => {
 });
 
 let handleChat: typeof import("./server.js").handleChat;
+let resolveTarget: typeof import("./server.js").resolveTarget;
+let TARGETS: typeof import("./server.js").TARGETS;
 
 beforeAll(async () => {
   process.env.GEMINI_API_KEY = "test-gemini-key";
@@ -47,6 +49,8 @@ beforeAll(async () => {
   delete process.env.CHAT_UI_SERVICE_API_KEY;
   const mod = await import("./server.js");
   handleChat = mod.handleChat;
+  resolveTarget = mod.resolveTarget;
+  TARGETS = mod.TARGETS;
 });
 
 const CATALOG = [
@@ -62,6 +66,22 @@ const CATALOG = [
     ],
   },
   { id: "check-balance", description: "Reads a member's balance.", hasRiskyStep: false, inputParams: [{ name: "memberId", type: "string", required: true }] },
+  {
+    id: "meridian-check-balance",
+    description: "Reads a MERIDIAN member's balance.",
+    hasRiskyStep: false,
+    inputParams: [{ name: "memberId", type: "string", required: true }],
+  },
+  {
+    id: "meridian-place-hold",
+    description: "Places a hold on a MERIDIAN member's share.",
+    hasRiskyStep: true,
+    inputParams: [
+      { name: "memberId", type: "string", required: true },
+      { name: "shareId", type: "string", required: true },
+      { name: "reasonCode", type: "string", required: true },
+    ],
+  },
 ];
 
 function stubFetch(invokeResponses: Record<string, unknown> = {}) {
@@ -227,5 +247,72 @@ describe("handleChat -- multi-step chained requests", () => {
     const nextRes = fakeRes();
     await handleChat(fakeReq("create a new member named Someone Else", session), nextRes);
     expect(session.pendingPlan).toBeDefined();
+  });
+});
+
+describe("resolveTarget -- the single console's multi-target selection", () => {
+  it("has at least mock-bank and a MERIDIAN teller/supervisor pair configured by default", () => {
+    const ids = TARGETS.map((t) => t.id);
+    expect(ids).toContain("mock-bank");
+    expect(ids).toContain("meridian");
+    expect(ids).toContain("meridian-supervisor");
+  });
+
+  it("falls back to the first target for an undefined or unknown id, never throwing", () => {
+    expect(resolveTarget(undefined).id).toBe(TARGETS[0].id);
+    expect(resolveTarget("not-a-real-target").id).toBe(TARGETS[0].id);
+  });
+
+  it("resolves a known id to its own entry, not the default", () => {
+    expect(resolveTarget("meridian").id).toBe("meridian");
+    expect(resolveTarget("meridian-supervisor").fillParams.username).toBe("super1");
+  });
+});
+
+describe("handleChat -- target-aware routing (one console, multiple backends)", () => {
+  it("with no activeTargetId set, invokes against the default (mock-bank) target's apiBase and identity", async () => {
+    const calls = stubFetch({ "check-balance": { status: "success", outputs: { checkingBalance: "$1.00" } } });
+    router = () => ({ name: "invoke__check_balance", args: { reasoning: "r", memberId: "10001" } });
+
+    await handleChat(fakeReq("what's the balance for member 10001?", {}), fakeRes());
+
+    const invoke = calls.find((c) => c.url.includes("/invoke"));
+    expect(invoke?.url.startsWith(TARGETS[0].apiBase)).toBe(true);
+    const body = JSON.parse(String(invoke?.init?.body)) as { params: Record<string, string> };
+    expect(body.params.username).toBe(TARGETS[0].fillParams.username);
+  });
+
+  it("with activeTargetId set to a MERIDIAN target, invokes against ITS apiBase and injects ITS operator identity, not the default's", async () => {
+    const meridian = TARGETS.find((t) => t.id === "meridian")!;
+    const calls = stubFetch({ "meridian-check-balance": { status: "success", outputs: { primaryShareBalance: "$1.00" } } });
+    router = () => ({ name: "invoke__meridian_check_balance", args: { reasoning: "r", memberId: "100234" } });
+
+    const session: Record<string, unknown> = { activeTargetId: "meridian" };
+    await handleChat(fakeReq("what's the balance for member 100234?", session), fakeRes());
+
+    const invoke = calls.find((c) => c.url.includes("/invoke"));
+    expect(invoke?.url.startsWith(meridian.apiBase)).toBe(true);
+    const body = JSON.parse(String(invoke?.init?.body)) as { params: Record<string, string> };
+    expect(body.params.username).toBe("teller1");
+    expect(body.params.branch).toBe("MAIN-001");
+  });
+
+  it("with activeTargetId set to the supervisor variant, injects super1 -- same apiBase as the teller variant, different identity", async () => {
+    const supervisor = TARGETS.find((t) => t.id === "meridian-supervisor")!;
+    const teller = TARGETS.find((t) => t.id === "meridian")!;
+    expect(supervisor.apiBase).toBe(teller.apiBase);
+
+    const calls = stubFetch({ "meridian-place-hold": { status: "success", outputs: {} } });
+    router = () => ({ name: "invoke__meridian_place_hold", args: { reasoning: "r", memberId: "102777", shareId: "102777-S0001", reasonCode: "LEGAL" } });
+
+    const session: Record<string, unknown> = { activeTargetId: "meridian-supervisor" };
+    await handleChat(fakeReq("place a hold on share 102777-S0001 for member 102777, reason LEGAL", session), fakeRes());
+    // Risky capability -- first turn only plans/confirms, doesn't invoke yet.
+    expect(session.pendingPlan).toBeDefined();
+
+    await handleChat(fakeReq("yes", session), fakeRes());
+    const invoke = calls.find((c) => c.url.includes("/invoke"));
+    const body = JSON.parse(String(invoke?.init?.body)) as { params: Record<string, string> };
+    expect(body.params.username).toBe("super1");
   });
 });

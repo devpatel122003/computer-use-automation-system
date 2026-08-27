@@ -1,0 +1,13 @@
+[
+  { "label": "Check a balance (happy path)", "message": "What's the balance for member 10001?" },
+  { "label": "Permission denied (business outcome)", "message": "What's the balance for member 99999?" },
+  { "label": "Member not found (business outcome)", "message": "What's the balance for member 999999?" },
+  { "label": "Session timeout, auto-recovered (one-shot -- needs a fresh reset)", "message": "What's the balance for member 90909?" },
+  { "label": "Create a new member", "message": "Create a new member named Priya Nair with an initial checking balance of $1000 and savings balance of $250" },
+  { "label": "1. Open a savings account (do this before the close-account demo below)", "message": "Open a savings account for member 10001 with $100" },
+  { "label": "Transfer funds", "message": "Transfer $100 from checking to savings for member 10001" },
+  { "label": "Insufficient funds (business outcome)", "message": "Transfer $999999 from checking to savings for member 10001" },
+  { "label": "2. Close member 10001's sub-account (run after step 1 above)", "message": "Close member 10001's sub-account" },
+  { "label": "Unexpected dialog (hard failure, debuggable)", "message": "Open a savings account for member 77777 with $50" },
+  { "label": "Create member, then open account (chained)", "message": "Create a new member named Alan Turing, then open a savings account for them with $100." }
+]

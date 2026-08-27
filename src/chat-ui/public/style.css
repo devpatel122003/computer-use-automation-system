@@ -23,21 +23,210 @@ body {
   color: var(--text);
   display: flex;
   justify-content: center;
-  padding: 24px;
+  padding: 12px;
   min-height: 100vh;
 }
 
-.chat-app {
+.console {
   width: 100%;
-  max-width: 640px;
+  max-width: 1100px;
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* Fills the viewport (minus the body's own 12px top/bottom padding) instead of capping at a
+ * fixed 720px -- on a normal laptop screen that fixed cap left real vertical space unused
+ * while the sidebar (target switcher + demo-script buttons, the two things a live demo
+ * actually clicks) still had to scroll internally to show everything. */
+.sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  height: calc(100vh - 24px);
+  overflow-y: auto;
+}
+
+.sidebar h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.sidebar h2:not(:first-child) {
+  margin-top: 14px;
+}
+
+.sidebar .hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.target-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.target-btn {
+  text-align: left;
+  border: 1px solid var(--border);
+  background: #f8f9fb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.target-btn:hover:not(.active):not(:disabled) {
+  border-color: var(--user-bubble);
+}
+
+.target-btn.active {
+  background: var(--user-bubble);
+  color: white;
+  border-color: var(--user-bubble);
+}
+
+.target-btn:disabled {
+  cursor: default;
+}
+
+/* Collapsed by default (see index.html's <details>) -- the raw catalog metadata is useful
+ * to check but isn't what a live demo actually clicks, so it no longer eats sidebar height
+ * by default. Native <details>/<summary>: no JS needed to open/close it. */
+.catalog-details {
+  margin-bottom: 4px;
+}
+
+.catalog-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 2px 0;
+}
+
+.catalog-details[open] summary {
+  margin-bottom: 8px;
+}
+
+.catalog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.catalog-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.catalog-name {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.catalog-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.badge-risky {
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.demo-scripts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.demo-script-btn {
+  text-align: left;
+  border: 1px solid var(--border);
+  background: #f8f9fb;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.demo-script-btn:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+
+.dashboard-link {
+  display: block;
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--user-bubble);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.dashboard-link:hover {
+  text-decoration: underline;
+}
+
+.chat-app {
+  flex: 1;
+  min-width: 0;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
-  height: min(720px, 90vh);
+  height: calc(100vh - 24px);
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+@media (max-width: 800px) {
+  .console {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    max-height: 280px;
+  }
 }
 
 header {
@@ -56,6 +245,68 @@ header .subtitle {
   margin: 4px 0 0;
   font-size: 13px;
   color: #cfe0f0;
+}
+
+.interventions {
+  padding: 12px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.intervention-card {
+  border: 2px solid #b02a2a;
+  background: #fff5f5;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.intervention-screenshot {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.intervention-reason {
+  font-weight: 600;
+  font-size: 13px;
+  color: #7a0000;
+}
+
+.intervention-meta {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin: 4px 0 8px;
+}
+
+.intervention-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.intervention-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.intervention-btn.resume {
+  background: var(--accent);
+  color: white;
+}
+
+.intervention-btn.abort {
+  background: #b02a2a;
+  color: white;
 }
 
 .messages {

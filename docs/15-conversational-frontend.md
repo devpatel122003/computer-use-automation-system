@@ -220,16 +220,18 @@ from the page entirely (not just disabled) on a browser that doesn't implement i
 supply — or need to know — a back-office credential.** `runChatTurn()` accepts an optional
 `fillParams: Record<string, string>`, merged into the invoke call *after* planning and
 **always winning** over anything the model itself proposed. The chat UI passes its own
-configured service-account operator credential
-(`CHAT_UI_OPERATOR_USERNAME`/`CHAT_UI_OPERATOR_PASSWORD`) through it; the CLI doesn't use
-this at all, since an internal caller running the CLI is already the authenticated party. The
-injected value is also never included in what's returned to *any* caller (`redactedParams`
-is built from the plan *before* the merge), so even an internal debugging view can't
-accidentally surface it.
+configured service-account operator credential through it -- as of the unified,
+multi-target console, that credential comes from whichever `TARGETS` entry (in
+`src/chat-ui/server.ts`) the browser session has selected, not a single fixed env var: the
+mock-bank target's own `fillParams`, or MERIDIAN's teller (`teller1`) vs. supervisor
+(`super1`) identity, depending on which one is active. The CLI doesn't use this at all, since
+an internal caller running the CLI is already the authenticated party. The injected value is
+also never included in what's returned to *any* caller (`redactedParams` is built from the
+plan *before* the merge), so even an internal debugging view can't accidentally surface it.
 
-**A second, unrelated credential concept, added by the per-operator identity feature:**
-`CHAT_UI_OPERATOR_USERNAME`/`PASSWORD` above is the mock-bank *sign-on* credential baked
-into capability params. Separately, `CHAT_UI_SERVICE_API_KEY` (falling back to
+**A second, unrelated credential concept, added by the per-operator identity feature:** a
+`TARGETS` entry's `fillParams` above is the target-system *sign-on* credential baked into
+capability params. Separately, `CHAT_UI_SERVICE_API_KEY` (falling back to
 `CAPABILITY_API_KEY` if unset) is which named entry in `config/operators.json` this
 server's own *outbound HTTP call* to the capability API authenticates as -- setting it
 means every chat-UI-originated run's evidence/audit trail says `chat-ui-service`, not

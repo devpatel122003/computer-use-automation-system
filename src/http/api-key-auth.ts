@@ -18,10 +18,10 @@ declare global {
   namespace Express {
     interface Request {
       /** Set by requireApiKey/requireBasicAuth once auth succeeds -- the id of the
-       *  config/operators.json entry whose credential matched. NOT the same concept as
-       *  CHAT_UI_OPERATOR_USERNAME/PASSWORD (the mock-bank sign-on credential the chat UI
-       *  injects into capability params) -- this is who authenticated to THIS system's own
-       *  HTTP surface. */
+       *  config/operators.json entry whose credential matched. NOT the same concept as the
+       *  active target's `fillParams` in src/chat-ui/server.ts (the target-system sign-on
+       *  credential the chat UI injects into capability params) -- this is who
+       *  authenticated to THIS system's own HTTP surface. */
       operatorId?: string;
     }
   }

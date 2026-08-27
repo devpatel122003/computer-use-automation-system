@@ -375,6 +375,35 @@ by default everywhere (same opt-in posture as `--assisted-recovery`): an unatten
 (the capability API, `canary-check`) has no human to hand a stuck run to, so it keeps failing
 immediately unless this is explicitly turned on.
 
+**4d. The same real handoff, reachable from the console -- no terminal, no scripted click.**
+The two paths above prove the mechanism; neither is something a person watching the chat
+console would ever see triggered from a demo-script button. `src/api/http-escalation.ts`
+closes that gap: the capability API's own `onEscalate` now pauses on an in-memory
+promise instead of declining automatically, exposed as `GET /interventions` (what's paused,
+with a live screenshot) and `POST /interventions/:id/resolve` (`resume`/`abort`) -- proxied
+through the console at the same two paths. The original `/invoke` (and therefore `/chat`)
+request that triggered the escalation stays open, blocked, until a human answers.
+
+```bash
+npm run capability-api    # headed by default -- the live browser window is really visible
+npm run chat-ui
+```
+
+Open `http://localhost:4800`, ask *"Open a savings account for member 77777 with $50"*, confirm
+with "yes". A red intervention card appears in the console with the live screenshot, the
+reason, and Resume/Abort buttons -- while a REAL headed Chromium window is genuinely sitting
+on the interstitial page on your own screen. Click **"Confirm & Continue" in that real
+window** (not scripted this time), then click **Resume** in the console: the blocked chat
+reply completes for real with a genuine confirmation number. Click **Abort** instead (with or
+without touching the browser) to see the clean, structured failure that produces. Verified
+both ways live: `resume` without touching the page first correctly re-fails
+(`"observed": "No locator candidate resolved to an element."` -- the interstitial's Submit
+button no longer exists once you've moved past it, exactly as it shouldn't); `abort` reports
+`"observed": "url=http://localhost:4000/members/77777/sub-accounts"`, the same clean failure
+shape as every other hard failure in this system. A pending intervention nobody answers times
+out to `abort` after 10 minutes rather than hanging a real browser and a rate-limit slot
+forever.
+
 **5. Confidence & approval (Section 8 stretch goal).** Every replay records its outcome
 against the artifact's exact content fingerprint in `evidence/artifacts/registry.json`, and
 computes a confidence label (`unproven` → `low`/`medium` → `high`) from clean-run history
@@ -651,6 +680,35 @@ npx tsx src/cli/replay.ts --artifact evidence/artifacts/close-sub-account.artifa
 Replay the exact same command a second time to see the real `already_closed` business
 outcome instead of a crash.
 
+**10f. Recording a new capability without writing a new source file.** Each capability above
+needed its own `run-agent-*.ts` wrapper plus, usually, its own `src/cli/capabilities/*.ts`
+domain-knowledge file (param mappings, the success checkpoint, known outcomes, and which
+steps get which intermediate checkpoint). `record-capability` reads that same domain
+knowledge from one JSON config instead:
+
+```bash
+npm run record-capability -- --config config/capability-configs/mock-bank-check-balance.example.json
+npm run record-capability -- --config config/capability-configs/meridian-check-balance.example.json
+```
+
+The two example configs shipped here reproduce `check-balance` and `meridian-check-balance`
+field-for-field (see `src/cli/record-capability.test.ts`, which loads and asserts against
+both) -- running either one re-records that same capability for real, exactly like its
+hand-written `run-agent-*` script would. `--goal`, `--start-url`, and `--artifact-out` on the
+command line override the config file's own values, the same way every hand-written wrapper
+already lets you override its default goal.
+
+This does **not** make param mappings or known outcomes up for you -- those stay hand-authored
+domain knowledge, same as every other capability in this repo (see `recorder.ts`'s own doc
+comment on why that's a deliberate choice, not a gap). What it removes is having to write a
+new `.ts` file to hold that knowledge: describe a capability as one JSON file (steps'
+checkpoint-annotation rules included -- `checkpointAnnotations` covers the exact two matcher
+primitives, `isClickNamed`/`isClickMatching`, every existing `annotate*Checkpoints` function
+in this repo already reduces to) and this script drives the same `runDiscoveryCli()` engine
+every other capability uses. Recording a brand-new capability against a brand-new target is
+then: write one config JSON (see the two examples for the field-by-field shape), point
+`startUrl`/`baseUrlPattern` at it, and run this.
+
 **11. Conversational front end.** The other half of "the agent-facing product decides what
 to do": natural language, mapped to a capability + typed args by one Gemini call, then
 invoked through the same capability API as step 9. With three real capabilities now
@@ -715,6 +773,52 @@ member id) into step 2's params, and invokes step 2. Fails fast (never invokes s
 step 1 doesn't cleanly succeed. See `docs/15-conversational-frontend.md`'s "Chained
 requests" for the real bug this surfaced live (planning the second clause in complete
 isolation made Gemini correctly refuse to call any function at all) and how it was fixed.
+
+**11c. One page, one port, every target (the unified demo console).** `http://localhost:4800`
+is the single entry point for a live demo -- not just the chat panel, and not one process per
+target either. The sidebar has three things:
+
+- A **target switcher** at the top -- "Mock Bank" / "MERIDIAN CORE (teller)" / "MERIDIAN CORE
+  (supervisor)" -- backed by a small `TARGETS` registry in `src/chat-ui/server.ts`, each entry
+  naming its own capability-api instance, its own signed-on operator identity, its own
+  demo-script file, and its own dashboard link. Clicking one `POST`s `/target`, which sets
+  `activeTargetId` on that browser's own session (the same session mechanism already holding
+  `pendingPlan`/`pendingChain`) -- every other route (`/chat`, `/catalog`, `/config`) reads it
+  back per-request, so one process genuinely serves every target, not three copies of the same
+  server on three ports. Switching clears any pending confirmation/chain/history: a different
+  target means a different capability catalog and a different identity underneath, so
+  anything pending against the old one would be actively wrong against the new one, not just
+  stale. The MERIDIAN teller/supervisor pair is the same backend and catalog, just a different
+  `fillParams` identity (`teller1` vs `super1`) -- proof the switch is real: ask it to place a
+  hold as the teller and it comes back `supervisor_override_required`; switch to supervisor,
+  ask again, and it actually posts.
+- A live **capability catalog** (name, approval state, confidence, a `risky` badge) for
+  whichever target is active, fetched from `GET /catalog` -- a redacted read-through of that
+  target's own capability-api `GET /capabilities` that never hands the browser an API key of
+  its own.
+- A **"Demo scripts"** list of buttons, one JSON file per target
+  (`config/demo-scripts/mock-bank.json`, `meridian.json`, `meridian-supervisor.json`),
+  covering every capability's happy path plus its real business outcomes, not just one or two
+  examples -- mock-bank's covers all five capabilities including the genuine
+  `permission_denied` (member `99999`), `member_not_found`, simulated-slow-load, and
+  interstitial-hard-failure seed scenarios `apps/mock-bank/src/data.ts` ships; MERIDIAN's
+  covers all six capabilities including `invalid_email_format`, the certificate
+  minimum-deposit business rule, and the teller/supervisor Place Hold split. Clicking one adds
+  no new invocation logic: it fills the same composer input a person would type and submits it
+  through the unchanged `/chat` path, so a scripted demo step and a free-typed request are
+  indistinguishable to the server.
+
+An "Open ops dashboard ↗" link (from `GET /config`) points at whichever target's dashboard is
+active. `npm run chat-ui` is the only command needed -- the built-in `TARGETS` default already
+covers mock-bank (`:4700`/`:4600`) and both MERIDIAN identities (`:4701`/`:4601`); a
+`CHAT_UI_TARGETS_FILE` env var fully replaces that list for a different port layout or a real
+third target.
+
+A fourth thing shows up only when it's needed: if a request hits a genuine mid-replay hard
+failure, a red **intervention card** appears above the chat log -- a live screenshot, the
+reason, and Resume/Abort buttons, polled from `GET /interventions` every 2.5s. This is the
+real human-escalation handoff (§3.6), reachable from the console instead of only a terminal
+-- see "4d" below for the full walkthrough.
 
 **12. Assisted fallback (bounded LLM recovery).** Opt-in only -- `replay`'s own promise
 ("never calls a model") holds unless you pass this:
@@ -835,7 +939,7 @@ npm run replay -- \
 npm run replay -- \
   --artifact evidence/artifacts-meridian/meridian-transfer-funds.artifact.json \
   --registry evidence/artifacts-meridian/registry.json \
-  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"100987","fromShare":"100987-S0001-13","toShare":"100987-MMKT-14","amount":"5.00"}' \
+  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"100987","fromShare":"100987-S0001","toShare":"100987-MMKT-3","amount":"5.00"}' \
   --allow-risky true
 ```
 
@@ -856,21 +960,43 @@ globally via the live app's own `/settings` screen (`errorRate`, `forcedInject` 
 to reset `forcedInject` back to `""` afterward, since it's global and affects every other
 session against the shared demo target).
 
-**Capability API, chatbot, and dashboard, pointed at MERIDIAN's own catalog** -- a second
-instance of each, mirroring the existing `northgate-cu` multi-tenant pattern (same server
-code, separate config, see `ADAPTATION.md`):
+**Capability API and dashboard, pointed at MERIDIAN's own catalog** -- a second instance of
+each, mirroring the existing `northgate-cu` multi-tenant pattern (same server code, separate
+config, see `ADAPTATION.md`). The chat/console layer needs no second instance at all -- one
+`npm run chat-ui` already knows about both:
 
 ```bash
-CAPABILITY_ARTIFACTS_DIR=evidence/artifacts-meridian CAPABILITY_API_PORT=4701 npm run capability-api
-CAPABILITY_ARTIFACTS_DIR=evidence/artifacts-meridian DASHBOARD_PORT=4601 npm run dashboard
-CHAT_UI_OPERATOR_BRANCH=MAIN-001 CAPABILITY_API_BASE=http://localhost:4701 CHAT_UI_PORT=4801 npm run chat-ui
+npm run capability-api-meridian   # port 4701, evidence/artifacts-meridian
+npm run dashboard-meridian        # port 4601, same artifacts dir, HTTP Basic auth
+npm run chat-ui                   # port 4800 -- the ONE console, for every target
 ```
 
-Open `http://localhost:4801` and ask it something like *"what's the balance for member
-100234"* or *"transfer $5 from share 100987-S0001-13 to 100987-MMKT-14 for member 100987"* --
-the same confirm-before-risky-action flow as the take-home's chat UI, just talking to
-MERIDIAN's capability catalog. Open `http://localhost:4601` (HTTP Basic auth, same
-`DASHBOARD_PASSWORD`) to watch the run history, contract, and drift signal for all six
+(Earlier this repo ran a second `chat-ui-meridian` process on its own port, with its own
+`CHAT_UI_OPERATOR_*` env vars. That's gone -- see "11c" above: one process now holds all
+three identities (mock-bank, MERIDIAN teller, MERIDIAN supervisor) in a `TARGETS` registry and
+switches between them per browser session. A real bug surfaced and got fixed on the way to
+that design: the original two-process setup's documented MERIDIAN launch command never set an
+operator credential at all, so it silently injected the *mock-bank* demo credential
+(`demo_operator`/`demo_password`) into every MERIDIAN sign-on step -- not a valid MERIDIAN
+operator, so every invocation would have failed at login. The `TARGETS` registry's
+`meridian`/`meridian-supervisor` entries carry the correct `teller1`/`super1` credentials
+built in, so this can't recur silently the way a forgotten env var could.)
+
+Open `http://localhost:4800`, click **"MERIDIAN CORE (teller)"** in the sidebar's target
+switcher, and the catalog/demo-scripts/dashboard-link all update to MERIDIAN's own -- all six
+capabilities, and demo scripts covering every one of them (a balance check, a not-found
+lookup, a name search, a transfer, an open-share happy path *and* its certificate
+minimum-deposit business outcome, an update-member happy path *and* its invalid-email business
+outcome, and a teller attempting the supervisor-only Place Hold). Ask it something like
+*"what's the balance for member 100234"* or *"transfer $5 from share 100987-S0001 to
+100987-MMKT-3 for member 100987"*, or just click a demo-script button -- the same
+confirm-before-risky-action flow as the take-home's chat UI, just talking to MERIDIAN's
+capability catalog. Click **"MERIDIAN CORE (supervisor)"** and ask the exact same Place Hold
+question again: same backend, same catalog, only the signed-on identity changed (`super1`
+instead of `teller1`) -- and it actually posts instead of coming back
+`supervisor_override_required`, proof the switch is a real identity change, not cosmetic. The
+sidebar's "Open ops dashboard ↗" link (or `http://localhost:4601` directly, HTTP Basic auth,
+same `DASHBOARD_PASSWORD`) shows the run history, contract, and drift signal for all six
 capabilities.
 
 **The escalation demo.** A real, live, end-to-end proof of "stuck → stop → escalate," not
@@ -884,7 +1010,7 @@ hang:
 npm run replay -- \
   --artifact evidence/artifacts-meridian/meridian-transfer-funds.artifact.json \
   --registry evidence/artifacts-meridian/registry.json \
-  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"100987","fromShare":"100987-S0001-13","toShare":"100987-MMKT-14","amount":"1.00"}' \
+  --params '{"username":"teller1","password":"password","branch":"MAIN-001","memberId":"100987","fromShare":"100987-S0001","toShare":"100987-MMKT-3","amount":"1.00"}' \
   --interactive-escalation true
 ```
 

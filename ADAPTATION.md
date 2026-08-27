@@ -79,6 +79,36 @@ cleanly separated every case. The four write capabilities deliberately carry **n
 Leaving it undetected routes it to the generic hard-failure path, the only one that calls
 `tryEscalate` — verified live (below), not just designed.
 
+**A real incident, caught live while building the demo console: literal share IDs drift, type
+codes don't.** MERIDIAN's own share-numbering scheme appends an incrementing per-share
+sequence number (`100987-S0001`, `100987-MMKT-3`) that is **not stable across the shared demo
+target's own resets/reseeds** — a `fromShare`/`toShare` value hardcoded into a README example
+or a demo script at one point in time (`100987-S0001-13`/`100987-MMKT-14`) genuinely stopped
+resolving later, failing with a real `select_option` timeout ("did not find some options"),
+not a bug in the replay engine itself. Confirmed by re-querying the live target directly
+(`curl` against the signed-on session) rather than guessing, then fixed everywhere the stale
+values appeared (README, RUNBOOK, the console's own demo-script config). The lesson
+generalizes beyond this one fix: a capability's *type-level* params (MERIDIAN's share **type**
+codes — `S0001`/`S0070`/`MMKT`/`CERT` — mock-bank's account **type** strings) are stable
+literals safe to hardcode into a demo script or a doc; a capability's *instance-level* IDs
+(a specific share's own generated number) are not, on a target whose data resets — exactly the
+canonicalization concern Section 3.7/§8 already raises for cross-tenant reuse, showing up here
+within a single tenant instead of across tenants.
+
+**A second real incident, immediately after fixing the first: the confidence circuit
+breaker correctly refused to let the fix through unattended.** The stale-share-ID failure
+above (plus one other transient failure) pushed `meridian-transfer-funds`'s drift-adjusted
+confidence to `low` — `execution-policy.ts`'s `effectiveAllowRisky` gate, by design, declines
+`allowRisky: true` on anything below `medium` even though the artifact itself is still
+`approved`, falling back to a confirmation the unattended API/chat path has no human to give.
+This is the gate working exactly as designed, not a bug: five fresh, genuinely successful
+CLI-driven replays (interactive confirmation, real invocations against the live target) were
+needed to push the rolling score back above the 0.7/5-run `medium` threshold before the chat
+demo script would complete again over HTTP. Left in as a real, honest example of what this
+project's own stretch-goal circuit breaker is for — a track record that degrades really does
+lock unattended execution back to attended, and recovers the same way any real capability's
+trust would: more clean runs, not a manual override.
+
 ## Safety, evidence, and escalation survival
 
 Guardrails needed zero code changes — MERIDIAN's routes are just more entries in the same

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import fs from "node:fs";
 import path from "node:path";
 import express from "express";
 import helmet from "helmet";
@@ -17,6 +18,7 @@ import { loadMatchingDriftReports } from "../replay/drift-loader.js";
 import { effectiveAllowRisky } from "../replay/execution-policy.js";
 import { requireApiKey } from "../http/api-key-auth.js";
 import { requestLog } from "../http/request-log.js";
+import { HttpEscalationRegistry } from "./http-escalation.js";
 
 /**
  * The brief's §8 "agent-facing capability interface" stretch goal: a small HTTP surface an
@@ -26,13 +28,21 @@ import { requestLog } from "../http/request-log.js";
  * it"). This is a thin wrapper: no new business logic. Every invocation runs through the
  * exact same `replay()` engine, `GuardrailsPolicy`, and confidence-registry gate as the
  * `replay` CLI -- an agent calling this can't get looser guardrails than a human running
- * the CLI would. Unlike the CLI, there is no operator to prompt for a risky-step
- * confirmation, so a risky step on a non-`approved` artifact is declined automatically
- * (no `onRiskyStep` callback is passed) rather than hanging the request on stdin that will
- * never arrive. Requires a real API key (CAPABILITY_API_KEY -- see .env.example and
- * SECURITY.md) on every route except /health: this endpoint can both read capability
- * confidence state and trigger a real action, so both legs need the same gate, not just
- * /invoke.
+ * the CLI would. A risky step on a non-approved artifact still declines automatically here
+ * (no `onRiskyStep` callback is passed) rather than hanging the request on a prompt with no
+ * terminal to answer it -- that pre-flight approval gate is deliberately unattended-only.
+ *
+ * A genuine mid-replay hard failure (§3.6's "escalate to a human") is a different case, and
+ * DOES get a real human-in-the-loop path here: `onEscalate` is wired to a
+ * `HttpEscalationRegistry` (`./http-escalation.ts`) instead of a terminal prompt, so a
+ * console/dashboard user -- not someone at this process's stdin -- can see the paused run
+ * (screenshot included, via `GET /interventions`) and resolve it (`POST
+ * /interventions/:id/resolve`) while the original `/invoke` request stays open waiting. The
+ * live, headed browser page itself is the same real handoff surface `EscalationController`
+ * gives the CLI; this just answers "who resolves it" with an HTTP caller instead of stdin.
+ * Requires a real API key (CAPABILITY_API_KEY -- see .env.example and SECURITY.md) on every
+ * route except /health: this endpoint can both read capability confidence state and trigger
+ * a real action, so both legs need the same gate, not just /invoke.
  */
 
 // Configurable (mirrors CAPABILITY_API_PORT below), not just a literal, so a second instance
@@ -42,6 +52,11 @@ import { requestLog } from "../http/request-log.js";
 // mock-bank tenant, one level up (a whole different target app, not just a rebrand).
 const ARTIFACTS_DIR = process.env.CAPABILITY_ARTIFACTS_DIR ?? "evidence/artifacts";
 const REGISTRY_PATH = path.join(ARTIFACTS_DIR, "registry.json");
+
+// One shared instance for this process's lifetime -- every /invoke call that hits a genuine
+// hard failure raises its escalation here, so a single console polling /interventions sees
+// every pending one regardless of which invocation raised it.
+const escalationRegistry = new HttpEscalationRegistry();
 
 const app = express();
 app.disable("x-powered-by");
@@ -66,6 +81,39 @@ app.use(requireApiKey());
 // throttled independently of read traffic so a runaway/malicious caller can't exhaust the
 // same budget a normal discovery (`GET /capabilities`) call would need.
 const invokeLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false });
+
+// The human-escalation surface (§3.6): what's paused right now, waiting for a person, and
+// how a person resolves it. See http-escalation.ts's own doc comment for why this exists
+// alongside (not instead of) EscalationController's terminal-prompt version.
+app.get("/interventions", (_req, res) => {
+  res.json(escalationRegistry.list());
+});
+
+// Path never comes from the request -- only from this process's own in-memory registry
+// (populated by createOnEscalate, never by client input) -- so there's no path-traversal
+// surface here despite serving a file by id.
+app.get("/interventions/:id/screenshot", (req, res) => {
+  const screenshotPath = escalationRegistry.getScreenshotPath(req.params.id);
+  if (!screenshotPath || !fs.existsSync(screenshotPath)) {
+    res.status(404).json({ error: `No pending intervention (or no screenshot) for id "${req.params.id}".` });
+    return;
+  }
+  res.type("png").send(fs.readFileSync(screenshotPath));
+});
+
+app.post("/interventions/:id/resolve", (req, res) => {
+  const decision = req.body?.decision === "resume" || req.body?.decision === "abort" ? req.body.decision : undefined;
+  if (!decision) {
+    res.status(400).json({ error: 'Missing or invalid "decision" -- must be "resume" or "abort".' });
+    return;
+  }
+  const resolved = escalationRegistry.resolve(req.params.id, decision);
+  if (!resolved) {
+    res.status(404).json({ error: `No pending intervention with id "${req.params.id}" (already resolved, timed out, or never existed).` });
+    return;
+  }
+  res.json({ resolved: true, decision });
+});
 
 app.get("/capabilities", (_req, res) => {
   const catalog = loadCapabilityCatalog(ARTIFACTS_DIR);
@@ -173,6 +221,7 @@ app.post("/capabilities/:id/invoke", invokeLimiter, async (req, res) => {
       logger,
       runId,
       allowRisky,
+      onEscalate: escalationRegistry.createOnEscalate({ page: surface.getPage(), logger, runId, capability: artifact.name }),
     });
 
     logger.writeJson("replay-result.json", result);

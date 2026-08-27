@@ -1,0 +1,45 @@
+{
+  "id": "check-balance",
+  "name": "Check Balance",
+  "description": "Signs on, looks up a member by ID, and reports their current checking and savings balance.",
+  "version": "1.0.0",
+  "appId": "mock-bank",
+  "baseUrlPattern": "http://localhost:4000",
+  "goal": "Sign on as operator \"demo_operator\" with password \"demo_password\", look up member 10001, and extract and report their current checking balance and savings balance.",
+  "startUrl": "http://localhost:4000/login",
+  "password": "demo_password",
+  "artifactOut": "evidence/artifacts/check-balance.artifact.json",
+  "registryPath": "evidence/artifacts/registry.json",
+  "paramMappings": [
+    { "role": "textbox", "name": "Operator ID", "paramName": "username", "type": "string", "description": "Operator ID used to sign on to the terminal." },
+    { "role": "textbox", "name": "Password", "paramName": "password", "type": "string", "sensitive": true, "description": "Operator password used to sign on to the terminal." },
+    { "role": "textbox", "name": "Member ID", "paramName": "memberId", "type": "string", "description": "The member whose balances to look up." }
+  ],
+  "successCheckpoint": { "kind": "url", "expr": "/members/{memberId}", "description": "Reached the member detail page showing both balances." },
+  "knownOutcomes": [
+    {
+      "name": "member_not_found",
+      "category": "business_outcome",
+      "detector": { "kind": "text_match", "expr": "No member found with ID", "description": "Search returned no matching member." },
+      "description": "No member exists with the given memberId. A legitimate result, not a crash."
+    },
+    {
+      "name": "permission_denied",
+      "category": "business_outcome",
+      "detector": { "kind": "text_match", "expr": "Access denied", "description": "Operator lacks permission to view this member." },
+      "description": "The signed-on operator is not permitted to view this member's balances."
+    },
+    {
+      "name": "session_timeout",
+      "category": "recoverable",
+      "detector": { "kind": "text_match", "expr": "session has expired", "description": "Session expired mid-flow, redirected to sign-on." },
+      "description": "The operator session expired mid-flow; automation re-authenticates and retries the step once.",
+      "recovery": "reauthenticate_and_retry_step",
+      "recoveryStepIds": ["step-2", "step-3", "step-4", "step-5"]
+    }
+  ],
+  "checkpointAnnotations": [
+    { "matchClickNames": ["Sign On"], "matchMode": "exact", "checkpoint": { "kind": "url", "expr": "/search", "description": "Reached the search page after signing on." } },
+    { "matchClickNames": ["Look Up Member"], "matchMode": "exact", "checkpoint": { "kind": "url", "expr": "/members/{memberId}", "description": "Reached the member detail page showing both balances." } }
+  ]
+}

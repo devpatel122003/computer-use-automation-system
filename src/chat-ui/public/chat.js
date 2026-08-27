@@ -9,6 +9,11 @@ const input = document.getElementById("input");
 const micBtn = document.getElementById("mic-btn");
 const micStatus = document.getElementById("mic-status");
 const speakToggle = document.getElementById("speak-toggle");
+const catalogListEl = document.getElementById("catalog-list");
+const demoScriptsEl = document.getElementById("demo-scripts");
+const dashboardLinkEl = document.getElementById("dashboard-link");
+const targetSwitcherEl = document.getElementById("target-switcher");
+const interventionsEl = document.getElementById("interventions");
 
 function addMessage(text, who, caption) {
   const el = document.createElement("div");
@@ -136,6 +141,224 @@ if (SpeechRecognitionImpl) {
 } else {
   micBtn.hidden = true;
 }
+
+// Sidebar: capability catalog + demo-script buttons + optional dashboard link. Both fetches
+// hit this same server (never capability-api directly -- the browser never holds an API
+// key), and both fail soft: a demo running the chat panel alone (capability-api down, or
+// /config unset) should still work, just with an empty/short sidebar instead of a crash.
+
+function renderCatalog(catalog) {
+  catalogListEl.innerHTML = "";
+  if (!Array.isArray(catalog) || catalog.length === 0) {
+    catalogListEl.innerHTML = '<li class="muted">No capabilities found.</li>';
+    return;
+  }
+  for (const cap of catalog) {
+    const li = document.createElement("li");
+    li.className = "catalog-item";
+    const name = document.createElement("div");
+    name.className = "catalog-name";
+    name.textContent = cap.name ?? cap.id;
+    if (cap.hasRiskyStep) {
+      const badge = document.createElement("span");
+      badge.className = "badge badge-risky";
+      badge.textContent = "risky";
+      name.appendChild(badge);
+    }
+    const meta = document.createElement("div");
+    meta.className = "catalog-meta";
+    meta.textContent = `${cap.approvalState ?? "unknown"} · v${cap.version ?? "?"}`;
+    li.appendChild(name);
+    li.appendChild(meta);
+    catalogListEl.appendChild(li);
+  }
+}
+
+async function loadCatalog() {
+  try {
+    const res = await fetch("/catalog");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+    renderCatalog(data);
+  } catch (err) {
+    catalogListEl.innerHTML = `<li class="muted">Catalog unavailable (${err.message ?? err}).</li>`;
+  }
+}
+
+function renderDemoScripts(scripts) {
+  demoScriptsEl.innerHTML = "";
+  if (!Array.isArray(scripts) || scripts.length === 0) return;
+  for (const script of scripts) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "demo-script-btn";
+    btn.textContent = script.label;
+    btn.title = script.message;
+    // Fills the real composer input and submits through the exact same path a typed message
+    // would take -- no separate invocation logic for buttons vs. free text.
+    btn.addEventListener("click", () => sendMessage(script.message));
+    demoScriptsEl.appendChild(btn);
+  }
+}
+
+function renderTargetSwitcher(targets, activeTarget) {
+  targetSwitcherEl.innerHTML = "";
+  for (const t of targets) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "target-btn" + (t.id === activeTarget.id ? " active" : "");
+    btn.textContent = t.label;
+    btn.addEventListener("click", () => switchTarget(t.id, t.label));
+    targetSwitcherEl.appendChild(btn);
+  }
+}
+
+// Switching targets means a different backend AND a different signed-on identity
+// underneath -- the server clears any pending confirmation/chain/history for this session
+// (see server.ts's POST /target), so the chat panel here does the client-side equivalent:
+// drop the old dashboard link and demo scripts, refresh the catalog against the NEW target,
+// and leave a visible note in the transcript rather than silently wiping it (a person should
+// be able to see exactly when and to what they switched).
+async function switchTarget(targetId, targetLabel) {
+  try {
+    const res = await fetch("/target", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetId }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      addMessage(`Couldn't switch target: ${data.error ?? `HTTP ${res.status}`}`, "bot error");
+      return;
+    }
+    addMessage(`Switched to ${targetLabel}. Catalog and demo scripts below now reflect it.`, "bot");
+    await Promise.all([loadCatalog(), loadConsoleConfig()]);
+  } catch (err) {
+    addMessage(`Couldn't switch target (${err.message ?? err}).`, "bot error");
+  }
+}
+
+async function loadConsoleConfig() {
+  try {
+    const res = await fetch("/config");
+    const data = await res.json();
+    renderDemoScripts(data.demoScripts);
+    if (Array.isArray(data.targets) && data.activeTarget) {
+      renderTargetSwitcher(data.targets, data.activeTarget);
+    }
+    if (data.dashboardUrl) {
+      dashboardLinkEl.href = data.dashboardUrl;
+      dashboardLinkEl.hidden = false;
+    } else {
+      dashboardLinkEl.hidden = true;
+    }
+  } catch {
+    // No config, no demo-script buttons, no dashboard link, no switcher -- the chat panel
+    // itself still works, so this stays a soft failure with nothing shown to the user.
+  }
+}
+
+// Human escalation: a genuine mid-replay hard failure pauses the real (headed) browser
+// session server-side and waits for a person -- see src/api/http-escalation.ts. This tab has
+// no way to be pushed to, so it polls; the real handoff is the live browser window itself
+// (visible on the same machine running the demo), this card is just the "resume/abort"
+// signal a terminal prompt would otherwise be. Tracks which ids it's already narrated in the
+// chat log so a repeated poll doesn't spam the same announcement every 2.5s.
+const announcedInterventionIds = new Set();
+
+function renderInterventions(list) {
+  if (!Array.isArray(list) || list.length === 0) {
+    interventionsEl.hidden = true;
+    interventionsEl.innerHTML = "";
+    return;
+  }
+  interventionsEl.hidden = false;
+  interventionsEl.innerHTML = "";
+  for (const item of list) {
+    if (!announcedInterventionIds.has(item.id)) {
+      announcedInterventionIds.add(item.id);
+      addMessage(
+        `Human needed: "${item.reason}" (${item.capability}). The live browser window is paused on ${item.url} — fix it there if it needs fixing, then Resume or Abort below.`,
+        "bot error"
+      );
+    }
+
+    const card = document.createElement("div");
+    card.className = "intervention-card";
+
+    const img = document.createElement("img");
+    img.className = "intervention-screenshot";
+    img.src = `/interventions/${item.id}/screenshot`;
+    img.alt = "Live session screenshot at the moment of escalation";
+    card.appendChild(img);
+
+    const reason = document.createElement("div");
+    reason.className = "intervention-reason";
+    reason.textContent = item.reason;
+    card.appendChild(reason);
+
+    const meta = document.createElement("div");
+    meta.className = "intervention-meta";
+    meta.textContent = `${item.capability} · step ${item.step} · ${item.url}`;
+    card.appendChild(meta);
+
+    const actions = document.createElement("div");
+    actions.className = "intervention-actions";
+
+    const resumeBtn = document.createElement("button");
+    resumeBtn.type = "button";
+    resumeBtn.className = "intervention-btn resume";
+    resumeBtn.textContent = "Resume (I fixed it)";
+    resumeBtn.addEventListener("click", () => resolveIntervention(item.id, "resume"));
+
+    const abortBtn = document.createElement("button");
+    abortBtn.type = "button";
+    abortBtn.className = "intervention-btn abort";
+    abortBtn.textContent = "Abort";
+    abortBtn.addEventListener("click", () => resolveIntervention(item.id, "abort"));
+
+    actions.appendChild(resumeBtn);
+    actions.appendChild(abortBtn);
+    card.appendChild(actions);
+    interventionsEl.appendChild(card);
+  }
+}
+
+async function resolveIntervention(id, decision) {
+  try {
+    const res = await fetch(`/interventions/${id}/resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      addMessage(`Couldn't resolve the intervention: ${data.error ?? `HTTP ${res.status}`}`, "bot error");
+      return;
+    }
+    addMessage(`Told the paused run to ${decision === "resume" ? "resume" : "abort"}.`, "bot");
+    announcedInterventionIds.delete(id);
+    pollInterventions(); // refresh immediately rather than waiting for the next tick
+  } catch (err) {
+    addMessage(`Couldn't resolve the intervention (${err.message ?? err}).`, "bot error");
+  }
+}
+
+async function pollInterventions() {
+  try {
+    const res = await fetch("/interventions");
+    if (!res.ok) return; // a transient miss just means the card doesn't update this tick
+    renderInterventions(await res.json());
+  } catch {
+    // Same soft-fail as above -- this is a polling loop, not a user-initiated action.
+  }
+}
+
+setInterval(pollInterventions, 2500);
+pollInterventions();
+
+loadCatalog();
+loadConsoleConfig();
 
 addMessage(
   'Hi! I can help you look up a member or open a new sub-account. Try: "Open a savings account for member 10001 with $100."',
