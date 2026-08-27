@@ -162,7 +162,7 @@ code path for it to take.
 
 Near-pure logic — checkpoint evaluation, redaction, allowlist matching, the confidence/registry
 math, the recorder, schema validation, the replay engine's own recovery/retry/escalation state
-machine, the discovery loop's control flow — has a real Vitest unit suite (234 tests across 28
+machine, the discovery loop's control flow — has a real Vitest unit suite (303 tests across 35
 files as of this writing) built against small fakes: a stub `Surface`, a scripted fake model
 *output* (never a claim about what a real model would decide), and a real `GuardrailsPolicy`
 against a temp config where a class's private state made a plain fake impractical.

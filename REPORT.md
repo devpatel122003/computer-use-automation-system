@@ -127,7 +127,7 @@ matching (including origin-parsing edge cases), the confidence/registry math, th
 artifact-building, schema cross-field validation, the replay engine's recovery/retry/
 escalation-resume state machine, and the discovery loop's own control flow (escalate/resume,
 dead-end detection, risky-action confirmation) — has a real unit test suite (`npm test`,
-Vitest, 240 tests across 29 files as of this pass) built against small fakes (a stub
+Vitest, 303 tests across 35 files as of this pass) built against small fakes (a stub
 `Surface`, a scripted fake model *output*, a real `GuardrailsPolicy` against a temp config
 where the class's private state made a plain fake impractical), not mocks of the browser or
 of what the model would actually decide. What's

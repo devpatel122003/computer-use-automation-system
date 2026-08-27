@@ -967,7 +967,7 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs a real Vitest unit suite (240 tests across 29 files, no network/browser
+`npm test` runs a real Vitest unit suite (303 tests across 35 files, no network/browser
 needed) over the near-pure logic: checkpoint evaluation (URL templates, wildcards, text
 matching, malformed-input guards), redaction (including the exact credential-leak scenario
 described in `REPORT.md` "Safety", and non-string/nested-value masking), allowlist route

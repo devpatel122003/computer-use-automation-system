@@ -38,8 +38,8 @@ green/red checkmark on GitHub) runs three checks, in order, every time:
 
 1. **`npm run typecheck`** — makes sure every file is internally consistent about what kind
    of data it expects and returns, without actually running any of the program.
-2. **`npm test`** — runs the full automated test suite (as of this writing, 234 tests across
-   28 files) against a *simulated* version of the browser-driving layer — no real browser
+2. **`npm test`** — runs the full automated test suite (as of this writing, 303 tests across
+   35 files) against a *simulated* version of the browser-driving layer — no real browser
    is opened during this check, which is exactly why this can run inside GitHub's own cloud
    machines with no visible display.
 3. **`npm audit --omit=dev --audit-level=high`** — checks every dependency this project
@@ -188,8 +188,8 @@ $ npm run typecheck
 
 $ npm test
 > vitest run
- Test Files  28 passed (28)
-      Tests  234 passed (234)
+ Test Files  35 passed (35)
+      Tests  303 passed (303)
    Duration  ...
 
 $ npm audit --omit=dev --audit-level=high

@@ -188,11 +188,17 @@ an empty string at replay time, three steps deep, instead of failing loudly at r
 - `src/artifact/recorder.ts` — `buildArtifact()`, `ParamMapping`, `RecorderOptions`,
   `attachStepCheckpoint()` (post-processing helper that attaches a checkpoint to the first
   step matching a predicate, robust to discovery taking a slightly different number of steps
-  to reach the same milestone).
+  to reach the same milestone), and `isClickNamed()`/`isClickMatching()` — the exact-quoted-name
+  and case-insensitive-substring predicates every capability's own `annotate*Checkpoints()`
+  function uses with `attachStepCheckpoint()`, centralized here after the same one-line
+  predicate turned up copy-pasted across all 11 `src/cli/capabilities/*.ts` files.
 - `src/cli/capabilities/open-sub-account.ts` — the real, checked-in `ParamMapping[]`,
   `knownOutcomes`, and `successCheckpoint` for this demo capability.
-- `src/cli/run-agent.ts` — calls `buildArtifact()` after a `"finished"` discovery run and
-  writes the result to `evidence/artifacts/open-sub-account.artifact.json`.
+- `src/cli/discovery-cli.ts`'s `runDiscoveryCli()` — calls `buildArtifact()` after a
+  `"finished"` discovery run and writes the result to
+  `evidence/artifacts/open-sub-account.artifact.json`; `src/cli/run-agent.ts` itself only
+  supplies the capability metadata and goal text (see
+  [`04-discovery-agent.md`](04-discovery-agent.md)'s "shared CLI runner" section).
 - Consumed by `src/replay/replay-engine.ts` (see
   [`06-deterministic-replay.md`](06-deterministic-replay.md)) and scored by
   `src/artifact/registry.ts` (see [`10-confidence-and-approval.md`](10-confidence-and-approval.md)).

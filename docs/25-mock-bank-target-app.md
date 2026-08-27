@@ -145,13 +145,37 @@ Routes in `src/server.ts`, in the order a real session walks them:
 |---|---|
 | `GET/POST /login` | Session-based sign-on; sets `req.session.username` |
 | `GET /search` | Member lookup by ID; redirects to the member page or shows a not-found message |
-| `GET /members/:id` | Member detail; branches on `simulateSlow` (awaits a 3s `delay()`) and `permissionRestricted` (renders an access-denied view) |
+| `GET /members/new`, `POST /members` | The `create-member` capability: enroll a brand new member (name + optional starting checking/savings, defaulting to $0 if left blank) |
+| `GET /members/new/confirm/:id` | The new-member confirmation page |
+| `GET /members/:id` | Member detail; branches on `simulateSlow` (awaits a 3s `delay()`) and `permissionRestricted` (renders an access-denied view); also where `check-balance` reads the already-shown checking/savings balances |
+| `GET /members/:id/transfer`, `POST /members/:id/transfer`, `GET /members/:id/transfer/confirm` | The `transfer-funds` capability: move funds between a member's own checking and savings, with `insufficient_funds`/`invalid_transfer` business outcomes |
 | `GET /members/:id/sub-accounts/new` | The "open a new sub-account" form |
 | `POST /members/:id/sub-accounts` | Validates the deposit (`< 25` → `validation_error`), then either creates the account directly or, for `requiresInterstitialConfirmation` members, renders the surprise interstitial instead |
 | `POST /members/:id/sub-accounts/confirm-interstitial` | The human's one manual click dismissing that interstitial, on the *same* live session |
 | `GET /members/:id/sub-accounts/:subId/confirm` | The confirmation page, showing a real generated account number (`SA-00001`, `SA-00002`, …) |
+| `GET/POST /members/:id/sub-accounts/:subId/close`, `GET /members/:id/sub-accounts/:subId/closed` | The `close-sub-account` capability; all three share one lookup+ownership-check helper, `findSubAccountForMember()` in `data.ts` |
 | `POST /__test__/reset` | Test-only: resets all in-memory state via `resetData()` |
 | `GET /legacy-widget-demo`, `/legacy-widget-demo/confirmed` | The canvas-only fixture and its landing page after a successful click |
+
+Those three close-sub-account routes originally each repeated the same six-line block
+inline — look up the member, look up the sub-account, verify the sub-account actually belongs
+to that member, 404 otherwise — real, verified duplication (checked by direct diff across all
+three routes, not just similar-looking code), now centralized as `findSubAccountForMember()`
+in `data.ts`:
+
+```ts
+export function findSubAccountForMember(memberId: string, subId: string): { member: Member; subAccount: SubAccount } | undefined {
+  const member = findMember(memberId);
+  const subAccount = findSubAccount(subId);
+  if (!member || !subAccount || subAccount.memberId !== member.id) return undefined;
+  return { member, subAccount };
+}
+```
+
+Verified live after the change, not just by unit test: a real open→close round trip (a fresh
+sub-account opened, then closed for real), a real re-close of the same, already-closed
+sub-account (correctly reporting the `already_closed` business outcome, not a crash), and a
+direct request for a nonexistent sub-account id (correctly a real 404).
 
 The session-timeout scenario is implemented as a one-shot arm/consume pair in `data.ts`:
 
@@ -194,7 +218,7 @@ matters (see `../SECURITY.md`).
 
 - `apps/mock-bank/src/server.ts` — every route.
 - `apps/mock-bank/src/data.ts` — `Member`, `SubAccount`, the seed list, `resetData()`,
-  `consumeSessionTimeoutArm()`.
+  `consumeSessionTimeoutArm()`, `findSubAccountForMember()`.
 - `apps/mock-bank/src/tenants.ts` — `TenantLabels`, `getTenantLabels()`, the `mock-bank` and
   `northgate-cu` tenant records.
 - `apps/mock-bank/views/*.ejs` — `login.ejs`, `search.ejs`, `member.ejs`, `newSubAccount.ejs`,

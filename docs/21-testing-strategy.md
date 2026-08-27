@@ -4,7 +4,7 @@
 
 The near-pure logic (does this checkpoint pass, is this text a secret, does this route match
 the allowlist, does the replay state machine recover/retry/escalate correctly) has a real,
-fast, 234-test Vitest suite behind it — but the two things that can't be honestly faked, a
+fast, 303-test Vitest suite behind it — but the two things that can't be honestly faked, a
 real browser and an LLM's actual judgment, are verified with real, checked-in evidence
 instead, because a test that mocks either of those would only prove the mock behaves the way
 its author assumed, not that the system works.
@@ -43,13 +43,13 @@ npm test
 ```
 
 ```
- Test Files  28 passed (28)
-      Tests  234 passed (234)
+ Test Files  35 passed (35)
+      Tests  303 passed (303)
    Start at  00:34:39
    Duration  650ms (transform 1.10s, setup 0ms, import 1.94s, tests 236ms, environment 3ms)
 ```
 
-240 tests across 29 files, done in well under a second, with no browser window opening and no
+303 tests across 35 files, done in well under a second, with no browser window opening and no
 network call going out anywhere — because none of it needs a real page or a real model to
 prove itself.
 
@@ -97,25 +97,35 @@ less than it looks like it proves.
 
 ### What
 
-As of this pass: **240 tests across 29 files**, all in `src/**/*.test.ts`, run via `npm test`
+As of this pass: **303 tests across 35 files**, all in `src/**/*.test.ts`, run via `npm test`
 (Vitest). The full list of test files:
 
 ```
 src/agent/discovery-agent.test.ts        src/agent/model-retry.test.ts
 src/api/status.test.ts                   src/api/tenant-resolution.test.ts
-src/artifact/catalog.test.ts             src/artifact/recorder.test.ts
-src/artifact/registry.test.ts            src/artifact/schema.test.ts
-src/artifact/stability.test.ts           src/artifact/tenant-override.test.ts
+src/artifact/canary-history.test.ts      src/artifact/catalog.test.ts
+src/artifact/recorder.test.ts            src/artifact/registry.test.ts
+src/artifact/schema.test.ts              src/artifact/stability.test.ts
+src/artifact/tenant-override.test.ts     src/chat-ui/server.test.ts
 src/cli/agent-chat.test.ts               src/cli/agent-invoke-demo.test.ts
 src/dashboard/metrics.test.ts            src/dashboard/render.test.ts
 src/escalation/controller.test.ts        src/escalation/prompt.test.ts
-src/evidence/audit-report.test.ts        src/frontend/planner.test.ts
-src/guardrails/allowlist.test.ts         src/guardrails/policy.test.ts
-src/guardrails/redaction.test.ts         src/http/api-key-auth.test.ts
+src/evidence/audit-report.test.ts        src/frontend/chain-mappings.test.ts
+src/frontend/chain.test.ts               src/frontend/chat-turn.test.ts
+src/frontend/planner.test.ts             src/guardrails/allowlist.test.ts
+src/guardrails/policy.test.ts            src/guardrails/redaction.test.ts
+src/http/api-key-auth.test.ts            src/http/operator-registry.test.ts
 src/replay/assisted-recovery.test.ts     src/replay/checkpoint.test.ts
 src/replay/drift-loader.test.ts          src/replay/drift.test.ts
 src/replay/execution-policy.test.ts      src/replay/replay-engine.test.ts
+src/replay/self-heal.test.ts
 ```
+
+(This list grows over time as new modules earn their own tests — e.g. `chat-turn.test.ts`,
+`chain.test.ts`/`chain-mappings.test.ts` for multi-step chained chat requests, `self-heal.test.ts`
+for self-healing locator proposals, `canary-history.test.ts` for trend-based canary alerting,
+and `operator-registry.test.ts` for per-operator identity — each added alongside the feature it
+covers, not backfilled later.)
 
 What that suite covers, mapped to real modules:
 
@@ -175,7 +185,12 @@ Three techniques, used deliberately and never blended with "hope the mock is rea
    with `perform()` swapped for a per-test closure that reads and writes a small `state` object
    (`{ url, text }`). `replay-engine.test.ts`'s `fakeSurface()` helper is the canonical
    example — it lets a test script exactly what "the browser did" without a real browser
-   existing.
+   existing. Deliberately **not** centralized into one shared helper even though several test
+   files declare a same-named `fakeSurface()`/`fakePolicy()`: each file's version was checked
+   directly against the others and found to genuinely differ (different signatures, different
+   stubbed behavior for that file's own scenarios) — sharing a name isn't sharing logic, and
+   forcing one generic shape onto tests that don't actually need the same thing would make each
+   test harder to read for a marginal line-count save.
 2. **A scripted fake model *output*.** `discovery-agent.test.ts`'s `scriptedGenai()` returns a
    fixed queue of tool calls (e.g. `escalate` then `finish`) shaped like a real
    `@google/genai` response — never a claim about what the real model would choose, only a
@@ -188,6 +203,14 @@ Three techniques, used deliberately and never blended with "hope the mock is rea
    real — because the bug that test guards against (assuming every landed URL was reached via
    GET) lives inside `GuardrailsPolicy`'s own route-matching logic, which a fake `authorize()`
    would have no reason to reproduce.
+4. **`src/test-support/fixtures.ts`**, for the handful of fixtures that *were* found to be
+   byte-for-byte identical across files (verified by direct diff, not assumed from similar
+   naming): `fakeLogger()` (a stubbed `EvidenceLogger`, shared by 4 test files),
+   `fakeRes()` (a stubbed Express `Response`, shared by 2), and `baseArtifact()` (a minimal
+   valid `CapabilityArtifact` fixture, shared by 2). Kept deliberately small and specific —
+   this is not a general-purpose test-utils dump, just the exact handful of fixtures that
+   independent verification showed were genuinely duplicated, not merely similarly named (see
+   point 1 above for the ones that looked similar but weren't).
 
 What deliberately has **none** of the above standing in for it: the real Playwright `Surface`
 implementation, and the real Gemini model's judgment about what to click. Those are verified by
@@ -203,6 +226,13 @@ cherry-picked success.
 ### Where
 
 - Test files: `src/**/*.test.ts` (list above); run via `npm test` → Vitest.
+- `src/test-support/fixtures.ts` — the small set of genuinely-duplicated fixtures
+  (`fakeLogger`, `fakeRes`, `baseArtifact`) described above.
+- `tsconfig.json` — `noUnusedLocals`/`noUnusedParameters`, enabled permanently after a
+  one-time repo-wide sweep for dead code found real issues (an unused test-stub parameter,
+  an unused exported type, a silently-ignored CLI flag caused by an unused function
+  parameter) with zero false positives; `npm run typecheck` now catches this class of bug
+  going forward, not just type errors.
 - CI: `.github/workflows/ci.yml` runs `npm run typecheck` and `npm test` on every push/PR to
   `main` — see [`23-continuous-integration.md`](23-continuous-integration.md).
 - Real evidence instead of mocks: `/evidence/artifacts/`, `/evidence/runs/`, produced by
@@ -224,8 +254,8 @@ Real output from this repo, right now:
 ```
  RUN  v4.1.10 /Users/devpatel/Desktop/interface.ai
 
- Test Files  28 passed (28)
-      Tests  234 passed (234)
+ Test Files  35 passed (35)
+      Tests  303 passed (303)
    Start at  00:34:39
    Duration  650ms (transform 1.10s, setup 0ms, import 1.94s, tests 236ms, environment 3ms)
 ```

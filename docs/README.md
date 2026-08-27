@@ -86,10 +86,13 @@ If you're new here, read in this order:
 ## Also see, at the repo root
 
 - [`../README.md`](../README.md) — setup instructions and the exact commands to run a live
-  demo end to end
+  demo end to end, including the MERIDIAN CORE adaptation demo path
 - [`../REPORT.md`](../REPORT.md) — the original ~3-page design write-up (architecture,
   artifact schema, determinism & error handling, heterogeneity/multi-tenant, escalation,
   safety, and what was cut and why) — this `docs/` folder is the long-form expansion of it
+- [`../ADAPTATION.md`](../ADAPTATION.md) — the later Adaptation Project write-up: pointing this
+  same core at a real, live legacy target (MERIDIAN CORE) instead of `mock-bank`, what that
+  actually took, and what survived unchanged
 - [`../SECURITY.md`](../SECURITY.md) — the source-of-truth threat model
   ([`19-security-and-authentication.md`](19-security-and-authentication.md) is its
   long-form, plain-language companion)

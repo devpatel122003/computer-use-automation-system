@@ -170,8 +170,24 @@ action failure (and therefore counts toward the dead-end limit) rather than a sp
 [`07-guardrails-and-safety.md`](07-guardrails-and-safety.md)): if
 `GuardrailsPolicy.authorize()` classifies an action `risky`, the loop calls
 `options.onRiskyAction` (wired to `EscalationController.confirmRiskyAction` in
-`src/cli/run-agent.ts`, which is the terminal prompt shown in the walkthrough above); declining
-ends the run with status `"escalated"`.
+`src/cli/discovery-cli.ts`'s `runDiscoveryCli()` — the shared runner every `run-agent-*.ts`
+entry point calls into, described below — which is the terminal prompt shown in the
+walkthrough above); declining ends the run with status `"escalated"`.
+
+**The shared CLI runner.** Every `run-agent-*.ts` entry point (one per capability — as of this
+pass, 5 against mock-bank (including `run-agent.ts` itself, for `open-sub-account`) and 6
+against the live MERIDIAN CORE target, see `ADAPTATION.md`)
+used to wire up `PlaywrightSurface`, `GuardrailsPolicy`, `EvidenceLogger`,
+`EscalationController`, and `DiscoveryAgent`, run the loop, and hand a `"finished"` result to
+`buildArtifact()`, with that entire sequence copy-pasted into every single file — real,
+verified duplication (an identical control-flow body across 10 files, not just similarly-named
+functions), not a hypothetical one. `src/cli/discovery-cli.ts`'s `runDiscoveryCli()` now does
+all of that exactly once; each `run-agent-*.ts` file only computes its own defaults and goal
+text, then calls it with a config object (capability id/name/description, param mappings,
+checkpoints, known outcomes, the goal string, credentials, and where to write the artifact).
+Collapsing this cut the total line count of all 10 entry points combined by about a third,
+and means a future change to how discovery is wired for the CLI (a new callback, a different
+default timeout) now happens in one place instead of ten.
 
 ### Where
 
@@ -181,10 +197,13 @@ ends the run with status `"escalated"`.
   text block Gemini reads) and `findElement()` (turns a model's `{role, name, nth}` back into
   a real `ObservedElement`).
 - `src/agent/types.ts` — `DiscoveryStep`, `DiscoveryStatus`, `DiscoveryResult`.
-- Wired in from `src/cli/run-agent.ts`, which supplies the real `PlaywrightSurface`,
-  `GuardrailsPolicy`, `EvidenceLogger`, and `EscalationController` and, on a `"finished"`
-  result, hands the transcript to `buildArtifact()` (see
-  [`05-artifact-schema.md`](05-artifact-schema.md)).
+- `src/cli/discovery-cli.ts` — `runDiscoveryCli()`, the shared runner described above: supplies
+  the real `PlaywrightSurface`, `GuardrailsPolicy`, `EvidenceLogger`, and
+  `EscalationController`, runs the loop, and on a `"finished"` result hands the transcript to
+  `buildArtifact()` (see [`05-artifact-schema.md`](05-artifact-schema.md)).
+- `src/cli/run-agent*.ts` (11 files: `run-agent.ts` plus one `run-agent-<capability>.ts` per
+  other capability) — each supplies only its own defaults, goal text, and capability metadata,
+  then calls `runDiscoveryCli()`.
 
 ### Worked technical example
 
