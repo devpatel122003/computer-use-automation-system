@@ -8,6 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "dev-all": "bash scripts/dev-all.sh",
     "mock-bank": "tsx apps/mock-bank/src/server.ts",
     "utility-mock": "PORT=4300 tsx apps/utility-mock/src/server.ts",
     "mock-bank:northgate": "TENANT=northgate-cu PORT=4100 tsx apps/mock-bank/src/server.ts",

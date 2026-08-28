@@ -108,6 +108,17 @@ this mid-demo.
 
 Everything below assumes you're in the repo root.
 
+**Want everything running at once instead of one terminal per server?**
+
+```bash
+npm run dev-all
+```
+
+Starts mock-bank (4000), both capability-api instances (4700/4701), both dashboards
+(4600/4601), and the chat-ui console (4800) together in one terminal, output prefixed by
+service name. Ctrl+C stops all of them. Steps 1+ below are the same servers started
+individually, useful when you want a given service's output isolated in its own terminal.
+
 **1. Start the target app** (separate terminal, keeps running):
 
 ```bash
