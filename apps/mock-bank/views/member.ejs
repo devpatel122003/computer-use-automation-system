@@ -23,6 +23,17 @@
     <tr><td><font color="#7a0000"><b><%= labels.accessDeniedText %></b> Operator <%= username %> is not permitted to view member <%= member.id %>.</font></td></tr>
   </table>
 <% } else { %>
+  <%
+    // A single, stable, plain-text summary of the sub-accounts table below -- lets a
+    // capability extract "does this member have sub-accounts, and what's in them" as one
+    // typed field, the same way checkingBalanceValue/savingsBalanceValue already let it
+    // extract the main balances, without needing to parse an arbitrary-length HTML table.
+    var subAccountsSummary = subAccounts.length === 0
+      ? "No sub-accounts on file."
+      : subAccounts.map(function (sa) {
+          return sa.id + " (" + sa.accountType + ", $" + sa.initialDeposit.toFixed(2) + (sa.closedAt ? ", closed" : ", open") + ")";
+        }).join("; ");
+  %>
   <table cellpadding="8" cellspacing="0" border="1">
     <tr>
       <td>
@@ -31,6 +42,7 @@
           <tr><td><b>Name</b></td><td><span id="memberNameValue"><%= member.name %></span></td></tr>
           <tr><td><b>Checking Balance</b></td><td><span id="checkingBalanceValue">$<%= member.checkingBalance.toFixed(2) %></span></td></tr>
           <tr><td><b>Savings Balance</b></td><td><span id="savingsBalanceValue">$<%= member.savingsBalance.toFixed(2) %></span></td></tr>
+          <tr><td><b>Sub-Accounts</b></td><td><span id="subAccountsSummaryValue"><%= subAccountsSummary %></span></td></tr>
         </table>
       </td>
     </tr>

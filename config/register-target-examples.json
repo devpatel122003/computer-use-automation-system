@@ -1,0 +1,9 @@
+[
+  {
+    "label": "GridPoint Utility Co-op (apps/utility-mock, port 4300)",
+    "baseUrl": "http://localhost:4300",
+    "startUrl": "http://localhost:4300/login",
+    "routesText": "GET /login\nPOST /login\nGET /accounts\nGET /accounts/:id\nGET /accounts/:id/meter-reading/new\nPOST /accounts/:id/meter-reading risky",
+    "goal": "Sign in as agent \"agent1\" with PIN \"4242\", look up account ACC-1001, and report the customer name, service address, balance due, and current meter reading."
+  }
+]

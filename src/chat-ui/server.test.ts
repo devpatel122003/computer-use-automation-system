@@ -42,6 +42,8 @@ vi.mock("@google/genai", () => {
 let handleChat: typeof import("./server.js").handleChat;
 let resolveTarget: typeof import("./server.js").resolveTarget;
 let TARGETS: typeof import("./server.js").TARGETS;
+let parseRouteLines: typeof import("./server.js").parseRouteLines;
+let loadRegisterTargetExamples: typeof import("./server.js").loadRegisterTargetExamples;
 
 beforeAll(async () => {
   process.env.GEMINI_API_KEY = "test-gemini-key";
@@ -51,6 +53,8 @@ beforeAll(async () => {
   handleChat = mod.handleChat;
   resolveTarget = mod.resolveTarget;
   TARGETS = mod.TARGETS;
+  parseRouteLines = mod.parseRouteLines;
+  loadRegisterTargetExamples = mod.loadRegisterTargetExamples;
 });
 
 const CATALOG = [
@@ -314,5 +318,53 @@ describe("handleChat -- target-aware routing (one console, multiple backends)", 
     const invoke = calls.find((c) => c.url.includes("/invoke"));
     const body = JSON.parse(String(invoke?.init?.body)) as { params: Record<string, string> };
     expect(body.params.username).toBe("super1");
+  });
+});
+
+describe("parseRouteLines -- the 'register a new target' allowlist-entry parser", () => {
+  it("parses a well-formed line into a route rule, defaulting risk by method", () => {
+    const { routes, errors } = parseRouteLines("GET /login\nPOST /login");
+    expect(errors).toHaveLength(0);
+    expect(routes).toEqual([
+      { pattern: "/login", methods: ["GET"], risk: "safe" },
+      { pattern: "/login", methods: ["POST"], risk: "risky" },
+    ]);
+  });
+
+  it("honors an explicit trailing risk word, overriding the method-based default", () => {
+    const { routes } = parseRouteLines("GET /members/:id risky\nPOST /search safe");
+    expect(routes).toEqual([
+      { pattern: "/members/:id", methods: ["GET"], risk: "risky" },
+      { pattern: "/search", methods: ["POST"], risk: "safe" },
+    ]);
+  });
+
+  it("skips blank lines and reports a clear error for an unparseable one, without throwing", () => {
+    const { routes, errors } = parseRouteLines("GET /login\n\n   \nPUT /nope\nrandom garbage");
+    expect(routes).toEqual([{ pattern: "/login", methods: ["GET"], risk: "safe" }]);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toContain("PUT /nope");
+  });
+
+  it("rejects a route pattern that doesn't start with '/'", () => {
+    const { routes, errors } = parseRouteLines("GET login");
+    expect(routes).toHaveLength(0);
+    expect(errors[0]).toContain("must start with");
+  });
+
+  it("returns an empty route list (not a throw) for empty input", () => {
+    expect(parseRouteLines("")).toEqual({ routes: [], errors: [] });
+  });
+});
+
+describe("loadRegisterTargetExamples -- the 'register a new target' example picker", () => {
+  it("loads the real shipped GridPoint example with all four fields populated", () => {
+    const examples = loadRegisterTargetExamples();
+    const gridpoint = examples.find((e) => e.label.includes("GridPoint"));
+    expect(gridpoint).toBeDefined();
+    expect(gridpoint!.baseUrl).toBe("http://localhost:4300");
+    expect(gridpoint!.startUrl).toBe("http://localhost:4300/login");
+    expect(gridpoint!.routesText).toContain("POST /accounts/:id/meter-reading risky");
+    expect(gridpoint!.goal).toContain("agent1");
   });
 });

@@ -388,6 +388,19 @@ same run is also what dropped this artifact's recorded confidence score from `hi
 - **A server-side redirect or in-place re-render after a `POST`** is caught by the post-action
   landed-URL check (`authorizeLandedUrl`), independent of whatever `predictNavigation()` guessed
   before the click.
+- **A real Playwright navigation race, found live against MERIDIAN, not mock-bank.** Checkpoint
+  and known-outcome detection both read the page's visible text (`Surface.getVisibleText()`)
+  after nearly every action — the single hottest call site in replay. Against a real,
+  network-latency-bound external target, that `page.evaluate()` can race a navigation still
+  settling and throw "Execution context was destroyed, most likely because of a navigation" —
+  previously unhandled, so an ordinary transient timing condition crashed the whole run as an
+  uncaught exception ("Couldn't even start") instead of getting the same wait-and-retry
+  treatment every other transient condition here gets. Fixed with a narrow, shared retry
+  (`withNavigationRaceRetry` in `playwright-surface.ts`): one retry, only for this exact
+  known-transient message, after the page's own load state settles; a second real failure
+  still throws. Applied to all three real `.evaluate()` call sites in that file (this one,
+  discovery's DOM scan, and the guardrail's pre-click navigation prediction), not just the one
+  caught live, since all three run on the same kind of live page and share the exact race.
 
 ## Related docs
 

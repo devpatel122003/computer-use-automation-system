@@ -44,6 +44,18 @@
       "type": "string",
       "sourceStepId": "step-8",
       "description": "Extracted from text \"$12500.00\""
+    },
+    {
+      "name": "memberName",
+      "type": "string",
+      "sourceStepId": "step-9",
+      "description": "Extracted from text \"Alice Johnson\""
+    },
+    {
+      "name": "subAccounts",
+      "type": "string",
+      "sourceStepId": "step-10",
+      "description": "One-line summary of the member's sub-accounts (id, type, deposit, open/closed), or \"No sub-accounts on file.\""
     }
   ],
   "steps": [
@@ -295,6 +307,60 @@
         }
       ],
       "outputName": "savingsBalance",
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-9",
+      "actionType": "extract",
+      "description": "Extract value from text \"Alice Johnson\"",
+      "locator": [
+        {
+          "strategy": "text",
+          "name": "Alice Johnson",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "#memberNameValue",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "outputName": "memberName",
+      "risk": "safe",
+      "waitPolicy": {
+        "timeoutMs": 5000,
+        "retries": 0
+      }
+    },
+    {
+      "id": "step-10",
+      "actionType": "extract",
+      "description": "Extract value from text \"No sub-accounts on file.\"",
+      "locator": [
+        {
+          "strategy": "text",
+          "name": "No sub-accounts on file.",
+          "nth": 0,
+          "confidence": "medium",
+          "rationale": "Exact visible text match; stable as long as copy doesn't change. Falls back to the id selector for any member who actually has sub-accounts, where this exact text won't match."
+        },
+        {
+          "strategy": "css_structural",
+          "cssPath": "#subAccountsSummaryValue",
+          "nth": 0,
+          "confidence": "low",
+          "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+        }
+      ],
+      "outputName": "subAccounts",
       "risk": "safe",
       "waitPolicy": {
         "timeoutMs": 5000,

@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head><title>GridPoint &mdash; Submit Meter Reading</title></head>
+<body>
+  <p>Signed in as <%= agentId %> | <a href="/logout">Sign Out</a></p>
+  <h1>Submit Meter Reading &mdash; Account <%= account.id %></h1>
+  <p>Current reading on file: <%= account.meterReading %></p>
+  <% if (typeof error !== "undefined" && error) { %>
+    <p style="color:red;"><b><%= error %></b></p>
+  <% } %>
+  <form method="POST" action="/accounts/<%= account.id %>/meter-reading">
+    <label for="newReading">New Meter Reading</label>
+    <input type="text" id="newReading" name="newReading" value="<%= newReading %>" />
+    <button type="submit">Submit Reading</button>
+  </form>
+</body>
+</html>

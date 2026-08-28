@@ -1,39 +1,272 @@
 {
-  "allowedBaseUrls": ["http://localhost:4000", "http://localhost:4100", "https://web-sample.interface-hiring.com"],
+  "allowedBaseUrls": [
+    "http://localhost:4000",
+    "http://localhost:4100",
+    "https://web-sample.interface-hiring.com",
+    "http://localhost:4300"
+  ],
   "routes": [
-    { "pattern": "/login", "methods": ["GET", "POST"], "risk": "safe" },
-    { "pattern": "/logout", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/search", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/new", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members", "methods": ["POST"], "risk": "risky" },
-    { "pattern": "/members/new/confirm/:id", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/:id", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/:id/sub-accounts/new", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/:id/sub-accounts", "methods": ["POST"], "risk": "risky" },
-    { "pattern": "/members/:id/sub-accounts/:subId/confirm", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/:id/transfer", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/:id/transfer", "methods": ["POST"], "risk": "risky" },
-    { "pattern": "/members/:id/transfer/confirm", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/:id/sub-accounts/:subId/close", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/:id/sub-accounts/:subId/close", "methods": ["POST"], "risk": "risky" },
-    { "pattern": "/members/:id/sub-accounts/:subId/closed", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/legacy-widget-demo", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/legacy-widget-demo/confirmed", "methods": ["GET"], "risk": "safe" },
-
-    { "pattern": "/signon", "methods": ["GET", "POST"], "risk": "safe" },
-    { "pattern": "/menu", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/signoff", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/settings", "methods": ["GET", "POST"], "risk": "safe" },
-    { "pattern": "/members", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/:id/transfer/review", "methods": ["POST"], "risk": "safe" },
-    { "pattern": "/members/:id/transfer/post", "methods": ["POST"], "risk": "risky" },
-    { "pattern": "/members/:id/open-share", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/:id/open-share/review", "methods": ["POST"], "risk": "safe" },
-    { "pattern": "/members/:id/open-share/post", "methods": ["POST"], "risk": "risky" },
-    { "pattern": "/members/:id/update", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/:id/update", "methods": ["POST"], "risk": "risky" },
-    { "pattern": "/members/:id/hold", "methods": ["GET"], "risk": "safe" },
-    { "pattern": "/members/:id/hold/review", "methods": ["POST"], "risk": "risky" },
-    { "pattern": "/members/:id/hold/post", "methods": ["POST"], "risk": "risky" }
+    {
+      "pattern": "/login",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/logout",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/search",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/new",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members",
+      "methods": [
+        "POST"
+      ],
+      "risk": "risky"
+    },
+    {
+      "pattern": "/members/new/confirm/:id",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/sub-accounts/new",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/sub-accounts",
+      "methods": [
+        "POST"
+      ],
+      "risk": "risky"
+    },
+    {
+      "pattern": "/members/:id/sub-accounts/:subId/confirm",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/transfer",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/transfer",
+      "methods": [
+        "POST"
+      ],
+      "risk": "risky"
+    },
+    {
+      "pattern": "/members/:id/transfer/confirm",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/sub-accounts/:subId/close",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/sub-accounts/:subId/close",
+      "methods": [
+        "POST"
+      ],
+      "risk": "risky"
+    },
+    {
+      "pattern": "/members/:id/sub-accounts/:subId/closed",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/legacy-widget-demo",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/legacy-widget-demo/confirmed",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/signon",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/menu",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/signoff",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/settings",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/transfer/review",
+      "methods": [
+        "POST"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/transfer/post",
+      "methods": [
+        "POST"
+      ],
+      "risk": "risky"
+    },
+    {
+      "pattern": "/members/:id/open-share",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/open-share/review",
+      "methods": [
+        "POST"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/open-share/post",
+      "methods": [
+        "POST"
+      ],
+      "risk": "risky"
+    },
+    {
+      "pattern": "/members/:id/update",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/update",
+      "methods": [
+        "POST"
+      ],
+      "risk": "risky"
+    },
+    {
+      "pattern": "/members/:id/hold",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/members/:id/hold/review",
+      "methods": [
+        "POST"
+      ],
+      "risk": "risky"
+    },
+    {
+      "pattern": "/members/:id/hold/post",
+      "methods": [
+        "POST"
+      ],
+      "risk": "risky"
+    },
+    {
+      "pattern": "/accounts",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/accounts/:id",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/accounts/:id/meter-reading/new",
+      "methods": [
+        "GET"
+      ],
+      "risk": "safe"
+    },
+    {
+      "pattern": "/accounts/:id/meter-reading",
+      "methods": [
+        "POST"
+      ],
+      "risk": "risky"
+    }
   ]
 }

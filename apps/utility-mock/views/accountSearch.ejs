@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head><title>GridPoint &mdash; Find Account</title></head>
+<body>
+  <p>Signed in as <%= agentId %> | <a href="/logout">Sign Out</a></p>
+  <h1>Find Customer Account</h1>
+  <% if (typeof error !== "undefined" && error) { %>
+    <p style="color:red;"><b><%= error %></b></p>
+  <% } %>
+  <form method="GET" action="/accounts">
+    <label for="accountNumber">Account Number</label>
+    <input type="text" id="accountNumber" name="accountNumber" value="<%= accountNumber %>" />
+    <button type="submit">Look Up Account</button>
+  </form>
+</body>
+</html>

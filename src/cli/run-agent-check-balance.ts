@@ -21,7 +21,9 @@ const DEFAULT_PASSWORD = "demo_password";
 function buildDefaultGoal(username: string, password: string): string {
   return (
     `Sign on as operator "${username}" with password "${password}", look up member 10001, ` +
-    "and extract and report their current checking balance and savings balance."
+    "and extract and report their full name, current checking balance, current savings " +
+    "balance, and sub-accounts summary (the one-line summary shown on the member page, or " +
+    '"No sub-accounts on file." if they have none).'
   );
 }
 

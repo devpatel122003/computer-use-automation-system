@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head><title>GridPoint &mdash; Account <%= account.id %></title></head>
+<body>
+  <p>Signed in as <%= agentId %> | <a href="/logout">Sign Out</a> | <a href="/accounts">Back to Search</a></p>
+  <h1>Account <%= account.id %></h1>
+  <ul>
+    <li>Customer Name: <span id="customerNameValue"><%= account.customerName %></span></li>
+    <li>Service Address: <span id="serviceAddressValue"><%= account.serviceAddress %></span></li>
+    <li>Balance Due: <span id="balanceDueValue">$<%= account.balanceDue.toFixed(2) %></span></li>
+    <li>Meter Reading: <span id="meterReadingValue"><%= account.meterReading %></span></li>
+    <li>Status: <span id="statusValue"><%= account.status %></span></li>
+  </ul>
+  <a href="/accounts/<%= account.id %>/meter-reading/new">Submit Meter Reading</a>
+</body>
+</html>

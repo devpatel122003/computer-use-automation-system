@@ -6,46 +6,6 @@
     "approvalState": "approved",
     "history": [
       {
-        "runId": "replay-2026-08-25T19-33-39-897Z",
-        "timestamp": "2026-08-25T19:33:42.894Z",
-        "status": "success"
-      },
-      {
-        "runId": "replay-2026-08-25T19-53-18-710Z",
-        "timestamp": "2026-08-25T19:53:21.415Z",
-        "status": "success"
-      },
-      {
-        "runId": "replay-2026-08-25T19-56-34-981Z",
-        "timestamp": "2026-08-25T19:56:37.617Z",
-        "status": "success"
-      },
-      {
-        "runId": "replay-2026-08-25T19-58-39-320Z",
-        "timestamp": "2026-08-25T19:58:41.976Z",
-        "status": "success"
-      },
-      {
-        "runId": "replay-2026-08-25T20-04-21-614Z",
-        "timestamp": "2026-08-25T20:04:24.047Z",
-        "status": "failure"
-      },
-      {
-        "runId": "replay-2026-08-25T20-04-31-456Z",
-        "timestamp": "2026-08-25T20:04:33.839Z",
-        "status": "failure"
-      },
-      {
-        "runId": "replay-2026-08-25T21-05-30-575Z",
-        "timestamp": "2026-08-25T21:05:33.631Z",
-        "status": "success"
-      },
-      {
-        "runId": "replay-2026-08-25T21-35-50-912Z",
-        "timestamp": "2026-08-25T21:35:53.709Z",
-        "status": "success"
-      },
-      {
         "runId": "replay-2026-08-25T21-36-07-756Z",
         "timestamp": "2026-08-25T21:36:10.237Z",
         "status": "success"
@@ -254,6 +214,46 @@
         "runId": "replay-2026-08-27T19-51-58-270Z",
         "timestamp": "2026-08-27T19:52:01.917Z",
         "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-27T21-44-43-412Z",
+        "timestamp": "2026-08-27T21:44:46.400Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T03-10-59-697Z",
+        "timestamp": "2026-08-28T03:11:02.203Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T03-18-44-839Z",
+        "timestamp": "2026-08-28T03:18:46.199Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-18-46-955Z",
+        "timestamp": "2026-08-28T03:18:48.329Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-18-49-104Z",
+        "timestamp": "2026-08-28T03:18:51.567Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-19-09-117Z",
+        "timestamp": "2026-08-28T03:19:10.482Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-19-28-715Z",
+        "timestamp": "2026-08-28T03:19:31.185Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T03-22-34-395Z",
+        "timestamp": "2026-08-28T03:22:37.255Z",
+        "status": "success"
       }
     ]
   },
@@ -454,6 +454,11 @@
         "runId": "replay-2026-08-27T19-01-20-739Z",
         "timestamp": "2026-08-27T19:01:23.069Z",
         "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-27T21-42-03-414Z",
+        "timestamp": "2026-08-27T21:42:06.289Z",
+        "status": "success"
       }
     ]
   },
@@ -597,6 +602,26 @@
         "runId": "replay-2026-08-27T19-43-31-999Z",
         "timestamp": "2026-08-27T19:43:35.559Z",
         "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-27T20-44-38-952Z",
+        "timestamp": "2026-08-27T20:44:41.223Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-27T21-43-04-778Z",
+        "timestamp": "2026-08-27T21:43:06.586Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-27T21-45-35-611Z",
+        "timestamp": "2026-08-27T21:45:37.413Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-27T21-45-52-696Z",
+        "timestamp": "2026-08-27T21:45:54.428Z",
+        "status": "success"
       }
     ]
   },
@@ -639,6 +664,21 @@
       {
         "runId": "replay-2026-08-27T19-00-32-290Z",
         "timestamp": "2026-08-27T19:00:35.184Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-19-03-734Z",
+        "timestamp": "2026-08-28T03:19:05.091Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-19-05-844Z",
+        "timestamp": "2026-08-28T03:19:08.352Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-22-18-891Z",
+        "timestamp": "2026-08-28T03:22:21.872Z",
         "status": "business_outcome"
       }
     ]
@@ -760,6 +800,74 @@
       {
         "runId": "replay-2026-08-27T19-52-24-004Z",
         "timestamp": "2026-08-27T19:52:25.918Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-18-42-516Z",
+        "timestamp": "2026-08-28T03:18:44.073Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-19-11-234Z",
+        "timestamp": "2026-08-28T03:19:12.589Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-19-13-356Z",
+        "timestamp": "2026-08-28T03:19:14.714Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-19-31-939Z",
+        "timestamp": "2026-08-28T03:19:34.376Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T03-19-35-142Z",
+        "timestamp": "2026-08-28T03:19:37.607Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-22-47-634Z",
+        "timestamp": "2026-08-28T03:22:50.492Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T03-23-10-894Z",
+        "timestamp": "2026-08-28T03:23:13.789Z",
+        "status": "business_outcome"
+      }
+    ]
+  },
+  "check-balance@9ec685ff17001551": {
+    "artifactId": "check-balance",
+    "version": "1.0.0",
+    "fingerprint": "9ec685ff17001551",
+    "approvalState": "draft",
+    "history": [
+      {
+        "runId": "replay-2026-08-28T03-10-49-557Z",
+        "timestamp": "2026-08-28T03:10:51.193Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T03-11-02-971Z",
+        "timestamp": "2026-08-28T03:11:04.356Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T03-13-52-198Z",
+        "timestamp": "2026-08-28T03:13:54.593Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T03-26-50-155Z",
+        "timestamp": "2026-08-28T03:26:51.988Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T03-27-20-742Z",
+        "timestamp": "2026-08-28T03:27:22.547Z",
         "status": "business_outcome"
       }
     ]

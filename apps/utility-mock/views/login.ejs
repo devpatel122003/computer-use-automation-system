@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+<head><title>GridPoint Utility Co-op &mdash; Agent Sign-In</title></head>
+<body>
+  <h1>GridPoint Utility Co-op</h1>
+  <h2>Service Desk Sign-In</h2>
+  <% if (typeof error !== "undefined" && error) { %>
+    <p style="color:red;"><b><%= error %></b></p>
+  <% } %>
+  <form method="POST" action="/login">
+    <div>
+      <label for="agentId">Agent ID</label>
+      <input type="text" id="agentId" name="agentId" />
+    </div>
+    <div>
+      <label for="pin">PIN</label>
+      <input type="password" id="pin" name="pin" />
+    </div>
+    <button type="submit">Sign In</button>
+  </form>
+</body>
+</html>

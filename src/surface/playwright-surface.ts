@@ -149,7 +149,7 @@ export class PlaywrightSurface implements Surface {
     // a plain `page.evaluate(scanPage)` throws "__name is not defined" in the browser. Shim
     // it locally as a passthrough when evaluating the function as a source string instead.
     const shimmedSource = `(() => { const __name = (fn) => fn; return (${scanPage.toString()})(); })()`;
-    const raw = (await page.evaluate(shimmedSource)) as ReturnType<typeof scanPage>;
+    const raw = (await this.withNavigationRaceRetry(() => page.evaluate(shimmedSource))) as ReturnType<typeof scanPage>;
 
     const roleNameSeen = new Map<string, number>();
     const roleNameTotals = new Map<string, number>();
@@ -255,23 +255,25 @@ export class PlaywrightSurface implements Surface {
     // which the caller's normal known-outcome detection handles.
     if (!resolved) return undefined;
 
-    const info = await resolved.locator.evaluate((el) => {
-      // Check anchor FIRST: a real <a href> click navigates via its href regardless of
-      // whether it happens to sit inside a <form> -- forms don't intercept anchor clicks.
-      // Checking form first (the previous order) would predict the wrong destination for
-      // any off-allowlist link that happens to be nested inside a form.
-      const anchor = el.closest("a[href]");
-      if (anchor) {
-        return { method: "GET", action: anchor.getAttribute("href") ?? "" };
-      }
-      const form = el.closest("form");
-      if (form) {
-        const method = (form.getAttribute("method") ?? "GET").toUpperCase();
-        const action = form.getAttribute("action") ?? "";
-        return { method, action };
-      }
-      return null;
-    });
+    const info = await this.withNavigationRaceRetry(() =>
+      resolved.locator.evaluate((el) => {
+        // Check anchor FIRST: a real <a href> click navigates via its href regardless of
+        // whether it happens to sit inside a <form> -- forms don't intercept anchor clicks.
+        // Checking form first (the previous order) would predict the wrong destination for
+        // any off-allowlist link that happens to be nested inside a form.
+        const anchor = el.closest("a[href]");
+        if (anchor) {
+          return { method: "GET", action: anchor.getAttribute("href") ?? "" };
+        }
+        const form = el.closest("form");
+        if (form) {
+          const method = (form.getAttribute("method") ?? "GET").toUpperCase();
+          const action = form.getAttribute("action") ?? "";
+          return { method, action };
+        }
+        return null;
+      })
+    );
     if (!info) return null;
 
     return {
@@ -336,9 +338,34 @@ export class PlaywrightSurface implements Surface {
     }
   }
 
+  /** Retries an evaluate-style callback once, after waiting for the page's own load state to
+   *  settle, on this one specific known-transient Playwright race: `page.evaluate` (or a
+   *  locator's own `.evaluate`) running while a navigation is still destroying the JS
+   *  execution context it's mid-flight in, throwing "Execution context was destroyed, most
+   *  likely because of a navigation." First found live via `getVisibleText()` (checkpoint/
+   *  known-outcome detection's hot path, called after nearly every action) against MERIDIAN
+   *  -- a real, network-latency-bound external target, unlike mock-bank's local single-hop
+   *  navigations -- where it turned an ordinary transient timing hiccup into an immediate
+   *  "Couldn't even start" failure for the whole run instead of the wait-and-retry treatment
+   *  this exact class of condition is supposed to get elsewhere in this system. Shared here
+   *  rather than copy-pasted at each of this file's three real `.evaluate()` call sites. Only
+   *  ever retries once: a second real failure still throws, not silently swallowed or looped. */
+  private async withNavigationRaceRetry<T>(run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/Execution context was destroyed/.test(message)) throw err;
+      await this.getPage()
+        .waitForLoadState("load", { timeout: 5000 })
+        .catch(() => undefined);
+      return run();
+    }
+  }
+
   async getVisibleText(): Promise<string> {
     const page = this.getPage();
-    return page.evaluate(() => document.body.innerText);
+    return this.withNavigationRaceRetry(() => page.evaluate(() => document.body.innerText));
   }
 
   async screenshot(label: string): Promise<string> {

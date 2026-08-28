@@ -1,0 +1,10 @@
+<!doctype html>
+<html>
+<head><title>GridPoint &mdash; Reading Recorded</title></head>
+<body>
+  <p>Signed in as <%= agentId %> | <a href="/logout">Sign Out</a></p>
+  <h1>Reading Recorded Successfully</h1>
+  <p>Account <%= account.id %> new meter reading: <span id="newMeterReadingValue"><%= account.meterReading %></span></p>
+  <a href="/accounts/<%= account.id %>">Back to Account</a>
+</body>
+</html>

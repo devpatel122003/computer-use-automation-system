@@ -12,6 +12,11 @@ import type { ConversationTurn } from "../frontend/planner.js";
 import { planChainedTurn, type ChainPlanResult } from "../frontend/chain.js";
 import { resolveModelList } from "../agent/model-retry.js";
 import { requestLog } from "../http/request-log.js";
+import { PlaywrightSurface } from "../surface/playwright-surface.js";
+import { GuardrailsPolicy } from "../guardrails/policy.js";
+import { EvidenceLogger, newRunId } from "../evidence/logger.js";
+import { DiscoveryAgent } from "../agent/discovery-agent.js";
+import type { HttpMethod, RiskLevel, RouteRule } from "../guardrails/allowlist.js";
 
 /**
  * The other half of Section 1's sentence, made real with an actual UI instead of a CLI:
@@ -163,6 +168,33 @@ function loadDemoScripts(filePath: string | undefined): Array<{ label: string; m
   return [];
 }
 
+interface RegisterTargetExample {
+  label: string;
+  baseUrl: string;
+  startUrl: string;
+  routesText: string;
+  goal: string;
+}
+
+const REGISTER_TARGET_EXAMPLES_PATH = "config/register-target-examples.json";
+
+/** Same config-file-not-hardcoded shape as loadDemoScripts/TARGETS above, applied to the
+ *  "Register a new target" form: a picker of known-good examples (base URL, routes, goal)
+ *  a presenter can select instead of typing live, with zero change to what
+ *  POST /register-target itself does -- this only pre-fills the same four fields a person
+ *  would otherwise type by hand. Adding a new example later (a different fixture, a
+ *  different goal against the same one) is a JSON edit, not a code change. */
+export function loadRegisterTargetExamples(): RegisterTargetExample[] {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(REGISTER_TARGET_EXAMPLES_PATH, "utf-8"));
+    if (Array.isArray(parsed)) return parsed;
+  } catch {
+    // Malformed/missing file -- no examples in the picker, not a crash; the form itself
+    // still works exactly as it did before this existed.
+  }
+  return [];
+}
+
 // Holds a planned-but-not-yet-invoked risky capability call across exactly one confirmation
 // round-trip -- see the /chat handler below. A memory-backed session (express-session's
 // default store, same posture as mock-bank's own login session) is enough for a demo: this
@@ -229,6 +261,7 @@ app.get("/config", (req, res) => {
     targets: TARGETS.map((t) => ({ id: t.id, label: t.label })),
     dashboardUrl: target.dashboardUrl ?? null,
     demoScripts: loadDemoScripts(target.demoScriptsFile),
+    registerTargetExamples: loadRegisterTargetExamples(),
   });
 });
 
@@ -334,6 +367,154 @@ app.post("/interventions/:id/resolve", async (req, res) => {
   } catch (err) {
     const messageText = err instanceof Error ? err.message : String(err);
     res.status(502).json({ error: `Couldn't reach the capability API at ${target.apiBase}: ${messageText}` });
+  }
+});
+
+/**
+ * "A new bank's UI shows up -- where's the option to add it?" This is that option: a
+ * console-reachable form that (1) adds the new target's base URL and the routes it's
+ * expected to use to config/allowlist.json for real, then (2) runs one genuine
+ * LLM-driven discovery run against it -- the actual first half of onboarding a new target
+ * (brief §3.7/§8's "generalization" story), not a mock of it.
+ *
+ * Deliberately does NOT also produce a finished, reusable capability artifact -- that would
+ * mean inventing automatic inference for paramMappings/successCheckpoint/knownOutcomes,
+ * exactly the thing this repo has consistently kept human-authored on purpose (see
+ * recorder.ts's own doc comment). What this DOES prove for real: the agent can drive a
+ * brand-new UI it has never seen, under the exact same guardrails as every other target,
+ * with the allowlist entries it needed added through the console instead of by hand-editing
+ * a JSON file. Turning a successful run into a capability is the next, still-manual step --
+ * `npm run record-capability` (see README's "Recording a new capability" section), pointed
+ * at this run's own evidence.
+ *
+ * Risky actions and mid-run escalations are auto-declined/aborted here rather than routed to
+ * the console's interventions card: that mechanism (http-escalation.ts) is bound to a
+ * REPLAY's `onEscalate` contract (keyed on an ArtifactStep), and discovery's shape is
+ * different enough (no artifact exists yet) that reusing it would mean bolting on a second,
+ * subtly different contract under time pressure. A read-only reconnaissance goal (sign on,
+ * look something up) never hits this path at all; a goal needing confirmation or recovery
+ * should go through the CLI's `run-agent`/`--interactive-escalation` tooling, which already
+ * has a real answer for both.
+ */
+export function parseRouteLines(text: string): { routes: RouteRule[]; errors: string[] } {
+  const routes: RouteRule[] = [];
+  const errors: string[] = [];
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const parts = line.split(/\s+/);
+    const method = parts[0]?.toUpperCase();
+    const pattern = parts[1];
+    const riskWord = parts[2]?.toLowerCase();
+    if (method !== "GET" && method !== "POST") {
+      errors.push(`"${line}": expected the line to start with GET or POST.`);
+      continue;
+    }
+    if (!pattern || !pattern.startsWith("/")) {
+      errors.push(`"${line}": route pattern must start with "/" (e.g. /members/:id).`);
+      continue;
+    }
+    // Same convention config/allowlist.json already uses throughout: a bare GET defaults
+    // safe, a bare POST defaults risky, unless the line says otherwise -- reads/writes are
+    // just as likely to be right by default as not, so this is a starting point to review,
+    // not a substitute for actually looking at what each route does.
+    const risk: RiskLevel = riskWord === "safe" || riskWord === "risky" ? riskWord : method === "GET" ? "safe" : "risky";
+    routes.push({ pattern, methods: [method as HttpMethod], risk });
+  }
+  return { routes, errors };
+}
+
+const ALLOWLIST_PATH = "config/allowlist.json";
+
+app.post("/register-target", async (req, res) => {
+  if (!process.env.GEMINI_API_KEY) {
+    res.status(500).json({ error: "Server is not configured (missing GEMINI_API_KEY)." });
+    return;
+  }
+  const baseUrl = typeof req.body?.baseUrl === "string" ? req.body.baseUrl.trim() : "";
+  const goal = typeof req.body?.goal === "string" ? req.body.goal.trim() : "";
+  const routesText = typeof req.body?.routesText === "string" ? req.body.routesText : "";
+  const startUrl = typeof req.body?.startUrl === "string" && req.body.startUrl.trim() ? req.body.startUrl.trim() : baseUrl;
+
+  if (!baseUrl || !goal) {
+    res.status(400).json({ error: 'Both "baseUrl" and "goal" are required.' });
+    return;
+  }
+  let parsedBase: URL;
+  try {
+    parsedBase = new URL(baseUrl);
+  } catch {
+    res.status(400).json({ error: `"${baseUrl}" isn't a valid URL.` });
+    return;
+  }
+
+  const { routes, errors: routeErrors } = parseRouteLines(routesText);
+  if (routes.length === 0) {
+    res.status(400).json({
+      error: "No valid routes parsed. Each line should look like: GET /login  or  POST /members/:id/transfer risky",
+      details: routeErrors,
+    });
+    return;
+  }
+
+  // Persisted to disk BEFORE launching discovery -- GuardrailsPolicy re-reads this file from
+  // scratch on every construction (no cache), so a policy built after this write sees the
+  // new target immediately, in this same request, exactly like a human editing the file by
+  // hand would need to before running discovery themselves.
+  const allowlistConfig = JSON.parse(fs.readFileSync(ALLOWLIST_PATH, "utf-8")) as {
+    allowedBaseUrls: string[];
+    routes: RouteRule[];
+  };
+  if (!allowlistConfig.allowedBaseUrls.includes(parsedBase.origin)) {
+    allowlistConfig.allowedBaseUrls.push(parsedBase.origin);
+  }
+  let routesAdded = 0;
+  for (const route of routes) {
+    const alreadyPresent = allowlistConfig.routes.some(
+      (existing) => existing.pattern === route.pattern && existing.methods.includes(route.methods[0])
+    );
+    if (!alreadyPresent) {
+      allowlistConfig.routes.push(route);
+      routesAdded += 1;
+    }
+  }
+  fs.writeFileSync(ALLOWLIST_PATH, `${JSON.stringify(allowlistConfig, null, 2)}\n`);
+
+  const runId = newRunId("discovery");
+  const logger = new EvidenceLogger({ runId, runType: "discovery" });
+  const surface = new PlaywrightSurface({ evidenceDir: logger.screenshotsDir, headed: process.env.CHAT_UI_DISCOVERY_HEADED !== "false" });
+  try {
+    await surface.launch(startUrl);
+    const policy = new GuardrailsPolicy(); // fresh read of the allowlist just written above
+    const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const agent = new DiscoveryAgent({
+      surface,
+      policy,
+      logger,
+      genai,
+      onRiskyAction: async () => false,
+      onEscalate: async () => "abort",
+    });
+
+    const result = await agent.run(goal, startUrl);
+    logger.writeJson("discovery-result.json", result);
+
+    res.json({
+      runId,
+      status: result.status,
+      finalSummary: result.finalSummary,
+      escalationReason: result.escalationReason,
+      outputs: result.outputs,
+      stepCount: result.steps.length,
+      routesAddedToAllowlist: routesAdded,
+      routeParseWarnings: routeErrors,
+      evidenceDir: logger.runDir,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: `Discovery failed to run: ${message}` });
+  } finally {
+    await surface.close();
   }
 });
 

@@ -289,6 +289,30 @@ contract exists for.
   status; the server, not the client-side link, is what should report "already closed." A
   real bank's legacy UI plausibly behaves the same way — the affordance stays, the backend
   is the source of truth.
+- **`close-sub-account` targets "the" Close link by page position (`nth: 0`), not a specific
+  sub-account id** — a real robustness limit found live, not a crash: a member with more than
+  one sub-account (one already closed, one still open) always resolves to whichever one is
+  *first* in page order, regardless of which one a caller actually meant. For member `10002`
+  specifically, that's permanently the closed one, since it was created first. Not patched
+  with a schema change under demo-timing pressure; instead disclosed here and worked around by
+  choosing demo members with an unambiguous single sub-account. A production version should
+  give this capability a real `subAccountId` input param instead of relying on position.
+- **`close-sub-account` had no way to say "there's nothing to close" as a clean answer** —
+  attempting it against a member with zero sub-accounts at all (not "already closed," just
+  never opened) hard-failed with "No locator candidate resolved to an element" instead of a
+  business outcome, since the mechanical click had nothing to target. Fixed with a
+  `no_sub_account_to_close` known outcome, detected off the member page's own "No sub-accounts
+  on file." text — the same page `detectKnownOutcome()` already re-scans on any mechanical
+  action failure, so no new detection code was needed, only the missing outcome declaration.
+- **`check-balance` was under-extracting real data already on the page it visits.** The member
+  page shows the member's name and a Sub-Accounts table; the capability's two original
+  `extract` steps only ever captured the two balances. Found live when a chat follow-up
+  ("what's my name," "what about my sub-account") had nothing real to answer from. Fixed with
+  two more `extract` steps against the *same* page (no new navigation) — `memberName`, and a
+  `subAccounts` field reading a new one-line summary span (`#subAccountsSummaryValue`) added
+  to `member.ejs` specifically so a variable-length table can still be captured as one typed
+  string, the same "one stable id per fact" pattern the original two balance fields already
+  used.
 
 ## Related docs
 

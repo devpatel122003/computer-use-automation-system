@@ -25,6 +25,39 @@
       <p class="hint">Sends the same message a person could type, through the same chat path.</p>
       <div id="demo-scripts" class="demo-scripts"></div>
 
+      <details class="register-target-details">
+        <summary>Register a new target</summary>
+        <p class="hint">
+          A new bank's UI shows up: point discovery at it for real. This adds the URL/routes
+          to the allowlist and runs one genuine LLM-driven run against it -- it does not
+          produce a finished capability (that stays a reviewed, human-authored step; see
+          <code>npm run record-capability</code> in the README). Pick a read-only goal (sign
+          on + look something up) -- a goal needing a risky-action confirmation or a stuck-run
+          escalation isn't supported from this form yet, see the hint below the button.
+        </p>
+        <form id="register-target-form" class="register-target-form">
+          <label for="rt-example-picker">Load an example <span class="muted">(optional -- fills in the fields below)</span></label>
+          <select id="rt-example-picker">
+            <option value="">Type your own…</option>
+          </select>
+
+          <label for="rt-base-url">Base URL</label>
+          <input id="rt-base-url" type="text" placeholder="https://new-bank.example.com" autocomplete="off" />
+
+          <label for="rt-start-url">Start URL <span class="muted">(optional, defaults to base URL)</span></label>
+          <input id="rt-start-url" type="text" placeholder="https://new-bank.example.com/login" autocomplete="off" />
+
+          <label for="rt-routes">Routes (one per line: <code>METHOD /pattern [safe|risky]</code>)</label>
+          <textarea id="rt-routes" rows="4" placeholder="GET /login&#10;POST /login&#10;GET /search&#10;GET /members/:id"></textarea>
+
+          <label for="rt-goal">Goal</label>
+          <textarea id="rt-goal" rows="3" placeholder='Sign on as operator "demo" with password "demo", look up member 10001, and report their balance.'></textarea>
+
+          <button type="submit" class="send-btn">Run discovery</button>
+        </form>
+        <div id="register-target-result" class="register-target-result" hidden></div>
+      </details>
+
       <a id="dashboard-link" class="dashboard-link" href="#" target="_blank" rel="noopener" hidden>Open ops dashboard ↗</a>
     </aside>
 

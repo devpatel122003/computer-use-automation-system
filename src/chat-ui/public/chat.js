@@ -252,6 +252,9 @@ async function loadConsoleConfig() {
     } else {
       dashboardLinkEl.hidden = true;
     }
+    if (Array.isArray(data.registerTargetExamples)) {
+      populateRegisterTargetExamples(data.registerTargetExamples);
+    }
   } catch {
     // No config, no demo-script buttons, no dashboard link, no switcher -- the chat panel
     // itself still works, so this stays a soft failure with nothing shown to the user.
@@ -356,6 +359,95 @@ async function pollInterventions() {
 
 setInterval(pollInterventions, 2500);
 pollInterventions();
+
+// "Register a new target": adds a URL + its routes to the allowlist for real, then runs one
+// real discovery attempt against it -- see server.ts's POST /register-target for exactly
+// what this does and doesn't do (it does not produce a finished capability).
+const registerTargetForm = document.getElementById("register-target-form");
+const registerTargetResultEl = document.getElementById("register-target-result");
+const registerTargetExamplePicker = document.getElementById("rt-example-picker");
+
+// Config-driven, same as the target switcher and demo scripts above -- the picker's options
+// come from config/register-target-examples.json (server-side), not a hardcoded list here.
+// Selecting one only fills the same four fields a person would otherwise type by hand;
+// POST /register-target itself is completely unaware this picker exists.
+let registerTargetExamples = [];
+
+function populateRegisterTargetExamples(examples) {
+  registerTargetExamples = examples;
+  registerTargetExamplePicker.innerHTML = '<option value="">Type your own…</option>';
+  examples.forEach((example, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = example.label;
+    registerTargetExamplePicker.appendChild(option);
+  });
+}
+
+registerTargetExamplePicker.addEventListener("change", () => {
+  const index = registerTargetExamplePicker.value;
+  if (index === "") return; // "Type your own…" -- leave whatever's already in the fields
+  const example = registerTargetExamples[Number(index)];
+  if (!example) return;
+  document.getElementById("rt-base-url").value = example.baseUrl ?? "";
+  document.getElementById("rt-start-url").value = example.startUrl ?? "";
+  document.getElementById("rt-routes").value = example.routesText ?? "";
+  document.getElementById("rt-goal").value = example.goal ?? "";
+});
+
+function renderRegisterTargetResult(data, isError) {
+  registerTargetResultEl.hidden = false;
+  registerTargetResultEl.className = "register-target-result" + (isError ? " error" : "");
+  if (isError) {
+    registerTargetResultEl.textContent = data.error ?? "Something went wrong.";
+    return;
+  }
+  const lines = [
+    `Status: ${data.status}`,
+    `Steps taken: ${data.stepCount}`,
+    `Routes newly added to the allowlist: ${data.routesAddedToAllowlist}`,
+  ];
+  if (data.finalSummary) lines.push(`Summary: ${data.finalSummary}`);
+  if (data.escalationReason) lines.push(`Stopped because: ${data.escalationReason}`);
+  if (data.outputs && Object.keys(data.outputs).length > 0) {
+    lines.push(`Extracted: ${Object.entries(data.outputs).map(([k, v]) => `${k} = ${v}`).join(", ")}`);
+  }
+  lines.push(`Evidence: ${data.evidenceDir}`);
+  if (data.status === "finished") {
+    lines.push('Discovery succeeded. To turn this into a reusable capability, author a config JSON (see config/capability-configs/*.example.json) and run "npm run record-capability" against this same target -- that authoring step stays manual on purpose.');
+  }
+  registerTargetResultEl.textContent = lines.join("\n");
+}
+
+if (registerTargetForm) {
+  registerTargetForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const baseUrl = document.getElementById("rt-base-url").value.trim();
+    const startUrl = document.getElementById("rt-start-url").value.trim();
+    const routesText = document.getElementById("rt-routes").value;
+    const goal = document.getElementById("rt-goal").value.trim();
+
+    const submitBtn = registerTargetForm.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Running discovery… (this drives a real browser and can take a minute or two)";
+    registerTargetResultEl.hidden = true;
+
+    try {
+      const res = await fetch("/register-target", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseUrl, startUrl, routesText, goal }),
+      });
+      const data = await res.json();
+      renderRegisterTargetResult(data, !res.ok);
+    } catch (err) {
+      renderRegisterTargetResult({ error: `Couldn't reach the server (${err.message ?? err}).` }, true);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Run discovery";
+    }
+  });
+}
 
 loadCatalog();
 loadConsoleConfig();

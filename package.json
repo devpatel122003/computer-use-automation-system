@@ -9,6 +9,7 @@
   },
   "scripts": {
     "mock-bank": "tsx apps/mock-bank/src/server.ts",
+    "utility-mock": "PORT=4300 tsx apps/utility-mock/src/server.ts",
     "mock-bank:northgate": "TENANT=northgate-cu PORT=4100 tsx apps/mock-bank/src/server.ts",
     "run-agent": "tsx src/cli/run-agent.ts",
     "run-agent-create-member": "tsx src/cli/run-agent-create-member.ts",

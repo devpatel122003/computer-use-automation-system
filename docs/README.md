@@ -82,14 +82,19 @@ If you're new here, read in this order:
     are, and how this project actually uses them
 26. [`25-mock-bank-target-app.md`](25-mock-bank-target-app.md) — the deliberately old-fashioned
     fake bank app this whole system practices against, and why every seeded scenario exists
+27. [`26-extended-console-and-onboarding.md`](26-extended-console-and-onboarding.md) — **not
+    required by either brief**: the unified multi-target console, human escalation reachable
+    from a browser tab instead of only a terminal, and a "register a new target" form
+    verified against an independently-built fixture app
 
 ## Also see, at the repo root
 
 - [`../README.md`](../README.md) — setup instructions and the exact commands to run a live
   demo end to end, including the MERIDIAN CORE adaptation demo path
-- [`../REPORT.md`](../REPORT.md) — the original ~3-page design write-up (architecture,
-  artifact schema, determinism & error handling, heterogeneity/multi-tenant, escalation,
-  safety, and what was cut and why) — this `docs/` folder is the long-form expansion of it
+- [`../REPORT.md`](../REPORT.md) — the design write-up: a tight executive summary matching the
+  brief's ~1–3 page ask, covering the seven required headings plus stretch goals, followed by
+  the full detailed narrative (real bugs found, fixed, and re-verified live) those headings
+  are drawn from — this `docs/` folder is the long-form expansion of that same story
 - [`../ADAPTATION.md`](../ADAPTATION.md) — the later Adaptation Project write-up: pointing this
   same core at a real, live legacy target (MERIDIAN CORE) instead of `mock-bank`, what that
   actually took, and what survived unchanged
