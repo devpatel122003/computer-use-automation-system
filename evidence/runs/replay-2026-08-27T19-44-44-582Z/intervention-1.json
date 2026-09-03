@@ -1,0 +1,11 @@
+{
+  "id": "replay-2026-08-27T19-44-44-582Z-intervention-1",
+  "runId": "replay-2026-08-27T19-44-44-582Z",
+  "runType": "replay",
+  "capability": "Close Sub-Account",
+  "step": "step-7",
+  "reason": "click failed at step-7: No locator candidate resolved to an element.",
+  "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T19-44-44-582Z/screenshots/intervention-1.png",
+  "url": "http://localhost:4000/members/10001",
+  "createdAt": "2026-08-27T19:44:46.496Z"
+}

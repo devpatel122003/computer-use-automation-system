@@ -1,0 +1,10 @@
+{
+  "status": "success",
+  "runId": "replay-2026-08-28T18-01-21-358Z",
+  "outputs": {
+    "checkingBalance": "$4210.55",
+    "savingsBalance": "$12500.00",
+    "memberName": "Alice Johnson",
+    "subAccounts": "No sub-accounts on file."
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-27T18-55-11-704Z",
+  "outcome": "validation_rejected_business",
+  "description": "The requested share/deposit combination failed a real business rule (e.g. certificate minimum opening deposit of $500.00) -- a legitimate business outcome, not a system error.",
+  "stepId": "step-14",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T18-55-11-704Z/screenshots/001-outcome-validation_rejected_business.png"
+}

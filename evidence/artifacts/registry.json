@@ -6,16 +6,6 @@
     "approvalState": "approved",
     "history": [
       {
-        "runId": "replay-2026-08-25T21-36-07-756Z",
-        "timestamp": "2026-08-25T21:36:10.237Z",
-        "status": "success"
-      },
-      {
-        "runId": "replay-2026-08-25T22-07-57-216Z",
-        "timestamp": "2026-08-25T22:08:00.022Z",
-        "status": "success"
-      },
-      {
         "runId": "replay-2026-08-26T17-08-47-946Z",
         "timestamp": "2026-08-26T17:08:50.823Z",
         "status": "success"
@@ -254,6 +244,16 @@
         "runId": "replay-2026-08-28T03-22-34-395Z",
         "timestamp": "2026-08-28T03:22:37.255Z",
         "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T13-46-08-770Z",
+        "timestamp": "2026-08-28T13:46:10.631Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T13-46-23-774Z",
+        "timestamp": "2026-08-28T13:46:26.848Z",
+        "status": "business_outcome"
       }
     ]
   },
@@ -458,6 +458,11 @@
       {
         "runId": "replay-2026-08-27T21-42-03-414Z",
         "timestamp": "2026-08-27T21:42:06.289Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T23-06-21-287Z",
+        "timestamp": "2026-08-28T23:06:23.764Z",
         "status": "success"
       }
     ]
@@ -869,6 +874,88 @@
         "runId": "replay-2026-08-28T03-27-20-742Z",
         "timestamp": "2026-08-28T03:27:22.547Z",
         "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T13-45-47-341Z",
+        "timestamp": "2026-08-28T13:45:49.243Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T13-45-54-723Z",
+        "timestamp": "2026-08-28T13:45:56.581Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T13-45-58-437Z",
+        "timestamp": "2026-08-28T13:46:01.489Z",
+        "status": "success"
+      }
+    ]
+  },
+  "check-balance@c11b2bd7f58d03a6": {
+    "artifactId": "check-balance",
+    "version": "1.0.0",
+    "fingerprint": "c11b2bd7f58d03a6",
+    "approvalState": "draft",
+    "history": [
+      {
+        "runId": "replay-2026-08-28T17-54-50-822Z",
+        "timestamp": "2026-08-28T17:54:52.928Z",
+        "status": "success"
+      }
+    ]
+  },
+  "check-balance@6580415a1dbf9669": {
+    "artifactId": "check-balance",
+    "version": "1.0.0",
+    "fingerprint": "6580415a1dbf9669",
+    "approvalState": "draft",
+    "history": [
+      {
+        "runId": "replay-2026-08-28T17-58-54-140Z",
+        "timestamp": "2026-08-28T17:58:56.250Z",
+        "status": "success"
+      }
+    ]
+  },
+  "check-balance@3f9762e951d03aea": {
+    "artifactId": "check-balance",
+    "version": "1.0.0",
+    "fingerprint": "3f9762e951d03aea",
+    "approvalState": "draft",
+    "history": [
+      {
+        "runId": "replay-2026-08-28T18-01-21-358Z",
+        "timestamp": "2026-08-28T18:01:23.466Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T23-05-16-071Z",
+        "timestamp": "2026-08-28T23:05:18.386Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T23-05-26-918Z",
+        "timestamp": "2026-08-28T23:05:28.777Z",
+        "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T23-05-35-151Z",
+        "timestamp": "2026-08-28T23:05:37.083Z",
+        "status": "business_outcome"
+      }
+    ]
+  },
+  "check-balance@090fffcba6ebe765": {
+    "artifactId": "check-balance",
+    "version": "1.0.0",
+    "fingerprint": "090fffcba6ebe765",
+    "approvalState": "draft",
+    "history": [
+      {
+        "runId": "replay-2026-08-28T23-16-30-736Z",
+        "timestamp": "2026-08-28T23:16:32.654Z",
+        "status": "success"
       }
     ]
   }

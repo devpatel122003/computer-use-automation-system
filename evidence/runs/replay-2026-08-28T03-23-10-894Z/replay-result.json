@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-28T03-23-10-894Z",
+  "outcome": "already_closed",
+  "description": "This sub-account was already closed (e.g. by a previous run of this same artifact) -- a legitimate outcome, not a system error.",
+  "stepId": "step-8",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-28T03-23-10-894Z/screenshots/001-outcome-already_closed.png"
+}

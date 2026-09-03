@@ -44,6 +44,21 @@
         "runId": "replay-2026-08-27T19-05-00-955Z",
         "timestamp": "2026-08-27T19:05:04.431Z",
         "status": "business_outcome"
+      },
+      {
+        "runId": "replay-2026-08-28T13-56-13-218Z",
+        "timestamp": "2026-08-28T13:56:16.587Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T13-56-20-179Z",
+        "timestamp": "2026-08-28T13:56:23.355Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T23-13-07-173Z",
+        "timestamp": "2026-08-28T23:13:10.110Z",
+        "status": "business_outcome"
       }
     ]
   },
@@ -348,6 +363,11 @@
       {
         "runId": "replay-2026-08-27T19-44-06-303Z",
         "timestamp": "2026-08-27T19:44:11.816Z",
+        "status": "success"
+      },
+      {
+        "runId": "replay-2026-08-28T13-56-29-310Z",
+        "timestamp": "2026-08-28T13:56:33.772Z",
         "status": "success"
       }
     ]

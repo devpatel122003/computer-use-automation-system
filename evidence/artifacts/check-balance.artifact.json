@@ -147,12 +147,12 @@
     {
       "id": "step-4",
       "actionType": "click",
-      "description": "Click button \"Sign On\"",
+      "description": "Click button \"Sign Onmn\"",
       "locator": [
         {
           "strategy": "role",
           "role": "button",
-          "name": "Sign On",
+          "name": "Sign Onnnnn",
           "nth": 0,
           "confidence": "high",
           "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."

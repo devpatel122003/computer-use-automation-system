@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-27T18-32-44-361Z",
+  "outcome": "supervisor_override_required",
+  "description": "The signed-on operator is not a supervisor -- a legitimate business outcome (the target app's own real access-control decision), not a system error or guardrail block.",
+  "stepId": "step-14",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T18-32-44-361Z/screenshots/001-outcome-supervisor_override_required.png"
+}

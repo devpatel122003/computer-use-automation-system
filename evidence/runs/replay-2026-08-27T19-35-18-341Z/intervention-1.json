@@ -1,0 +1,11 @@
+{
+  "id": "replay-2026-08-27T19-35-18-341Z-intervention-1",
+  "runId": "replay-2026-08-27T19-35-18-341Z",
+  "runType": "replay",
+  "capability": "Open Sub-Account",
+  "step": "step-10",
+  "reason": "Checkpoint failed at step-10: Reached the sub-account confirmation page.",
+  "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T19-35-18-341Z/screenshots/intervention-1.png",
+  "url": "http://localhost:4000/members/77777/sub-accounts",
+  "createdAt": "2026-08-27T19:35:21.980Z"
+}

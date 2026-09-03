@@ -1,0 +1,2360 @@
+{
+  "status": "finished",
+  "goal": "Sign in as agent \"agent1\" with PIN \"4242\", look up account ACC-1001, and report the customer name, service address, balance due, and current meter reading.",
+  "startUrl": "http://localhost:4300/login",
+  "steps": [
+    {
+      "stepIndex": 0,
+      "observation": {
+        "url": "http://localhost:4300/login",
+        "title": "",
+        "elements": [],
+        "screenshotPath": ""
+      },
+      "toolName": "navigate",
+      "toolInput": {
+        "url": "http://localhost:4300/login"
+      },
+      "action": {
+        "type": "navigate",
+        "url": "http://localhost:4300/login"
+      },
+      "actionResult": {
+        "ok": true,
+        "url": "http://localhost:4300/login",
+        "httpStatus": 200
+      }
+    },
+    {
+      "stepIndex": 1,
+      "observation": {
+        "url": "http://localhost:4300/login",
+        "title": "GridPoint Utility Co-op — Agent Sign-In",
+        "elements": [
+          {
+            "role": "textbox",
+            "name": "Agent ID",
+            "value": "",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Agent ID",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Agent ID",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#agentId",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "textbox",
+            "name": "PIN",
+            "value": "",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "PIN",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "PIN",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#pin",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": true
+          },
+          {
+            "role": "button",
+            "name": "Sign In",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "button",
+                "name": "Sign In",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign In",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > button:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "GridPoint Utility Co-op",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "GridPoint Utility Co-op",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h1:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Service Desk Sign-In",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Service Desk Sign-In",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h2:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Agent ID",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Agent ID",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > div:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "PIN",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "PIN",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > div:nth-of-type(2) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-28T04-18-26-408Z/screenshots/001-observe.png"
+      },
+      "rationale": "Enter the agent ID 'agent1' to sign in.",
+      "toolName": "type",
+      "toolInput": {
+        "reasoning": "Enter the agent ID 'agent1' to sign in.",
+        "name": "Agent ID",
+        "text": "agent1",
+        "role": "textbox"
+      },
+      "action": {
+        "type": "type",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": "Agent ID",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "Agent ID",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "#agentId",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ],
+        "text": "agent1"
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4300/login"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 2,
+      "observation": {
+        "url": "http://localhost:4300/login",
+        "title": "GridPoint Utility Co-op — Agent Sign-In",
+        "elements": [
+          {
+            "role": "textbox",
+            "name": "Agent ID",
+            "value": "agent1",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Agent ID",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Agent ID",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#agentId",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "textbox",
+            "name": "PIN",
+            "value": "",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "PIN",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "PIN",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#pin",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": true
+          },
+          {
+            "role": "button",
+            "name": "Sign In",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "button",
+                "name": "Sign In",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign In",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > button:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "GridPoint Utility Co-op",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "GridPoint Utility Co-op",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h1:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Service Desk Sign-In",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Service Desk Sign-In",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h2:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Agent ID",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Agent ID",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > div:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "PIN",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "PIN",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > div:nth-of-type(2) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-28T04-18-26-408Z/screenshots/002-observe.png"
+      },
+      "rationale": "Enter the PIN '4242' to sign in.",
+      "toolName": "type",
+      "toolInput": {
+        "name": "PIN",
+        "reasoning": "Enter the PIN '4242' to sign in.",
+        "role": "textbox",
+        "text": "4242"
+      },
+      "action": {
+        "type": "type",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": "PIN",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "PIN",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "#pin",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ],
+        "text": "4242"
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4300/login"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 3,
+      "observation": {
+        "url": "http://localhost:4300/login",
+        "title": "GridPoint Utility Co-op — Agent Sign-In",
+        "elements": [
+          {
+            "role": "textbox",
+            "name": "Agent ID",
+            "value": "agent1",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Agent ID",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Agent ID",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#agentId",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "textbox",
+            "name": "PIN",
+            "value": "4242",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "PIN",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "PIN",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#pin",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": true
+          },
+          {
+            "role": "button",
+            "name": "Sign In",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "button",
+                "name": "Sign In",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign In",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > button:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "GridPoint Utility Co-op",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "GridPoint Utility Co-op",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h1:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Service Desk Sign-In",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Service Desk Sign-In",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h2:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Agent ID",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Agent ID",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > div:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "PIN",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "PIN",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > div:nth-of-type(2) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-28T04-18-26-408Z/screenshots/003-observe.png"
+      },
+      "rationale": "Click the Sign In button to submit credentials and log in.",
+      "toolName": "click",
+      "toolInput": {
+        "name": "Sign In",
+        "reasoning": "Click the Sign In button to submit credentials and log in.",
+        "role": "button"
+      },
+      "action": {
+        "type": "click",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "button",
+            "name": "Sign In",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "Sign In",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "body > form:nth-of-type(1) > button:nth-of-type(1)",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ]
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4300/accounts",
+        "httpStatus": 200
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 4,
+      "observation": {
+        "url": "http://localhost:4300/accounts",
+        "title": "GridPoint — Find Account",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Out",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "textbox",
+            "name": "Account Number",
+            "value": "",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Account Number",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Account Number",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#accountNumber",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "button",
+            "name": "Look Up Account",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "button",
+                "name": "Look Up Account",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Look Up Account",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > button:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Find Customer Account",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Find Customer Account",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h1:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Account Number",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Account Number",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-28T04-18-26-408Z/screenshots/004-observe.png"
+      },
+      "rationale": "Enter the account number ACC-1001 to look it up.",
+      "toolName": "type",
+      "toolInput": {
+        "text": "ACC-1001",
+        "role": "textbox",
+        "name": "Account Number",
+        "reasoning": "Enter the account number ACC-1001 to look it up."
+      },
+      "action": {
+        "type": "type",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": "Account Number",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "Account Number",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "#accountNumber",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ],
+        "text": "ACC-1001"
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4300/accounts"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 5,
+      "observation": {
+        "url": "http://localhost:4300/accounts",
+        "title": "GridPoint — Find Account",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Out",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "textbox",
+            "name": "Account Number",
+            "value": "ACC-1001",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "textbox",
+                "name": "Account Number",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Account Number",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#accountNumber",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "button",
+            "name": "Look Up Account",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "button",
+                "name": "Look Up Account",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Look Up Account",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > button:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Find Customer Account",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Find Customer Account",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h1:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Account Number",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Account Number",
+                "nth": 1,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > form:nth-of-type(1) > label:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-28T04-18-26-408Z/screenshots/005-observe.png"
+      },
+      "rationale": "Click Look Up Account to retrieve the account details for ACC-1001.",
+      "toolName": "click",
+      "toolInput": {
+        "reasoning": "Click Look Up Account to retrieve the account details for ACC-1001.",
+        "name": "Look Up Account",
+        "role": "button"
+      },
+      "action": {
+        "type": "click",
+        "target": [
+          {
+            "strategy": "role",
+            "role": "button",
+            "name": "Look Up Account",
+            "nth": 0,
+            "confidence": "high",
+            "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+          },
+          {
+            "strategy": "text",
+            "name": "Look Up Account",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "body > form:nth-of-type(1) > button:nth-of-type(1)",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ]
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "role",
+        "url": "http://localhost:4300/accounts/ACC-1001",
+        "httpStatus": 200
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 6,
+      "observation": {
+        "url": "http://localhost:4300/accounts/ACC-1001",
+        "title": "GridPoint — Account ACC-1001",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Out",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Back to Search",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Back to Search",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Back to Search",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(2)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Submit Meter Reading",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Submit Meter Reading",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Submit Meter Reading",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Account ACC-1001",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Account ACC-1001",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h1:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Miguel Alvarez",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Miguel Alvarez",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#customerNameValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "12 Birchwood Ln",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "12 Birchwood Ln",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#serviceAddressValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "$85.40",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "$85.40",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#balanceDueValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "4521",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "4521",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#meterReadingValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "ACTIVE",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "ACTIVE",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#statusValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-28T04-18-26-408Z/screenshots/006-observe.png"
+      },
+      "rationale": "Extract customer name",
+      "toolName": "extract",
+      "toolInput": {
+        "reasoning": "Extract customer name",
+        "name": "Miguel Alvarez",
+        "as": "customerName",
+        "role": "text"
+      },
+      "action": {
+        "type": "extract",
+        "target": [
+          {
+            "strategy": "text",
+            "name": "Miguel Alvarez",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "#customerNameValue",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ]
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "text",
+        "extractedValue": "Miguel Alvarez",
+        "url": "http://localhost:4300/accounts/ACC-1001"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 7,
+      "observation": {
+        "url": "http://localhost:4300/accounts/ACC-1001",
+        "title": "GridPoint — Account ACC-1001",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Out",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Back to Search",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Back to Search",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Back to Search",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(2)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Submit Meter Reading",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Submit Meter Reading",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Submit Meter Reading",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Account ACC-1001",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Account ACC-1001",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h1:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Miguel Alvarez",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Miguel Alvarez",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#customerNameValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "12 Birchwood Ln",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "12 Birchwood Ln",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#serviceAddressValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "$85.40",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "$85.40",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#balanceDueValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "4521",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "4521",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#meterReadingValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "ACTIVE",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "ACTIVE",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#statusValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-28T04-18-26-408Z/screenshots/007-observe.png"
+      },
+      "rationale": "Extract service address",
+      "toolName": "extract",
+      "toolInput": {
+        "name": "12 Birchwood Ln",
+        "role": "text",
+        "as": "serviceAddress",
+        "reasoning": "Extract service address"
+      },
+      "action": {
+        "type": "extract",
+        "target": [
+          {
+            "strategy": "text",
+            "name": "12 Birchwood Ln",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "#serviceAddressValue",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ]
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "text",
+        "extractedValue": "12 Birchwood Ln",
+        "url": "http://localhost:4300/accounts/ACC-1001"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 8,
+      "observation": {
+        "url": "http://localhost:4300/accounts/ACC-1001",
+        "title": "GridPoint — Account ACC-1001",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Out",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Back to Search",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Back to Search",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Back to Search",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(2)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Submit Meter Reading",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Submit Meter Reading",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Submit Meter Reading",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Account ACC-1001",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Account ACC-1001",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h1:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Miguel Alvarez",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Miguel Alvarez",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#customerNameValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "12 Birchwood Ln",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "12 Birchwood Ln",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#serviceAddressValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "$85.40",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "$85.40",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#balanceDueValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "4521",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "4521",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#meterReadingValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "ACTIVE",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "ACTIVE",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#statusValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-28T04-18-26-408Z/screenshots/008-observe.png"
+      },
+      "rationale": "Extract balance due",
+      "toolName": "extract",
+      "toolInput": {
+        "reasoning": "Extract balance due",
+        "name": "$85.40",
+        "as": "balanceDue",
+        "role": "text"
+      },
+      "action": {
+        "type": "extract",
+        "target": [
+          {
+            "strategy": "text",
+            "name": "$85.40",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "#balanceDueValue",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ]
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "text",
+        "extractedValue": "$85.40",
+        "url": "http://localhost:4300/accounts/ACC-1001"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 9,
+      "observation": {
+        "url": "http://localhost:4300/accounts/ACC-1001",
+        "title": "GridPoint — Account ACC-1001",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Out",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Back to Search",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Back to Search",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Back to Search",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(2)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Submit Meter Reading",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Submit Meter Reading",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Submit Meter Reading",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Account ACC-1001",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Account ACC-1001",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h1:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Miguel Alvarez",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Miguel Alvarez",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#customerNameValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "12 Birchwood Ln",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "12 Birchwood Ln",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#serviceAddressValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "$85.40",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "$85.40",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#balanceDueValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "4521",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "4521",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#meterReadingValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "ACTIVE",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "ACTIVE",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#statusValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-28T04-18-26-408Z/screenshots/009-observe.png"
+      },
+      "rationale": "Extract current meter reading",
+      "toolName": "extract",
+      "toolInput": {
+        "name": "4521",
+        "role": "text",
+        "as": "currentMeterReading",
+        "reasoning": "Extract current meter reading"
+      },
+      "action": {
+        "type": "extract",
+        "target": [
+          {
+            "strategy": "text",
+            "name": "4521",
+            "nth": 0,
+            "confidence": "medium",
+            "rationale": "Exact visible text match; stable as long as copy doesn't change."
+          },
+          {
+            "strategy": "css_structural",
+            "cssPath": "#meterReadingValue",
+            "nth": 0,
+            "confidence": "low",
+            "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+          }
+        ]
+      },
+      "actionResult": {
+        "ok": true,
+        "matchedStrategy": "text",
+        "extractedValue": "4521",
+        "url": "http://localhost:4300/accounts/ACC-1001"
+      },
+      "risk": "safe"
+    },
+    {
+      "stepIndex": 10,
+      "observation": {
+        "url": "http://localhost:4300/accounts/ACC-1001",
+        "title": "GridPoint — Account ACC-1001",
+        "elements": [
+          {
+            "role": "link",
+            "name": "Sign Out",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Sign Out",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Back to Search",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Back to Search",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Back to Search",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > p:nth-of-type(1) > a:nth-of-type(2)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "link",
+            "name": "Submit Meter Reading",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "role",
+                "role": "link",
+                "name": "Submit Meter Reading",
+                "nth": 0,
+                "confidence": "high",
+                "rationale": "Accessible role + name uniquely identifies this control, independent of markup/CSS."
+              },
+              {
+                "strategy": "text",
+                "name": "Submit Meter Reading",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > a:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ],
+            "sensitive": false
+          },
+          {
+            "role": "text",
+            "name": "Account ACC-1001",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Account ACC-1001",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "body > h1:nth-of-type(1)",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "Miguel Alvarez",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "Miguel Alvarez",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#customerNameValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "12 Birchwood Ln",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "12 Birchwood Ln",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#serviceAddressValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "$85.40",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "$85.40",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#balanceDueValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "4521",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "4521",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#meterReadingValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          },
+          {
+            "role": "text",
+            "name": "ACTIVE",
+            "nth": 0,
+            "locatorCandidates": [
+              {
+                "strategy": "text",
+                "name": "ACTIVE",
+                "nth": 0,
+                "confidence": "medium",
+                "rationale": "Exact visible text match; stable as long as copy doesn't change."
+              },
+              {
+                "strategy": "css_structural",
+                "cssPath": "#statusValue",
+                "nth": 0,
+                "confidence": "low",
+                "rationale": "Structural DOM position fallback; brittle to markup reordering, used only if the above fail."
+              }
+            ]
+          }
+        ],
+        "screenshotPath": "/Users/devpatel/Desktop/interface.ai/evidence/runs/discovery-2026-08-28T04-18-26-408Z/screenshots/010-observe.png"
+      },
+      "rationale": "Successfully signed in as agent1, looked up account ACC-1001, and found customer name: Miguel Alvarez, service address: 12 Birchwood Ln, balance due: $85.40, current meter reading: 4521.",
+      "toolName": "finish",
+      "toolInput": {
+        "summary": "Successfully signed in as agent1, looked up account ACC-1001, and found customer name: Miguel Alvarez, service address: 12 Birchwood Ln, balance due: $85.40, current meter reading: 4521.",
+        "success": true
+      }
+    }
+  ],
+  "outputs": {
+    "customerName": "Miguel Alvarez",
+    "serviceAddress": "12 Birchwood Ln",
+    "balanceDue": "$85.40",
+    "currentMeterReading": "4521"
+  },
+  "finalSummary": "Successfully signed in as agent1, looked up account ACC-1001, and found customer name: Miguel Alvarez, service address: 12 Birchwood Ln, balance due: $85.40, current meter reading: 4521."
+}

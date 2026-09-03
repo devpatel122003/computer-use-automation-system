@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-27T19-50-52-965Z",
+  "outcome": "no_sub_account_to_close",
+  "description": "This member has no sub-account to close. A legitimate result, not a crash.",
+  "stepId": "step-7",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T19-50-52-965Z/screenshots/001-outcome-no_sub_account_to_close.png"
+}

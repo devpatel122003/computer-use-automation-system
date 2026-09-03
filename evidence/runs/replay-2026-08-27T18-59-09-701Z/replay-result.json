@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-27T18-59-09-701Z",
+  "outcome": "permission_denied",
+  "description": "The signed-on operator is not permitted to view this member's balances.",
+  "stepId": "step-7",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T18-59-09-701Z/screenshots/001-outcome-permission_denied.png"
+}

@@ -1,0 +1,8 @@
+{
+  "status": "failure",
+  "runId": "replay-2026-08-27T19-50-03-824Z",
+  "stepId": "step-8",
+  "expected": "confirmation to proceed with risky step",
+  "observed": "no confirmation given (pass --allow-risky or confirm interactively)",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T19-50-03-824Z/screenshots/001-risky-unconfirmed-step-8.png"
+}

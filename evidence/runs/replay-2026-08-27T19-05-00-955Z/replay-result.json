@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-27T19-05-00-955Z",
+  "outcome": "member_not_found",
+  "description": "No member exists with the given member number. A legitimate result, not a crash.",
+  "stepId": "step-10",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T19-05-00-955Z/screenshots/001-outcome-member_not_found.png"
+}

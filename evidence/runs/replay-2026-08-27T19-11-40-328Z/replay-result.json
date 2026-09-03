@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-27T19-11-40-328Z",
+  "outcome": "invalid_email_format",
+  "description": "The submitted e-mail address failed MERIDIAN's own format validation -- a legitimate business outcome, not a system error.",
+  "stepId": "success_checkpoint",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T19-11-40-328Z/screenshots/001-outcome-invalid_email_format.png"
+}

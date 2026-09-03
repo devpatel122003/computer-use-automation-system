@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-28T03-22-18-891Z",
+  "outcome": "invalid_transfer",
+  "description": "The requested transfer amount wasn't a valid positive number, or the source and destination accounts were the same.",
+  "stepId": "step-11",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-28T03-22-18-891Z/screenshots/001-outcome-invalid_transfer.png"
+}

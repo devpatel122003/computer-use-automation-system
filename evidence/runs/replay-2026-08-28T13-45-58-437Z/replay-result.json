@@ -1,0 +1,10 @@
+{
+  "status": "success",
+  "runId": "replay-2026-08-28T13-45-58-437Z",
+  "outputs": {
+    "checkingBalance": "$1500.00",
+    "savingsBalance": "$2200.00",
+    "memberName": "Tempo Member",
+    "subAccounts": "No sub-accounts on file."
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "status": "business_outcome",
+  "runId": "replay-2026-08-28T03-20-04-174Z",
+  "outcome": "source_share_on_hold",
+  "description": "The source share is on HOLD and cannot be debited -- a legitimate business outcome, not a system error.",
+  "stepId": "step-16",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-28T03-20-04-174Z/screenshots/001-outcome-source_share_on_hold.png"
+}

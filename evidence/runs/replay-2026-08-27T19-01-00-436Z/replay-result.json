@@ -1,0 +1,8 @@
+{
+  "status": "failure",
+  "runId": "replay-2026-08-27T19-01-00-436Z",
+  "stepId": "step-10",
+  "expected": "Reached the sub-account confirmation page.",
+  "observed": "url=http://localhost:4000/members/77777/sub-accounts",
+  "evidenceRef": "/Users/devpatel/Desktop/interface.ai/evidence/runs/replay-2026-08-27T19-01-00-436Z/screenshots/001-checkpoint-failed-step-10.png"
+}

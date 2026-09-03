@@ -101,4 +101,7 @@ If you're new here, read in this order:
 - [`../SECURITY.md`](../SECURITY.md) — the source-of-truth threat model
   ([`19-security-and-authentication.md`](19-security-and-authentication.md) is its
   long-form, plain-language companion)
-- [`../RUNBOOK.md`](../RUNBOOK.md) — the live-demo rehearsal script
+- [`../RUNBOOK.md`](../RUNBOOK.md) — the live-demo rehearsal script (click-by-click, with timing
+  and fallbacks)
+- [`../PRESENTATION.md`](../PRESENTATION.md) — the narrative to talk from in a one-on-one:
+  the pitch, the decisions worth defending, what's real vs. mocked, and anticipated Q&A
